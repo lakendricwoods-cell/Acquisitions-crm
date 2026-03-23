@@ -305,7 +305,7 @@ export default function WorkspaceCanvas({
         subtitle="Mental deal board for imported signals, underwriting, and notes."
         actions={
           <div style={toolbarStyle}>
-            <ActionButton variant="gold" onClick={() => createBlock('note')}>
+            <ActionButton tone="gold" onClick={() => createBlock('note')}>
               Add Note
             </ActionButton>
             <ActionButton onClick={() => createBlock('signals')}>
@@ -497,7 +497,7 @@ function CanvasBlockCard({
 
       <div style={blockFooterStyle}>
         <ActionButton onClick={() => onDelete(block.id)}>Delete</ActionButton>
-        <ActionButton variant="gold" onClick={handleSave}>
+        <ActionButton tone="gold" onClick={handleSave}>
           {saving ? 'Saving...' : 'Save Block'}
         </ActionButton>
       </div>

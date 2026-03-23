@@ -175,7 +175,7 @@ export default function SettingsPage() {
               </Field>
 
               <div>
-                <ActionButton variant="gold" onClick={saveProfile}>
+                <ActionButton tone="gold" onClick={saveProfile}>
                   {loadingProfile ? 'Saving...' : 'Save Profile'}
                 </ActionButton>
               </div>
@@ -214,7 +214,7 @@ export default function SettingsPage() {
               </Field>
 
               <div>
-                <ActionButton variant="gold" onClick={savePreferences}>
+                <ActionButton tone="gold" onClick={savePreferences}>
                   {loadingPrefs ? 'Saving...' : 'Save Preferences'}
                 </ActionButton>
               </div>

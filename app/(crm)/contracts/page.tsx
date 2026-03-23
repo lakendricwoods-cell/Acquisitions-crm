@@ -73,7 +73,7 @@ export default function ContractsPage() {
       <SectionCard
         title="Contract Library"
         subtitle="Download, customize, and keep your deal documents organized in one place."
-        actions={<ActionButton variant="gold">Generate Custom Contract with AI</ActionButton>}
+        actions={<ActionButton tone="gold">Generate Custom Contract with AI</ActionButton>}
       >
         <div style={contractGridStyle}>
           {CONTRACTS.map((contract) => (
@@ -86,7 +86,7 @@ export default function ContractsPage() {
               </div>
 
               <div style={contractActionRowStyle}>
-                <ActionButton variant="gold">Download</ActionButton>
+                <ActionButton tone="gold">Download</ActionButton>
                 <ActionButton compact>Preview</ActionButton>
               </div>
             </div>
@@ -97,7 +97,7 @@ export default function ContractsPage() {
       <SectionCard
         title="Download All Contracts"
         subtitle="Grab the full bundle in one click for faster deal setup."
-        actions={<ActionButton variant="gold">Download Bundle</ActionButton>}
+        actions={<ActionButton tone="gold">Download Bundle</ActionButton>}
       >
         <div className="crm-muted">
           Use this as your fast-start legal pack for seller contracts, assignments, and buyer-side closing docs.

@@ -365,7 +365,7 @@ export default function LeadsPage() {
                 onChange={(e) => setAskingPrice(e.target.value)}
                 style={inputStyle}
               />
-              <ActionButton variant="gold" onClick={handleQuickAdd}>
+              <ActionButton tone="gold" onClick={handleQuickAdd}>
                 {saving ? 'Saving...' : 'Add Lead'}
               </ActionButton>
             </div>
@@ -511,7 +511,7 @@ export default function LeadsPage() {
 
                       <td style={tdStyle}>
                         <Link href={`/leads/${lead.id}`}>
-                          <ActionButton variant="gold">Open Workspace</ActionButton>
+                          <ActionButton tone="gold">Open Workspace</ActionButton>
                         </Link>
                       </td>
                     </tr>
@@ -598,7 +598,7 @@ function ScoreDrawer({
         <FieldsSection fields={detail.fields} />
 
         <div style={drawerActionsStyle}>
-          <ActionButton variant="gold" onClick={onSendToCanvas}>
+          <ActionButton tone="gold" onClick={onSendToCanvas}>
             Send to Workspace Canvas
           </ActionButton>
 

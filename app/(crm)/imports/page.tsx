@@ -297,7 +297,7 @@ export default function ImportsPage() {
                 </ActionButton>
 
                 <ActionButton
-                  variant="gold"
+                  tone="gold"
                   onClick={handleImport}
                   disabled={!rows.length || loading}
                 >

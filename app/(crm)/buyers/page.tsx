@@ -177,7 +177,7 @@ export default function BuyersPage() {
             </div>
 
             <div style={{ marginTop: 16 }}>
-              <ActionButton variant="gold" onClick={handleCreateBuyer}>
+              <ActionButton tone="gold" onClick={handleCreateBuyer}>
                 {saving ? 'Saving...' : 'Add Buyer'}
               </ActionButton>
             </div>

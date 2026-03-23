@@ -157,7 +157,7 @@ export default function CrmQuickActions() {
   return (
     <>
       <div style={barStyle}>
-        <ActionButton onClick={() => setOpen("lead")} variant="gold">
+        <ActionButton onClick={() => setOpen("lead")} tone="gold">
           + Lead
         </ActionButton>
         <ActionButton onClick={() => setOpen("task")}>+ Task</ActionButton>
@@ -193,7 +193,7 @@ export default function CrmQuickActions() {
                 </div>
                 <div style={actionsStyle}>
                   <ActionButton onClick={closeModal}>Cancel</ActionButton>
-                  <ActionButton onClick={handleCreateLead} variant="gold">
+                  <ActionButton onClick={handleCreateLead} tone="gold">
                     {saving ? "Creating..." : "Create Lead"}
                   </ActionButton>
                 </div>
@@ -222,7 +222,7 @@ export default function CrmQuickActions() {
                 </div>
                 <div style={actionsStyle}>
                   <ActionButton onClick={closeModal}>Cancel</ActionButton>
-                  <ActionButton onClick={handleCreateTask} variant="gold">
+                  <ActionButton onClick={handleCreateTask} tone="gold">
                     {saving ? "Creating..." : "Create Task"}
                   </ActionButton>
                 </div>
@@ -254,7 +254,7 @@ export default function CrmQuickActions() {
                 </div>
                 <div style={actionsStyle}>
                   <ActionButton onClick={closeModal}>Cancel</ActionButton>
-                  <ActionButton onClick={handleCreateBuyer} variant="gold">
+                  <ActionButton onClick={handleCreateBuyer} tone="gold">
                     {saving ? "Creating..." : "Create Buyer"}
                   </ActionButton>
                 </div>

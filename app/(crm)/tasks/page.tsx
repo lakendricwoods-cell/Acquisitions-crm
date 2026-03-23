@@ -402,7 +402,7 @@ export default function TasksPage() {
                         <div style={taskFooterStyle}>
                           {task.lead_id ? (
                             <Link href={`/leads/${task.lead_id}`}>
-                              <ActionButton variant="gold">Open Lead</ActionButton>
+                              <ActionButton tone="gold">Open Lead</ActionButton>
                             </Link>
                           ) : (
                             <ActionButton>Unlinked</ActionButton>

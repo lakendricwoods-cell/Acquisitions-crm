@@ -141,7 +141,7 @@ export default function CrmShell({ children }: CrmShellProps) {
               <span style={{ fontSize: 12, color: "var(--text-faint)" }}>N</span>
             </div>
 
-            <ActionButton variant="ghost" onClick={handleSignOut}>
+            <ActionButton tone="ghost" onClick={handleSignOut}>
               Sign Out
             </ActionButton>
           </div>
@@ -156,7 +156,7 @@ export default function CrmShell({ children }: CrmShellProps) {
 
           <div className="crm-topbar-right">
             <Link href="/leads/new">
-              <ActionButton variant="gold">+ Lead</ActionButton>
+              <ActionButton tone="gold">+ Lead</ActionButton>
             </Link>
             <Link href="/tasks">
               <ActionButton>+ Task</ActionButton>

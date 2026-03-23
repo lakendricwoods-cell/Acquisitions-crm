@@ -281,7 +281,7 @@ export default function PipelinePage() {
                       <div style={leadOwnerStyle}>{lead.owner_name || 'No owner name'}</div>
 
                       <div style={leadFooterStyle}>
-                        <ActionButton variant="gold">
+                        <ActionButton tone="gold">
                           Open Workspace
                         </ActionButton>
                       </div>
