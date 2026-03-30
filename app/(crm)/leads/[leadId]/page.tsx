@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useParams } from 'next/navigation'
+import ActionButton from '@/components/ui/action-button'
 import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
 import StatPill from '@/components/ui/stat-pill'
-import ActionButton from '@/components/ui/action-button'
 import WorkspaceCanvas from '@/components/workspace-canvas'
 import { supabase } from '@/lib/supabase'
 import { computeLeadScores } from '@/lib/intelligence/lead-score-v2'
+import { resolveField, resolveNumericField } from '@/lib/resolve-field'
+import { FIELD_ALIASES } from '@/lib/field-aliases'
+import { computeOwnershipYears } from '@/lib/compute-fields'
 
 type LeadRecord = {
   id: string
@@ -46,6 +49,7 @@ type LeadRecord = {
   ownership_length?: number | null
   owner_occupied?: boolean | null
   vacant?: boolean | null
+  lead_intelligence?: Record<string, unknown> | null
   raw_import_data?: Record<string, unknown> | null
   source_columns?: Record<string, unknown> | null
 }
@@ -64,6 +68,56 @@ function yn(value: boolean | null | undefined, positive = 'Yes', negative = 'No'
   return value ? positive : negative
 }
 
+function toNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+
+  const parsed = Number(String(value).replace(/[$,%\s,]/g, ''))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function toText(value: unknown) {
+  if (value === null || value === undefined) return null
+  const text = String(value).trim()
+  return text.length ? text : null
+}
+
+function toBoolean(value: unknown) {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'boolean') return value
+
+  const text = String(value).trim().toLowerCase()
+
+  if (
+    ['1', 'true', 'yes', 'y', 'occupied', 'owner occupied', 'homestead', 'primary'].includes(text)
+  ) {
+    return true
+  }
+
+  if (
+    ['0', 'false', 'no', 'n', 'vacant', 'non owner occupied', 'not owner occupied'].includes(text)
+  ) {
+    return false
+  }
+
+  return null
+}
+
+function debugBedroomSource(lead: LeadRecord) {
+  const checks = [
+    ['lead.bedrooms', lead.bedrooms],
+    ['lead.lead_intelligence.bedrooms', (lead.lead_intelligence as any)?.bedrooms],
+    ['lead.raw_import_data.bedrooms', (lead.raw_import_data as any)?.bedrooms],
+    ['lead.raw_import_data.beds', (lead.raw_import_data as any)?.beds],
+    ['lead.raw_import_data.bedroom_count', (lead.raw_import_data as any)?.bedroom_count],
+    ['lead.raw_import_data.nbr_beds', (lead.raw_import_data as any)?.nbr_beds],
+    ['lead.source_columns.bedrooms', (lead.source_columns as any)?.bedrooms],
+    ['lead.source_columns.beds', (lead.source_columns as any)?.beds],
+  ]
+
+  return checks.find(([, value]) => value !== undefined && value !== null && value !== '') || null
+}
+
 export default function LeadWorkspacePage() {
   const params = useParams()
   const leadId = String(params?.leadId || '')
@@ -76,11 +130,7 @@ export default function LeadWorkspacePage() {
 
       setLoading(true)
 
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', leadId)
-        .single()
+      const { data, error } = await supabase.from('leads').select('*').eq('id', leadId).single()
 
       if (error) {
         console.error(error)
@@ -96,10 +146,71 @@ export default function LeadWorkspacePage() {
     void loadLead()
   }, [leadId])
 
-  const scores = useMemo(() => {
+  const normalizedLead = useMemo(() => {
     if (!lead) return null
-    return computeLeadScores(lead as any)
+
+    const beds = resolveNumericField(lead as any, FIELD_ALIASES.beds, null, {
+      treatZeroAsMissing: true,
+      min: 1,
+    })
+
+    const baths = resolveNumericField(lead as any, FIELD_ALIASES.baths, null, {
+      treatZeroAsMissing: false,
+      min: 0,
+    })
+
+    const sqft = resolveNumericField(lead as any, FIELD_ALIASES.sqft, null, {
+      treatZeroAsMissing: true,
+      min: 1,
+    })
+
+    const ownerName =
+      toText(resolveField(lead as any, FIELD_ALIASES.ownerName)) ||
+      toText((lead.lead_intelligence as any)?.owner_name) ||
+      lead.owner_name
+
+    const ownerOccupied =
+      toBoolean(resolveField(lead as any, FIELD_ALIASES.ownerOccupied)) ??
+      toBoolean((lead.lead_intelligence as any)?.owner_occupied) ??
+      lead.owner_occupied
+
+    const lastSaleDate =
+      toText(resolveField(lead as any, FIELD_ALIASES.lastSaleDate)) ||
+      toText((lead.lead_intelligence as any)?.last_sale_date) ||
+      lead.last_sale_date
+
+    const estimatedValue =
+      toNumber(resolveField(lead as any, FIELD_ALIASES.estimatedValue)) ??
+      toNumber((lead.lead_intelligence as any)?.house_value) ??
+      toNumber((lead.lead_intelligence as any)?.estimated_value) ??
+      toNumber((lead.lead_intelligence as any)?.market_value) ??
+      lead.house_value ??
+      lead.estimated_value ??
+      lead.market_value
+
+    const ownershipYears = computeOwnershipYears({
+      ...lead,
+      last_sale_date: lastSaleDate,
+    })
+
+    return {
+      ...lead,
+      bedrooms: beds ?? null,
+      bathrooms: baths ?? null,
+      square_feet: sqft ?? null,
+      owner_name: ownerName ?? null,
+      owner_occupied: ownerOccupied,
+      last_sale_date: lastSaleDate ?? null,
+      ownership_length: ownershipYears ?? lead.ownership_length ?? null,
+      resolved_value: estimatedValue ?? null,
+      bed_debug_source: debugBedroomSource(lead),
+    }
   }, [lead])
+
+  const scores = useMemo(() => {
+    if (!normalizedLead) return null
+    return computeLeadScores(normalizedLead as any)
+  }, [normalizedLead])
 
   if (loading) {
     return (
@@ -111,7 +222,7 @@ export default function LeadWorkspacePage() {
     )
   }
 
-  if (!lead || !scores) {
+  if (!normalizedLead || !scores) {
     return (
       <PageShell title="Lead Workspace" subtitle="Lead could not be found.">
         <SectionCard title="Lead not found" subtitle="This record could not be loaded.">
@@ -123,9 +234,16 @@ export default function LeadWorkspacePage() {
     )
   }
 
-  const topValue = lead.house_value ?? lead.estimated_value ?? lead.market_value ?? null
+  const topValue =
+    normalizedLead.resolved_value ??
+    normalizedLead.house_value ??
+    normalizedLead.estimated_value ??
+    normalizedLead.market_value ??
+    null
+
   const addressLine =
-    [lead.city, lead.state, lead.zip].filter(Boolean).join(', ') || 'No city/state/zip'
+    [normalizedLead.city, normalizedLead.state, normalizedLead.zip].filter(Boolean).join(', ') ||
+    'No city/state/zip'
 
   return (
     <PageShell
@@ -143,45 +261,29 @@ export default function LeadWorkspacePage() {
       <div style={pageGridStyle}>
         <div style={leftRailStyle}>
           <SectionCard
-            title={lead.property_address_1 || 'Unknown property'}
+            title={normalizedLead.property_address_1 || 'Unknown property'}
             subtitle={addressLine}
-            actions={
-              <span className="crm-badge soft">
-                {lead.lead_type || 'standard'}
-              </span>
-            }
+            actions={<span className="crm-badge soft">{normalizedLead.lead_type || 'standard'}</span>}
           >
             <div style={heroSignalGridStyle}>
-              <HeroSignal
-                label="House Value"
-                value={money(topValue)}
-                tone="gold"
-              />
-              <HeroSignal
-                label="Equity"
-                value={money(lead.equity_amount)}
-                tone="green"
-              />
+              <HeroSignal label="House Value" value={money(topValue)} tone="gold" />
+              <HeroSignal label="Equity" value={money(normalizedLead.equity_amount)} tone="green" />
               <HeroSignal
                 label="Mortgage Balance"
-                value={money(lead.mortgage_balance)}
+                value={money(normalizedLead.mortgage_balance)}
                 tone="ice"
               />
               <HeroSignal
                 label="Last Money In"
-                value={money(lead.last_sale_amount)}
+                value={money(normalizedLead.last_sale_amount)}
                 tone="gold"
               />
               <HeroSignal
                 label="Last Sale Date"
-                value={lead.last_sale_date || '—'}
+                value={normalizedLead.last_sale_date || '—'}
                 tone="ice"
               />
-              <HeroSignal
-                label="Owner"
-                value={lead.owner_name || '—'}
-                tone="green"
-              />
+              <HeroSignal label="Owner" value={normalizedLead.owner_name || '—'} tone="green" />
             </div>
           </SectionCard>
 
@@ -190,57 +292,53 @@ export default function LeadWorkspacePage() {
             subtitle="Promoted from uploaded data and used for scoring."
           >
             <div style={propertyGridStyle}>
-              <InfoTile label="Lead Type" value={lead.lead_type || 'standard'} tone="gold" />
-              <InfoTile label="APN" value={lead.apn || '—'} tone="ice" />
-              <InfoTile label="County" value={lead.county || '—'} tone="green" />
+              <InfoTile label="Lead Type" value={normalizedLead.lead_type || 'standard'} tone="gold" />
+              <InfoTile label="APN" value={normalizedLead.apn || '—'} tone="ice" />
+              <InfoTile label="County" value={normalizedLead.county || '—'} tone="green" />
               <InfoTile
                 label="Beds / Baths"
-                value={`${lead.bedrooms ?? '—'} / ${lead.bathrooms ?? '—'}`}
+                value={`${normalizedLead.bedrooms ?? '—'} / ${normalizedLead.bathrooms ?? '—'}`}
                 tone="gold"
               />
               <InfoTile
                 label="Square Feet"
-                value={lead.square_feet ? String(lead.square_feet) : '—'}
+                value={normalizedLead.square_feet ? String(normalizedLead.square_feet) : '—'}
                 tone="ice"
               />
               <InfoTile
                 label="Year Built"
-                value={lead.year_built ? String(lead.year_built) : '—'}
+                value={normalizedLead.year_built ? String(normalizedLead.year_built) : '—'}
                 tone="green"
               />
               <InfoTile
                 label="Ownership Length"
-                value={lead.ownership_length ? `${lead.ownership_length} yrs` : '—'}
+                value={normalizedLead.ownership_length ? `${normalizedLead.ownership_length} yrs` : '—'}
                 tone="gold"
               />
               <InfoTile
                 label="Occupied / Vacant"
-                value={`${yn(lead.owner_occupied, 'Owner Occupied', 'Not Owner Occupied')}${lead.vacant === true ? ' · Vacant' : ''}`}
+                value={`${yn(normalizedLead.owner_occupied, 'Owner Occupied', 'Not Owner Occupied')}${normalizedLead.vacant === true ? ' · Vacant' : ''}`}
                 tone="ice"
               />
               <InfoTile
                 label="Default Amount"
-                value={money(lead.default_amount)}
+                value={money(normalizedLead.default_amount)}
                 tone="green"
               />
               <InfoTile
                 label="Auction Date"
-                value={lead.auction_date || '—'}
+                value={normalizedLead.auction_date || '—'}
                 tone="gold"
               />
-              <InfoTile
-                label="Lender"
-                value={lead.lender_name || '—'}
-                tone="ice"
-              />
+              <InfoTile label="Lender" value={normalizedLead.lender_name || '—'} tone="ice" />
               <InfoTile
                 label="Mailing Address"
                 value={
                   [
-                    lead.owner_mailing_address,
-                    lead.owner_mailing_city,
-                    lead.owner_mailing_state,
-                    lead.owner_mailing_zip,
+                    normalizedLead.owner_mailing_address,
+                    normalizedLead.owner_mailing_city,
+                    normalizedLead.owner_mailing_state,
+                    normalizedLead.owner_mailing_zip,
                   ]
                     .filter(Boolean)
                     .join(', ') || '—'
@@ -255,26 +353,10 @@ export default function LeadWorkspacePage() {
             subtitle="These are based on the imported fields now visible above."
           >
             <div style={scoreGridStyle}>
-              <ScoreCard
-                title="Overall Strength"
-                detail={scores.overall}
-                tone="gold"
-              />
-              <ScoreCard
-                title="Motivation"
-                detail={scores.motivation}
-                tone="green"
-              />
-              <ScoreCard
-                title="Contactability"
-                detail={scores.contactability}
-                tone="ice"
-              />
-              <ScoreCard
-                title="Marketability"
-                detail={scores.marketability}
-                tone="gold"
-              />
+              <ScoreCard title="Overall Strength" detail={scores.overall} tone="gold" />
+              <ScoreCard title="Motivation" detail={scores.motivation} tone="green" />
+              <ScoreCard title="Contactability" detail={scores.contactability} tone="ice" />
+              <ScoreCard title="Marketability" detail={scores.marketability} tone="gold" />
             </div>
           </SectionCard>
 
@@ -284,14 +366,26 @@ export default function LeadWorkspacePage() {
           >
             <div style={rawWrapStyle}>
               <pre style={rawPreStyle}>
-                {JSON.stringify(lead.raw_import_data || lead.source_columns || {}, null, 2)}
+                {JSON.stringify(
+                  {
+                    bed_debug_source: normalizedLead.bed_debug_source,
+                    lead_intelligence: normalizedLead.lead_intelligence || {},
+                    raw_import_data: normalizedLead.raw_import_data || {},
+                    source_columns: normalizedLead.source_columns || {},
+                  },
+                  null,
+                  2
+                )}
               </pre>
             </div>
           </SectionCard>
         </div>
 
         <div style={rightRailStyle}>
-          <WorkspaceCanvas leadId={lead.id} leadTitle={lead.property_address_1 || 'Lead'} />
+          <WorkspaceCanvas
+            leadId={normalizedLead.id}
+            leadTitle={normalizedLead.property_address_1 || 'Lead'}
+          />
         </div>
       </div>
     </PageShell>
@@ -333,15 +427,15 @@ function InfoTile({
 }) {
   const palette =
     tone === 'gold'
-      ? { border: 'rgba(214,166,75,0.18)', bg: 'rgba(214,166,75,0.07)' }
+      ? { border: 'rgba(214,166,75,0.18)', bg: 'rgba(214,166,75,0.06)', text: '#f6dd9f' }
       : tone === 'ice'
-        ? { border: 'rgba(147,197,253,0.18)', bg: 'rgba(147,197,253,0.07)' }
-        : { border: 'rgba(74,222,128,0.18)', bg: 'rgba(74,222,128,0.07)' }
+        ? { border: 'rgba(147,197,253,0.18)', bg: 'rgba(147,197,253,0.06)', text: '#dcebff' }
+        : { border: 'rgba(74,222,128,0.18)', bg: 'rgba(74,222,128,0.06)', text: '#dbffe6' }
 
   return (
-    <div style={{ ...tileStyle, borderColor: palette.border, background: palette.bg }}>
+    <div style={{ ...infoTileStyle, borderColor: palette.border, background: palette.bg }}>
       <div style={infoLabelStyle}>{label}</div>
-      <div style={tileValueStyle}>{value}</div>
+      <div style={{ ...infoValueStyle, color: palette.text }}>{value}</div>
     </div>
   )
 }
@@ -352,40 +446,40 @@ function ScoreCard({
   tone,
 }: {
   title: string
-  detail: { score: number; label: string; interpretation: string }
+  detail: { score: number; reason?: string | null }
   tone: 'gold' | 'ice' | 'green'
 }) {
   const palette =
     tone === 'gold'
-      ? { border: 'rgba(214,166,75,0.18)', bg: 'rgba(214,166,75,0.07)', text: '#f3d899' }
+      ? { border: 'rgba(214,166,75,0.18)', bg: 'rgba(214,166,75,0.06)', text: '#f3d899' }
       : tone === 'ice'
-        ? { border: 'rgba(147,197,253,0.18)', bg: 'rgba(147,197,253,0.07)', text: '#dcecff' }
-        : { border: 'rgba(74,222,128,0.18)', bg: 'rgba(74,222,128,0.07)', text: '#d8ffe6' }
+        ? { border: 'rgba(147,197,253,0.18)', bg: 'rgba(147,197,253,0.06)', text: '#dcecff' }
+        : { border: 'rgba(74,222,128,0.18)', bg: 'rgba(74,222,128,0.06)', text: '#d8ffe6' }
 
   return (
     <div style={{ ...scoreCardStyle, borderColor: palette.border, background: palette.bg }}>
       <div style={infoLabelStyle}>{title}</div>
       <div style={{ ...scoreValueStyle, color: palette.text }}>{detail.score}</div>
-      <div style={scoreLabelStyle}>{detail.label}</div>
-      <div style={scoreInterpretationStyle}>{detail.interpretation}</div>
+      <div style={scoreReasonStyle}>{detail.reason || 'No explanation provided.'}</div>
     </div>
   )
 }
 
 const pageGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.08fr) minmax(430px, 0.92fr)',
-  gap: 16,
+  gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
+  gap: 18,
+  alignItems: 'start',
 }
 
 const leftRailStyle: CSSProperties = {
   display: 'grid',
-  gap: 16,
+  gap: 18,
+  minWidth: 0,
 }
 
 const rightRailStyle: CSSProperties = {
-  display: 'grid',
-  gap: 16,
+  minWidth: 0,
 }
 
 const heroSignalGridStyle: CSSProperties = {
@@ -394,44 +488,10 @@ const heroSignalGridStyle: CSSProperties = {
   gap: 12,
 }
 
-const heroSignalStyle: CSSProperties = {
-  padding: 14,
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,0.06)',
-}
-
-const heroValueStyle: CSSProperties = {
-  marginTop: 8,
-  fontSize: 18,
-  fontWeight: 800,
-  color: 'var(--white-hi)',
-}
-
 const propertyGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 12,
-}
-
-const tileStyle: CSSProperties = {
-  padding: 12,
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.06)',
-}
-
-const infoLabelStyle: CSSProperties = {
-  fontSize: 10,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-  color: 'var(--white-faint)',
-  marginBottom: 8,
-}
-
-const tileValueStyle: CSSProperties = {
-  fontSize: 13,
-  lineHeight: 1.5,
-  fontWeight: 700,
-  color: 'var(--white-hi)',
 }
 
 const scoreGridStyle: CSSProperties = {
@@ -440,43 +500,75 @@ const scoreGridStyle: CSSProperties = {
   gap: 12,
 }
 
-const scoreCardStyle: CSSProperties = {
+const heroSignalStyle: CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid var(--border)',
   padding: 14,
+  display: 'grid',
+  gap: 6,
+}
+
+const infoTileStyle: CSSProperties = {
   borderRadius: 16,
-  border: '1px solid rgba(255,255,255,0.06)',
+  border: '1px solid var(--border)',
+  padding: 12,
+  display: 'grid',
+  gap: 6,
+}
+
+const scoreCardStyle: CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid var(--border)',
+  padding: 14,
+  display: 'grid',
+  gap: 8,
+}
+
+const infoLabelStyle: CSSProperties = {
+  fontSize: 11,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--text-faint)',
+}
+
+const heroValueStyle: CSSProperties = {
+  fontSize: 20,
+  fontWeight: 700,
+  lineHeight: 1.15,
+}
+
+const infoValueStyle: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 650,
+  lineHeight: 1.4,
 }
 
 const scoreValueStyle: CSSProperties = {
   fontSize: 28,
   fontWeight: 800,
+  lineHeight: 1,
 }
 
-const scoreLabelStyle: CSSProperties = {
-  marginTop: 4,
+const scoreReasonStyle: CSSProperties = {
   fontSize: 12,
-  fontWeight: 700,
-  color: 'var(--white-hi)',
-}
-
-const scoreInterpretationStyle: CSSProperties = {
-  marginTop: 8,
-  fontSize: 12,
-  lineHeight: 1.55,
-  color: 'var(--white-soft)',
+  lineHeight: 1.45,
+  color: 'var(--text-soft)',
 }
 
 const rawWrapStyle: CSSProperties = {
-  borderRadius: 16,
-  overflow: 'auto',
-  background: 'rgba(0,0,0,0.24)',
-  border: '1px solid rgba(255,255,255,0.06)',
   maxHeight: 420,
+  overflow: 'auto',
+  borderRadius: 16,
+  border: '1px solid var(--line)',
+  background: 'rgba(255,255,255,0.02)',
 }
 
 const rawPreStyle: CSSProperties = {
   margin: 0,
   padding: 14,
-  fontSize: 11,
-  lineHeight: 1.6,
-  color: 'rgba(255,255,255,0.82)',
+  fontSize: 12,
+  lineHeight: 1.5,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  color: 'var(--text-soft)',
 }
