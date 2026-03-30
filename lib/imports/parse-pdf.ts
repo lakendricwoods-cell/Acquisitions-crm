@@ -1,63 +1,136 @@
 import type { ParsedImportLeadRow } from './types'
 
-function toNumber(value?: string): number | null {
-  if (!value) return null
-  const cleaned = value.replace(/[$,\s]/g, '')
-  const parsed = Number(cleaned)
-  return Number.isFinite(parsed) ? parsed : null
+function normalizeText(text: string) {
+  return text.replace(/\s+/g, ' ').trim()
 }
 
-function matchFirst(text: string, patterns: RegExp[]): string | undefined {
+function findMoney(text: string, patterns: RegExp[]) {
   for (const pattern of patterns) {
     const match = text.match(pattern)
-    if (match?.[1]) return match[1].trim()
-    if (match?.[0]) return match[0].trim()
+    if (match?.[1]) {
+      const value = Number(match[1].replace(/[$,\s]/g, ''))
+      if (Number.isFinite(value)) return value
+    }
   }
-  return undefined
+  return null
 }
 
-function extractLeadFromText(text: string): ParsedImportLeadRow {
-  const normalized = text.replace(/\s+/g, ' ').trim()
+function findNumber(text: string, patterns: RegExp[]) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match?.[1]) {
+      const value = Number(match[1].replace(/[,\s]/g, ''))
+      if (Number.isFinite(value)) return value
+    }
+  }
+  return null
+}
 
-  const owner_email = matchFirst(normalized, [
-    /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i,
+function findText(text: string, patterns: RegExp[]) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match?.[1]) {
+      return normalizeText(match[1])
+    }
+  }
+  return null
+}
+
+function buildLeadFromPdfText(text: string): ParsedImportLeadRow {
+  const property_address_1 =
+    findText(text, [
+      /property address[:\s]+([^\n]+)/i,
+      /subject property[:\s]+([^\n]+)/i,
+      /address[:\s]+([^\n]+)/i,
+    ]) ?? null
+
+  const city =
+    findText(text, [
+      /city[:\s]+([^\n,]+)/i,
+    ]) ?? null
+
+  const state =
+    findText(text, [
+      /state[:\s]+([A-Z]{2})/i,
+    ]) ?? null
+
+  const zip =
+    findText(text, [
+      /zip[:\s]+(\d{5}(?:-\d{4})?)/i,
+      /postal code[:\s]+(\d{5}(?:-\d{4})?)/i,
+    ]) ?? null
+
+  const owner_name =
+    findText(text, [
+      /owner name[:\s]+([^\n]+)/i,
+      /borrower[:\s]+([^\n]+)/i,
+      /seller[:\s]+([^\n]+)/i,
+    ]) ?? null
+
+  const asking_price = findMoney(text, [
+    /asking price[:\s]+\$?([\d,]+)/i,
+    /list price[:\s]+\$?([\d,]+)/i,
+    /price[:\s]+\$?([\d,]+)/i,
   ])
 
-  const owner_phone_primary = matchFirst(normalized, [
-    /(\+?1?\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/,
+  const arv = findMoney(text, [
+    /arv[:\s]+\$?([\d,]+)/i,
+    /after repair value[:\s]+\$?([\d,]+)/i,
   ])
 
-  const property_address_1 = matchFirst(normalized, [
-    /(?:property address|subject property|address)[:\s]+([0-9]{1,6}\s+[^,]+(?:,\s*[^,]+){0,3})/i,
-    /\b([0-9]{1,6}\s+[A-Za-z0-9.\-'\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Court|Ct|Way|Terrace|Ter)\b[^,]*)/i,
+  const mao = findMoney(text, [
+    /mao[:\s]+\$?([\d,]+)/i,
+    /max allowable offer[:\s]+\$?([\d,]+)/i,
   ])
 
-  const owner_name = matchFirst(normalized, [
-    /(?:owner|seller|borrower)[:\s]+([A-Z][A-Za-z.\-'\s]{2,})/i,
+  const projected_spread = findMoney(text, [
+    /projected spread[:\s]+\$?([\d,]+)/i,
+    /spread[:\s]+\$?([\d,]+)/i,
   ])
 
-  const asking_price = matchFirst(normalized, [
-    /(?:asking price|asking|list price|price)[:\s]+\$?\s*([0-9,]{4,})/i,
+  const repair_estimate_total = findMoney(text, [
+    /repair estimate(?: total)?[:\s]+\$?([\d,]+)/i,
+    /estimated repairs?[:\s]+\$?([\d,]+)/i,
+    /rehab(?: cost)?[:\s]+\$?([\d,]+)/i,
   ])
 
-  const arv = matchFirst(normalized, [
-    /(?:arv|after repair value)[:\s]+\$?\s*([0-9,]{4,})/i,
+  const beds = findNumber(text, [
+    /beds?[:\s]+(\d+)/i,
+    /bedrooms?[:\s]+(\d+)/i,
   ])
 
-  const repair_estimate_total = matchFirst(normalized, [
-    /(?:repairs|repair estimate|estimated repairs|rehab)[:\s]+\$?\s*([0-9,]{3,})/i,
+  const baths = findNumber(text, [
+    /baths?[:\s]+(\d+(?:\.\d+)?)/i,
+    /bathrooms?[:\s]+(\d+(?:\.\d+)?)/i,
+  ])
+
+  const sqft = findNumber(text, [
+    /sq\.?\s?ft\.?[:\s]+([\d,]+)/i,
+    /square feet[:\s]+([\d,]+)/i,
+    /living area[:\s]+([\d,]+)/i,
+  ])
+
+  const year_built = findNumber(text, [
+    /year built[:\s]+(\d{4})/i,
   ])
 
   return {
-    property_address_1: property_address_1 || null,
-    owner_name: owner_name || null,
-    owner_phone_primary: owner_phone_primary || null,
-    owner_email: owner_email || null,
-    asking_price: toNumber(asking_price),
-    arv: toNumber(arv),
-    repair_estimate_total: toNumber(repair_estimate_total),
+    property_address_1,
+    city,
+    state,
+    zip,
+    owner_name,
     lead_source: 'pdf_import',
-    notes_summary: normalized.slice(0, 500) || null,
+    notes_summary: text.slice(0, 500),
+    asking_price,
+    arv,
+    mao,
+    projected_spread,
+    repair_estimate_total,
+    beds,
+    baths,
+    sqft,
+    year_built,
   }
 }
 
@@ -67,12 +140,7 @@ export async function parsePdfFile(file: File): Promise<ParsedImportLeadRow[]> {
   const arrayBuffer = await file.arrayBuffer()
   const uint8 = new Uint8Array(arrayBuffer)
 
-  const loadingTask = pdfjs.getDocument({
-    data: uint8,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-  })
-
+  const loadingTask = pdfjs.getDocument({ data: uint8 })
   const pdf = await loadingTask.promise
 
   let fullText = ''
@@ -81,28 +149,13 @@ export async function parsePdfFile(file: File): Promise<ParsedImportLeadRow[]> {
     const page = await pdf.getPage(pageNumber)
     const content = await page.getTextContent()
 
-   const pageText = content.items
-  .map((item) => {
-    if (typeof item === 'object' && item !== null && 'str' in item) {
-      return typeof item.str === 'string' ? item.str : ''
-    }
+    const pageText = content.items
+      .map((item: any) => ('str' in item ? item.str : ''))
+      .join(' ')
 
-    return ''
-  })
-  .join(' ')
-    fullText += ` ${pageText}`
+    fullText += `\n${pageText}`
   }
 
-  const extracted = extractLeadFromText(fullText)
-
-  const hasSignal = Boolean(
-    extracted.property_address_1 ||
-      extracted.owner_name ||
-      extracted.owner_phone_primary ||
-      extracted.owner_email ||
-      extracted.asking_price ||
-      extracted.arv,
-  )
-
-  return hasSignal ? [extracted] : []
+  const cleaned = normalizeText(fullText)
+  return [buildLeadFromPdfText(cleaned)]
 }
