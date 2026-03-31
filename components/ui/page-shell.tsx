@@ -1,40 +1,12 @@
 'use client'
 
-import type { ReactNode, CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
-type Props = {
+type PageShellProps = {
   title: string
   subtitle?: string
   actions?: ReactNode
   children: ReactNode
-}
-
-const containerStyle: CSSProperties = {
-  width: '100%',
-  minHeight: '100vh',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 20,
-  padding: '24px 28px',
-  background: 'transparent',
-}
-
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: 16,
-}
-
-const titleStyle: CSSProperties = {
-  fontSize: 20,
-  fontWeight: 600,
-  color: '#ffffff',
-}
-
-const subtitleStyle: CSSProperties = {
-  fontSize: 13,
-  color: 'rgba(255,255,255,0.6)',
 }
 
 export default function PageShell({
@@ -42,19 +14,74 @@ export default function PageShell({
   subtitle,
   actions,
   children,
-}: Props) {
+}: PageShellProps) {
   return (
-    <div style={containerStyle}>
+    <div style={outerStyle}>
       <div style={headerStyle}>
-        <div>
-          <div style={titleStyle}>{title}</div>
-          {subtitle && <div style={subtitleStyle}>{subtitle}</div>}
+        <div style={titleWrapStyle}>
+          <h1 style={titleStyle}>{title}</h1>
+          {subtitle ? <p style={subtitleStyle}>{subtitle}</p> : null}
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>{actions}</div>
+        {actions ? <div style={actionsStyle}>{actions}</div> : null}
       </div>
 
-      <div style={{ width: '100%' }}>{children}</div>
+      <div style={contentStyle}>{children}</div>
     </div>
   )
+}
+
+const outerStyle: CSSProperties = {
+  width: '100%',
+  minWidth: 0,
+  maxWidth: 1680,
+  margin: '0 auto',
+  padding: '22px 22px 28px',
+  boxSizing: 'border-box',
+  display: 'grid',
+  gap: 18,
+  background: 'transparent',
+}
+
+const headerStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 16,
+  flexWrap: 'wrap',
+}
+
+const titleWrapStyle: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  minWidth: 0,
+}
+
+const titleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 28,
+  fontWeight: 800,
+  lineHeight: 1.08,
+  color: '#ffffff',
+}
+
+const subtitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 13,
+  lineHeight: 1.5,
+  color: 'rgba(255,255,255,0.58)',
+}
+
+const actionsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  flexWrap: 'wrap',
+}
+
+const contentStyle: CSSProperties = {
+  width: '100%',
+  minWidth: 0,
+  display: 'grid',
+  gap: 18,
 }

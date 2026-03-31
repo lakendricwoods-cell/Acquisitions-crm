@@ -1,15 +1,10 @@
-import '@/app/globals.css'
+import type { ReactNode } from 'react'
+import CrmShell from '@/components/ui/crm-shell'
 
 export default function CRMLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
-  return (
-    <div className="crm-root">
-      <div className="crm-shell">
-        {children}
-      </div>
-    </div>
-  )
+  return <CrmShell>{children}</CrmShell>
 }
