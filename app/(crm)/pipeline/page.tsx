@@ -308,7 +308,7 @@ const emptyStyle: CSSProperties = {
 const leadCardStyle: CSSProperties = {
   borderRadius: 18,
   border: '1px solid var(--border)',
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
+  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.96), rgba(0, 0, 0, 0.99))',
   padding: 13,
   display: 'grid',
   gap: 10,
@@ -341,7 +341,7 @@ const leadMetaGridStyle: CSSProperties = {
 const metaStyle: CSSProperties = {
   borderRadius: 12,
   border: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(6,8,14,0.92), rgba(2,4,10,0.98))',
+  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.98))',
   padding: '8px 9px',
 }
 

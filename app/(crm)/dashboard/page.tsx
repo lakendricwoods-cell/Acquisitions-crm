@@ -606,7 +606,7 @@ export default function DashboardPage() {
                 style={{
                   ...typeCardStyle,
                   borderColor: `${item.color}55`,
-                  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+                  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
                   boxShadow: `inset 0 0 14px ${item.glow}`,
                 }}
               >
@@ -626,7 +626,7 @@ export default function DashboardPage() {
                 key={item.key}
                 style={{
                   ...stageHealthRowStyle,
-                  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+                  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
                   boxShadow: `inset 0 0 10px ${item.glow}`,
                   borderColor: `${item.color}26`,
                 }}
@@ -740,22 +740,22 @@ function HeroMetric({
   const tones: Record<string, CSSProperties> = {
     cyan: {
       borderColor: 'rgba(56,189,248,0.28)',
-      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
       boxShadow: 'inset 0 0 16px rgba(56,189,248,0.10), 0 0 18px rgba(56,189,248,0.08)',
     },
     teal: {
       borderColor: 'rgba(34,211,238,0.28)',
-      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
       boxShadow: 'inset 0 0 16px rgba(34,211,238,0.10), 0 0 18px rgba(34,211,238,0.08)',
     },
     amber: {
       borderColor: 'rgba(245,158,11,0.28)',
-      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
       boxShadow: 'inset 0 0 16px rgba(245,158,11,0.10), 0 0 18px rgba(245,158,11,0.08)',
     },
     violet: {
       borderColor: 'rgba(139,92,246,0.28)',
-      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
       boxShadow: 'inset 0 0 16px rgba(139,92,246,0.10), 0 0 18px rgba(139,92,246,0.08)',
     },
   }
@@ -866,7 +866,7 @@ const chartValueStyle: CSSProperties = {
 const chartTrackStyle: CSSProperties = {
   height: 220,
   borderRadius: 14,
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
   border: '1px solid rgba(255,255,255,0.05)',
   display: 'flex',
   alignItems: 'flex-end',
@@ -996,7 +996,7 @@ const leadListStyle: CSSProperties = {
 const leadCardStyle: CSSProperties = {
   borderRadius: 18,
   border: '1px solid rgba(255,255,255,0.05)',
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
   padding: 14,
   display: 'grid',
   gap: 10,
@@ -1046,7 +1046,7 @@ const actionListStyle: CSSProperties = {
 const actionItemStyle: CSSProperties = {
   borderRadius: 14,
   border: '1px solid rgba(255,255,255,0.05)',
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0,0,0,1))',
   padding: 12,
   fontSize: 13,
   color: 'var(--white-soft)',

@@ -292,7 +292,7 @@ textarea::placeholder {
 
 .crm-topbar-left {
   display: flex;
-  alignItems: center;
+  align-Items: center;
   gap: 14px;
   min-width: 0;
 }
@@ -380,7 +380,7 @@ textarea::placeholder {
   overflow: hidden;
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.055) !important;
-  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0, 0, 0, 1)) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.02),
     0 18px 44px rgba(0, 0, 0, 0.76),
@@ -466,7 +466,7 @@ textarea::placeholder {
   font-weight: 670;
   letter-spacing: -0.01em;
   color: var(--white-hi);
-  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0, 0, 0, 1)) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.02),
     0 8px 18px rgba(0,0,0,0.34) !important;
@@ -518,7 +518,7 @@ textarea::placeholder {
   min-height: 30px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.055) !important;
-  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0, 0, 0, 1)) !important;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -595,7 +595,7 @@ textarea::placeholder {
   color: var(--white-hi);
   border: 1px solid rgba(255,255,255,0.07) !important;
   border-radius: 13px;
-  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0, 0, 0, 1)) !important;
   outline: none;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.018),
@@ -725,9 +725,9 @@ textarea::placeholder {
   max-width: 620px;
   border-radius: 28px;
   border: 1px solid var(--glass-border);
-  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(0, 0, 0, 1));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    inset 0 1px 0 rgba(20, 20, 20, 0.02),
     0 28px 80px rgba(0, 0, 0, 0.78);
   padding: 18px;
 }
