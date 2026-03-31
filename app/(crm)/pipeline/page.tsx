@@ -23,21 +23,21 @@ type LeadRecord = {
 }
 
 const PIPELINE_STAGES = [
-  { key: 'lead_inbox', label: 'Lead Inbox', color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
-  { key: 'new_lead', label: 'New Lead', color: '#d6a64b', bg: 'rgba(214,166,75,0.08)' },
-  { key: 'skip_trace', label: 'Skip Trace', color: '#0ea5e9', bg: 'rgba(14,165,233,0.08)' },
-  { key: 'contact_attempted', label: 'Contact Attempted', color: '#f97316', bg: 'rgba(249,115,22,0.08)' },
-  { key: 'contacted', label: 'Contacted', color: '#22c55e', bg: 'rgba(34,197,94,0.08)' },
-  { key: 'follow_up', label: 'Follow Up', color: '#a855f7', bg: 'rgba(168,85,247,0.08)' },
+  { key: 'lead_inbox', label: 'Lead Inbox', color: '#7dd3fc', bg: 'rgba(125,211,252,0.08)' },
+  { key: 'new_lead', label: 'New Lead', color: '#22d3ee', bg: 'rgba(34,211,238,0.08)' },
+  { key: 'skip_trace', label: 'Skip Trace', color: '#38bdf8', bg: 'rgba(56,189,248,0.08)' },
+  { key: 'contact_attempted', label: 'Contact Attempted', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+  { key: 'contacted', label: 'Contacted', color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)' },
+  { key: 'follow_up', label: 'Follow Up', color: '#818cf8', bg: 'rgba(129,140,248,0.08)' },
   { key: 'appointment_set', label: 'Appointment Set', color: '#06b6d4', bg: 'rgba(6,182,212,0.08)' },
-  { key: 'offer_sent', label: 'Offer Sent', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  { key: 'negotiation', label: 'Negotiation', color: '#ec4899', bg: 'rgba(236,72,153,0.08)' },
-  { key: 'verbal_yes', label: 'Verbal Yes', color: '#84cc16', bg: 'rgba(132,204,22,0.08)' },
+  { key: 'offer_sent', label: 'Offer Sent', color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
+  { key: 'negotiation', label: 'Negotiation', color: '#c084fc', bg: 'rgba(192,132,252,0.08)' },
+  { key: 'verbal_yes', label: 'Verbal Yes', color: '#a3e635', bg: 'rgba(163,230,53,0.08)' },
   { key: 'under_contract', label: 'Under Contract', color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
-  { key: 'title_opened', label: 'Title Opened', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
+  { key: 'title_opened', label: 'Title Opened', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' },
   { key: 'buyer_marketing', label: 'Buyer Marketing', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
   { key: 'assigned', label: 'Assigned', color: '#14b8a6', bg: 'rgba(20,184,166,0.08)' },
-  { key: 'double_close', label: 'Double Close', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+  { key: 'double_close', label: 'Double Close', color: '#fb7185', bg: 'rgba(251,113,133,0.08)' },
   { key: 'closed', label: 'Closed', color: '#22c55e', bg: 'rgba(34,197,94,0.10)' },
   { key: 'dead', label: 'Dead', color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
 ] as const
@@ -131,7 +131,7 @@ export default function PipelinePage() {
   return (
     <PageShell
       title="Pipeline"
-      subtitle="Full multi-stage deal flow with every stage color-coded."
+      subtitle="Full multi-stage deal flow with neon stage color-coding."
       actions={
         <>
           <StatPill label="Leads" value={leads.length} />
@@ -152,7 +152,7 @@ export default function PipelinePage() {
                 ...columnStyle,
                 borderColor: `${stage.color}44`,
                 background: stage.bg,
-                boxShadow: `0 0 0 1px ${stage.color}22 inset, 0 24px 48px rgba(0,0,0,0.24)`,
+                boxShadow: `0 0 0 1px ${stage.color}22 inset, 0 0 22px ${stage.color}12`,
               }}
             >
               <div style={columnHeaderStyle}>
@@ -167,6 +167,7 @@ export default function PipelinePage() {
                       background: `${stage.color}22`,
                       borderColor: `${stage.color}55`,
                       color: stage.color,
+                      boxShadow: `0 0 14px ${stage.color}33`,
                     }}
                   >
                     {stage.count}
@@ -186,6 +187,7 @@ export default function PipelinePage() {
                         style={{
                           ...leadCardStyle,
                           borderColor: `${stage.color}44`,
+                          boxShadow: `inset 0 0 16px ${stage.color}12`,
                         }}
                       >
                         <div style={leadTopStyle}>
@@ -198,6 +200,7 @@ export default function PipelinePage() {
                               background: `${stage.color}18`,
                               borderColor: `${stage.color}44`,
                               color: stage.color,
+                              boxShadow: `0 0 10px ${stage.color}28`,
                             }}
                           >
                             {lead.lead_type || 'standard'}
@@ -266,7 +269,7 @@ const columnStyle: CSSProperties = {
 
 const columnHeaderStyle: CSSProperties = {
   padding: 14,
-  borderBottom: '1px solid var(--line)',
+  borderBottom: '1px solid rgba(255,255,255,0.06)',
 }
 
 const columnTopRowStyle: CSSProperties = {
@@ -279,7 +282,7 @@ const columnTopRowStyle: CSSProperties = {
 const columnTitleStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 700,
-  color: 'var(--text)',
+  color: '#f8fcff',
 }
 
 const columnSubtitleStyle: CSSProperties = {
@@ -303,7 +306,7 @@ const emptyStyle: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   borderRadius: 16,
-  border: '1px dashed var(--border)',
+  border: '1px dashed rgba(255,255,255,0.08)',
   color: 'var(--text-faint)',
   fontSize: 12,
 }
@@ -327,7 +330,7 @@ const leadTopStyle: CSSProperties = {
 const leadTitleStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 700,
-  color: 'var(--text)',
+  color: '#f8fcff',
 }
 
 const leadSubStyle: CSSProperties = {
@@ -343,7 +346,7 @@ const leadMetaGridStyle: CSSProperties = {
 
 const metaStyle: CSSProperties = {
   borderRadius: 12,
-  border: '1px solid var(--line)',
+  border: '1px solid rgba(255,255,255,0.06)',
   background: 'rgba(255,255,255,0.02)',
   padding: '8px 9px',
 }
@@ -359,6 +362,6 @@ const metaLabelStyle: CSSProperties = {
 const metaValueStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 650,
-  color: 'var(--text)',
+  color: '#f5faff',
   lineHeight: 1.3,
 }

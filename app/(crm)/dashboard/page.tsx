@@ -85,25 +85,25 @@ const STAGES = [
 
 const STAGE_META: Record<
   string,
-  { label: string; color: string; soft: string }
+  { label: string; color: string; soft: string; glow: string }
 > = {
-  lead_inbox: { label: 'Lead Inbox', color: '#64748b', soft: 'rgba(100,116,139,0.16)' },
-  new_lead: { label: 'New Lead', color: '#d6a64b', soft: 'rgba(214,166,75,0.16)' },
-  skip_trace: { label: 'Skip Trace', color: '#0ea5e9', soft: 'rgba(14,165,233,0.16)' },
-  contact_attempted: { label: 'Contact Attempted', color: '#f97316', soft: 'rgba(249,115,22,0.16)' },
-  contacted: { label: 'Contacted', color: '#22c55e', soft: 'rgba(34,197,94,0.16)' },
-  follow_up: { label: 'Follow Up', color: '#a855f7', soft: 'rgba(168,85,247,0.16)' },
-  appointment_set: { label: 'Appointment Set', color: '#06b6d4', soft: 'rgba(6,182,212,0.16)' },
-  offer_sent: { label: 'Offer Sent', color: '#f59e0b', soft: 'rgba(245,158,11,0.16)' },
-  negotiation: { label: 'Negotiation', color: '#ec4899', soft: 'rgba(236,72,153,0.16)' },
-  verbal_yes: { label: 'Verbal Yes', color: '#84cc16', soft: 'rgba(132,204,22,0.16)' },
-  under_contract: { label: 'Under Contract', color: '#10b981', soft: 'rgba(16,185,129,0.16)' },
-  title_opened: { label: 'Title Opened', color: '#3b82f6', soft: 'rgba(59,130,246,0.16)' },
-  buyer_marketing: { label: 'Buyer Marketing', color: '#8b5cf6', soft: 'rgba(139,92,246,0.16)' },
-  assigned: { label: 'Assigned', color: '#14b8a6', soft: 'rgba(20,184,166,0.16)' },
-  double_close: { label: 'Double Close', color: '#ef4444', soft: 'rgba(239,68,68,0.16)' },
-  closed: { label: 'Closed', color: '#22c55e', soft: 'rgba(34,197,94,0.18)' },
-  dead: { label: 'Dead', color: '#94a3b8', soft: 'rgba(148,163,184,0.16)' },
+  lead_inbox: { label: 'Lead Inbox', color: '#7dd3fc', soft: 'rgba(125,211,252,0.10)', glow: 'rgba(125,211,252,0.38)' },
+  new_lead: { label: 'New Lead', color: '#22d3ee', soft: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.38)' },
+  skip_trace: { label: 'Skip Trace', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.38)' },
+  contact_attempted: { label: 'Contact Attempted', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.34)' },
+  contacted: { label: 'Contacted', color: '#2dd4bf', soft: 'rgba(45,212,191,0.10)', glow: 'rgba(45,212,191,0.34)' },
+  follow_up: { label: 'Follow Up', color: '#818cf8', soft: 'rgba(129,140,248,0.10)', glow: 'rgba(129,140,248,0.36)' },
+  appointment_set: { label: 'Appointment Set', color: '#06b6d4', soft: 'rgba(6,182,212,0.10)', glow: 'rgba(6,182,212,0.34)' },
+  offer_sent: { label: 'Offer Sent', color: '#fbbf24', soft: 'rgba(251,191,36,0.10)', glow: 'rgba(251,191,36,0.34)' },
+  negotiation: { label: 'Negotiation', color: '#c084fc', soft: 'rgba(192,132,252,0.10)', glow: 'rgba(192,132,252,0.36)' },
+  verbal_yes: { label: 'Verbal Yes', color: '#a3e635', soft: 'rgba(163,230,53,0.10)', glow: 'rgba(163,230,53,0.34)' },
+  under_contract: { label: 'Under Contract', color: '#10b981', soft: 'rgba(16,185,129,0.10)', glow: 'rgba(16,185,129,0.34)' },
+  title_opened: { label: 'Title Opened', color: '#60a5fa', soft: 'rgba(96,165,250,0.10)', glow: 'rgba(96,165,250,0.36)' },
+  buyer_marketing: { label: 'Buyer Marketing', color: '#8b5cf6', soft: 'rgba(139,92,246,0.10)', glow: 'rgba(139,92,246,0.36)' },
+  assigned: { label: 'Assigned', color: '#14b8a6', soft: 'rgba(20,184,166,0.10)', glow: 'rgba(20,184,166,0.34)' },
+  double_close: { label: 'Double Close', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.34)' },
+  closed: { label: 'Closed', color: '#22c55e', soft: 'rgba(34,197,94,0.10)', glow: 'rgba(34,197,94,0.34)' },
+  dead: { label: 'Dead', color: '#94a3b8', soft: 'rgba(148,163,184,0.08)', glow: 'rgba(148,163,184,0.22)' },
 }
 
 function normalizeStatus(status: string | null | undefined) {
@@ -276,35 +276,39 @@ function getStrengthBucket(score: number) {
 
 const LEAD_TYPE_STYLES: Record<
   string,
-  { label: string; bg: string; border: string; text: string; color: string }
+  { label: string; bg: string; border: string; text: string; color: string; glow: string }
 > = {
   standard: {
     label: 'Standard',
-    bg: 'rgba(59,130,246,0.12)',
-    border: 'rgba(59,130,246,0.28)',
+    bg: 'rgba(56,189,248,0.10)',
+    border: 'rgba(56,189,248,0.30)',
     text: '#dcebff',
-    color: '#60a5fa',
+    color: '#38bdf8',
+    glow: 'rgba(56,189,248,0.35)',
   },
   foreclosure: {
     label: 'Foreclosure',
-    bg: 'rgba(239,68,68,0.12)',
-    border: 'rgba(239,68,68,0.28)',
+    bg: 'rgba(251,113,133,0.10)',
+    border: 'rgba(251,113,133,0.30)',
     text: '#ffd9d9',
-    color: '#f87171',
+    color: '#fb7185',
+    glow: 'rgba(251,113,133,0.35)',
   },
   tax_lien: {
     label: 'Tax Lien',
-    bg: 'rgba(214,166,75,0.12)',
-    border: 'rgba(214,166,75,0.28)',
+    bg: 'rgba(245,158,11,0.10)',
+    border: 'rgba(245,158,11,0.30)',
     text: '#f3d899',
-    color: '#d6a64b',
+    color: '#f59e0b',
+    glow: 'rgba(245,158,11,0.35)',
   },
   foreclosure_tax_lien: {
     label: 'Foreclosure + Tax',
-    bg: 'rgba(168,85,247,0.12)',
-    border: 'rgba(168,85,247,0.28)',
+    bg: 'rgba(139,92,246,0.10)',
+    border: 'rgba(139,92,246,0.30)',
     text: '#ede7ff',
-    color: '#a855f7',
+    color: '#8b5cf6',
+    glow: 'rgba(139,92,246,0.35)',
   },
 }
 
@@ -482,6 +486,7 @@ export default function DashboardPage() {
           count,
           color: STAGE_META[stage].color,
           soft: STAGE_META[stage].soft,
+          glow: STAGE_META[stage].glow,
         }
       }),
     [normalizedLeads]
@@ -497,34 +502,37 @@ export default function DashboardPage() {
         count: normalizedLeads.filter((lead) => normalizeLeadType(lead.lead_type) === key).length,
         color: style.color,
         bg: style.bg,
+        glow: style.glow,
       }
     })
   }, [normalizedLeads])
 
   const strengthSeries = useMemo(() => {
     const buckets = ['0-19', '20-39', '40-59', '60-79', '80-100']
-    const colors: Record<string, string> = {
-      '0-19': '#ef4444',
-      '20-39': '#f97316',
-      '40-59': '#eab308',
-      '60-79': '#22c55e',
-      '80-100': '#06b6d4',
+    const meta: Record<string, { color: string; bg: string; glow: string }> = {
+      '0-19': { color: '#fb7185', bg: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.34)' },
+      '20-39': { color: '#f97316', bg: 'rgba(249,115,22,0.10)', glow: 'rgba(249,115,22,0.34)' },
+      '40-59': { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.34)' },
+      '60-79': { color: '#22d3ee', bg: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.34)' },
+      '80-100': { color: '#38bdf8', bg: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.38)' },
     }
 
     return buckets.map((bucket) => ({
       key: bucket,
       label: bucket,
       count: normalizedLeads.filter((lead) => getStrengthBucket(getLeadStrength(lead)) === bucket).length,
-      color: colors[bucket],
-      bg: `${colors[bucket]}22`,
+      color: meta[bucket].color,
+      bg: meta[bucket].bg,
+      glow: meta[bucket].glow,
     }))
   }, [normalizedLeads])
 
-  const graphSeries = graphMode === 'stage_distribution'
-    ? stageSeries
-    : graphMode === 'lead_types'
-      ? leadTypeSeries
-      : strengthSeries
+  const graphSeries =
+    graphMode === 'stage_distribution'
+      ? stageSeries
+      : graphMode === 'lead_types'
+        ? leadTypeSeries
+        : strengthSeries
 
   const maxGraphValue = Math.max(...graphSeries.map((item) => item.count), 1)
 
@@ -592,11 +600,11 @@ export default function DashboardPage() {
           <div style={heroLabelStyle}>Visible Pipeline Value</div>
           <div style={heroValueStyle}>{compactMoney(visibleValue)}</div>
         </div>
-        <div style={{ ...heroCardStyle, ...heroGreenStyle }}>
+        <div style={{ ...heroCardStyle, ...heroTealStyle }}>
           <div style={heroLabelStyle}>Visible Equity</div>
           <div style={heroValueStyle}>{compactMoney(visibleEquity)}</div>
         </div>
-        <div style={{ ...heroCardStyle, ...heroGoldStyle }}>
+        <div style={{ ...heroCardStyle, ...heroAmberStyle }}>
           <div style={heroLabelStyle}>Projected Spread</div>
           <div style={heroValueStyle}>{compactMoney(projectedSpread)}</div>
         </div>
@@ -651,8 +659,8 @@ export default function DashboardPage() {
                     style={{
                       ...chartBarStyle,
                       height: `${Math.max((item.count / maxGraphValue) * 100, item.count > 0 ? 10 : 0)}%`,
-                      background: item.color,
-                      boxShadow: `0 0 24px ${item.color}55`,
+                      background: `linear-gradient(180deg, ${item.color}, ${item.color}cc 55%, ${item.color}88)`,
+                      boxShadow: `0 0 12px ${item.glow}, 0 0 28px ${item.glow}`,
                     }}
                   />
                 </div>
@@ -680,12 +688,15 @@ export default function DashboardPage() {
                 key={item.key}
                 style={{
                   ...typeCardStyle,
-                  borderColor: item.color,
+                  borderColor: `${item.color}66`,
                   background: item.bg,
+                  boxShadow: `0 0 18px ${item.glow} inset`,
                 }}
               >
                 <div style={typeLabelStyle}>{item.label}</div>
-                <div style={{ ...typeCountStyle, color: item.color }}>{item.count}</div>
+                <div style={{ ...typeCountStyle, color: item.color, textShadow: `0 0 16px ${item.glow}` }}>
+                  {item.count}
+                </div>
               </div>
             ))}
           </div>
@@ -694,12 +705,20 @@ export default function DashboardPage() {
         <SectionCard title="Stage Health" subtitle="Where leads are currently sitting.">
           <div style={stageHealthStyle}>
             {stageSeries.map((item) => (
-              <div key={item.key} style={{ ...stageHealthRowStyle, background: item.soft }}>
+              <div
+                key={item.key}
+                style={{
+                  ...stageHealthRowStyle,
+                  background: item.soft,
+                  boxShadow: `0 0 12px ${item.glow} inset`,
+                  borderColor: `${item.color}33`,
+                }}
+              >
                 <div style={stageHealthLeftStyle}>
-                  <span style={{ ...stageDotStyle, background: item.color }} />
+                  <span style={{ ...stageDotStyle, background: item.color, boxShadow: `0 0 12px ${item.glow}` }} />
                   <span style={stageHealthLabelStyle}>{item.label}</span>
                 </div>
-                <span style={stageHealthValueStyle}>{item.count}</span>
+                <span style={{ ...stageHealthValueStyle, color: item.color }}>{item.count}</span>
               </div>
             ))}
           </div>
@@ -715,7 +734,7 @@ export default function DashboardPage() {
               <div className="crm-muted">No leads yet.</div>
             ) : (
               strongestLeads.map((lead) => (
-                <div key={lead.id} style={leadCardStyle}>
+                <div style={leadCardStyle} key={lead.id}>
                   <div style={leadTopStyle}>
                     <div>
                       <div style={leadTitleStyle}>{lead.property_address_1 || 'Unknown property'}</div>
@@ -775,13 +794,16 @@ function GraphToggle({
       onClick={onClick}
       style={{
         borderRadius: 999,
-        border: `1px solid ${active ? 'rgba(214,166,75,0.35)' : 'rgba(255,255,255,0.08)'}`,
-        background: active ? 'rgba(214,166,75,0.16)' : 'rgba(255,255,255,0.03)',
-        color: active ? '#f3d899' : 'var(--text-soft)',
+        border: `1px solid ${active ? 'rgba(34,211,238,0.55)' : 'rgba(255,255,255,0.08)'}`,
+        background: active
+          ? 'linear-gradient(180deg, rgba(34,211,238,0.16), rgba(34,211,238,0.08))'
+          : 'rgba(255,255,255,0.03)',
+        color: active ? '#8ff6ff' : 'var(--text-soft)',
         padding: '7px 12px',
         fontSize: 12,
         fontWeight: 700,
         cursor: 'pointer',
+        boxShadow: active ? '0 0 16px rgba(34,211,238,0.26)' : 'none',
       }}
     >
       {children}
@@ -816,27 +838,31 @@ const heroCardStyle: CSSProperties = {
   border: '1px solid transparent',
   display: 'grid',
   gap: 8,
-  boxShadow: '0 16px 36px rgba(0,0,0,0.18)',
+  boxShadow: '0 18px 38px rgba(0,0,0,0.22)',
 }
 
 const heroBlueStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06))',
-  borderColor: 'rgba(59,130,246,0.22)',
+  background: 'linear-gradient(180deg, rgba(56,189,248,0.14), rgba(56,189,248,0.05))',
+  borderColor: 'rgba(56,189,248,0.30)',
+  boxShadow: '0 0 20px rgba(56,189,248,0.16), 0 18px 38px rgba(0,0,0,0.22)',
 }
 
-const heroGreenStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(34,197,94,0.14), rgba(34,197,94,0.06))',
-  borderColor: 'rgba(34,197,94,0.22)',
+const heroTealStyle: CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(34,211,238,0.14), rgba(34,211,238,0.05))',
+  borderColor: 'rgba(34,211,238,0.30)',
+  boxShadow: '0 0 20px rgba(34,211,238,0.16), 0 18px 38px rgba(0,0,0,0.22)',
 }
 
-const heroGoldStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(214,166,75,0.14), rgba(214,166,75,0.06))',
-  borderColor: 'rgba(214,166,75,0.22)',
+const heroAmberStyle: CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(245,158,11,0.14), rgba(245,158,11,0.05))',
+  borderColor: 'rgba(245,158,11,0.30)',
+  boxShadow: '0 0 20px rgba(245,158,11,0.14), 0 18px 38px rgba(0,0,0,0.22)',
 }
 
 const heroPurpleStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(168,85,247,0.14), rgba(168,85,247,0.06))',
-  borderColor: 'rgba(168,85,247,0.22)',
+  background: 'linear-gradient(180deg, rgba(139,92,246,0.14), rgba(139,92,246,0.05))',
+  borderColor: 'rgba(139,92,246,0.30)',
+  boxShadow: '0 0 20px rgba(139,92,246,0.14), 0 18px 38px rgba(0,0,0,0.22)',
 }
 
 const heroLabelStyle: CSSProperties = {
@@ -849,8 +875,9 @@ const heroLabelStyle: CSSProperties = {
 const heroValueStyle: CSSProperties = {
   fontSize: 26,
   fontWeight: 800,
-  color: 'var(--text)',
+  color: '#f6fbff',
   lineHeight: 1,
+  textShadow: '0 0 18px rgba(125,211,252,0.14)',
 }
 
 const statsGridStyle: CSSProperties = {
@@ -908,12 +935,13 @@ const chartValueStyle: CSSProperties = {
 const chartTrackStyle: CSSProperties = {
   height: 220,
   borderRadius: 14,
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
-  border: '1px solid rgba(255,255,255,0.06)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015))',
+  border: '1px solid rgba(125,211,252,0.08)',
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
   padding: '8px 8px 10px',
+  boxShadow: 'inset 0 0 24px rgba(56,189,248,0.05)',
 }
 
 const chartBarStyle: CSSProperties = {
@@ -938,11 +966,12 @@ const valueGridStyle: CSSProperties = {
 
 const miniMetricStyle: CSSProperties = {
   borderRadius: 16,
-  border: '1px solid var(--line)',
+  border: '1px solid rgba(56,189,248,0.12)',
   background: 'rgba(255,255,255,0.02)',
   padding: 12,
   display: 'grid',
   gap: 6,
+  boxShadow: 'inset 0 0 18px rgba(56,189,248,0.04)',
 }
 
 const miniMetricLabelStyle: CSSProperties = {
@@ -955,7 +984,7 @@ const miniMetricLabelStyle: CSSProperties = {
 const miniMetricValueStyle: CSSProperties = {
   fontSize: 22,
   fontWeight: 800,
-  color: 'var(--text)',
+  color: '#f8fcff',
 }
 
 const typeGridStyle: CSSProperties = {
@@ -1025,7 +1054,6 @@ const stageHealthLabelStyle: CSSProperties = {
 const stageHealthValueStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 800,
-  color: 'var(--text)',
 }
 
 const leadListStyle: CSSProperties = {
@@ -1036,11 +1064,12 @@ const leadListStyle: CSSProperties = {
 
 const leadCardStyle: CSSProperties = {
   borderRadius: 18,
-  border: '1px solid var(--line)',
+  border: '1px solid rgba(56,189,248,0.10)',
   background: 'rgba(255,255,255,0.02)',
   padding: 14,
   display: 'grid',
   gap: 10,
+  boxShadow: 'inset 0 0 18px rgba(56,189,248,0.04)',
 }
 
 const leadTopStyle: CSSProperties = {
@@ -1053,7 +1082,7 @@ const leadTopStyle: CSSProperties = {
 const leadTitleStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 700,
-  color: 'var(--text)',
+  color: '#f6fbff',
 }
 
 const leadSubStyle: CSSProperties = {
@@ -1085,9 +1114,10 @@ const actionListStyle: CSSProperties = {
 
 const actionItemStyle: CSSProperties = {
   borderRadius: 14,
-  border: '1px solid var(--line)',
+  border: '1px solid rgba(56,189,248,0.10)',
   background: 'rgba(255,255,255,0.02)',
   padding: 12,
   fontSize: 13,
   color: 'var(--text-soft)',
+  boxShadow: 'inset 0 0 14px rgba(56,189,248,0.04)',
 }
