@@ -20,9 +20,9 @@ const pillStyle: CSSProperties = {
   minWidth: 0,
   borderRadius: 16,
   border: '1px solid rgba(88,230,255,0.12)',
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
+  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
   boxShadow:
-    'inset 0 0 0 1px rgba(88,230,255,0.03), 0 0 10px rgba(88,230,255,0.04)',
+    'inset 0 0 0 1px rgba(88,230,255,0.025), 0 0 10px rgba(88,230,255,0.03)',
   padding: '10px 12px',
   display: 'grid',
   gap: 4,
@@ -39,5 +39,5 @@ const valueStyle: CSSProperties = {
   fontSize: 18,
   fontWeight: 800,
   color: '#f7fcff',
-  textShadow: '0 0 8px rgba(88,230,255,0.04)',
+  textShadow: '0 0 8px rgba(88,230,255,0.03)',
 }

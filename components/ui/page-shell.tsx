@@ -36,6 +36,7 @@ export default function PageShell({
 const outerStyle: CSSProperties = {
   width: '100%',
   minWidth: 0,
+  background: 'transparent',
 }
 
 const innerStyle: CSSProperties = {
@@ -45,6 +46,7 @@ const innerStyle: CSSProperties = {
   minWidth: 0,
   padding: '20px 20px 28px',
   boxSizing: 'border-box',
+  background: 'transparent',
 }
 
 const headerStyle: CSSProperties = {
@@ -68,7 +70,7 @@ const titleStyle: CSSProperties = {
   fontWeight: 800,
   lineHeight: 1.1,
   color: '#f8fcff',
-  textShadow: '0 0 18px rgba(88,230,255,0.08)',
+  textShadow: '0 0 18px rgba(88,230,255,0.05)',
 }
 
 const subtitleStyle: CSSProperties = {
@@ -94,4 +96,5 @@ const contentStyle: CSSProperties = {
   minWidth: 0,
   display: 'grid',
   gap: 18,
+  background: 'transparent',
 }

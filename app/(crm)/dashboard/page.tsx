@@ -63,6 +63,15 @@ type DealRow = {
 
 type GraphMode = 'stage_distribution' | 'lead_types' | 'lead_strength'
 
+type GraphSeriesItem = {
+  key: string
+  label: string
+  count: number
+  color: string
+  soft: string
+  glow: string
+}
+
 const STAGES = [
   'lead_inbox',
   'new_lead',
@@ -84,23 +93,23 @@ const STAGES = [
 ] as const
 
 const STAGE_META: Record<string, { label: string; color: string; soft: string; glow: string }> = {
-  lead_inbox: { label: 'Lead Inbox', color: '#7dd3fc', soft: 'rgba(125,211,252,0.10)', glow: 'rgba(125,211,252,0.38)' },
-  new_lead: { label: 'New Lead', color: '#22d3ee', soft: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.38)' },
-  skip_trace: { label: 'Skip Trace', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.38)' },
-  contact_attempted: { label: 'Contact Attempted', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.34)' },
-  contacted: { label: 'Contacted', color: '#2dd4bf', soft: 'rgba(45,212,191,0.10)', glow: 'rgba(45,212,191,0.34)' },
-  follow_up: { label: 'Follow Up', color: '#818cf8', soft: 'rgba(129,140,248,0.10)', glow: 'rgba(129,140,248,0.36)' },
-  appointment_set: { label: 'Appointment Set', color: '#06b6d4', soft: 'rgba(6,182,212,0.10)', glow: 'rgba(6,182,212,0.34)' },
-  offer_sent: { label: 'Offer Sent', color: '#fbbf24', soft: 'rgba(251,191,36,0.10)', glow: 'rgba(251,191,36,0.34)' },
-  negotiation: { label: 'Negotiation', color: '#c084fc', soft: 'rgba(192,132,252,0.10)', glow: 'rgba(192,132,252,0.36)' },
-  verbal_yes: { label: 'Verbal Yes', color: '#a3e635', soft: 'rgba(163,230,53,0.10)', glow: 'rgba(163,230,53,0.34)' },
-  under_contract: { label: 'Under Contract', color: '#10b981', soft: 'rgba(16,185,129,0.10)', glow: 'rgba(16,185,129,0.34)' },
-  title_opened: { label: 'Title Opened', color: '#60a5fa', soft: 'rgba(96,165,250,0.10)', glow: 'rgba(96,165,250,0.36)' },
-  buyer_marketing: { label: 'Buyer Marketing', color: '#8b5cf6', soft: 'rgba(139,92,246,0.10)', glow: 'rgba(139,92,246,0.36)' },
-  assigned: { label: 'Assigned', color: '#14b8a6', soft: 'rgba(20,184,166,0.10)', glow: 'rgba(20,184,166,0.34)' },
-  double_close: { label: 'Double Close', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.34)' },
-  closed: { label: 'Closed', color: '#22c55e', soft: 'rgba(34,197,94,0.10)', glow: 'rgba(34,197,94,0.34)' },
-  dead: { label: 'Dead', color: '#94a3b8', soft: 'rgba(148,163,184,0.08)', glow: 'rgba(148,163,184,0.22)' },
+  lead_inbox: { label: 'Lead Inbox', color: '#67e8f9', soft: 'rgba(103,232,249,0.10)', glow: 'rgba(103,232,249,0.35)' },
+  new_lead: { label: 'New Lead', color: '#22d3ee', soft: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.34)' },
+  skip_trace: { label: 'Skip Trace', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.34)' },
+  contact_attempted: { label: 'Contact Attempted', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.30)' },
+  contacted: { label: 'Contacted', color: '#2dd4bf', soft: 'rgba(45,212,191,0.10)', glow: 'rgba(45,212,191,0.32)' },
+  follow_up: { label: 'Follow Up', color: '#818cf8', soft: 'rgba(129,140,248,0.10)', glow: 'rgba(129,140,248,0.30)' },
+  appointment_set: { label: 'Appointment Set', color: '#06b6d4', soft: 'rgba(6,182,212,0.10)', glow: 'rgba(6,182,212,0.30)' },
+  offer_sent: { label: 'Offer Sent', color: '#fbbf24', soft: 'rgba(251,191,36,0.10)', glow: 'rgba(251,191,36,0.30)' },
+  negotiation: { label: 'Negotiation', color: '#c084fc', soft: 'rgba(192,132,252,0.10)', glow: 'rgba(192,132,252,0.30)' },
+  verbal_yes: { label: 'Verbal Yes', color: '#a3e635', soft: 'rgba(163,230,53,0.10)', glow: 'rgba(163,230,53,0.28)' },
+  under_contract: { label: 'Under Contract', color: '#10b981', soft: 'rgba(16,185,129,0.10)', glow: 'rgba(16,185,129,0.28)' },
+  title_opened: { label: 'Title Opened', color: '#60a5fa', soft: 'rgba(96,165,250,0.10)', glow: 'rgba(96,165,250,0.30)' },
+  buyer_marketing: { label: 'Buyer Marketing', color: '#8b5cf6', soft: 'rgba(139,92,246,0.10)', glow: 'rgba(139,92,246,0.30)' },
+  assigned: { label: 'Assigned', color: '#14b8a6', soft: 'rgba(20,184,166,0.10)', glow: 'rgba(20,184,166,0.28)' },
+  double_close: { label: 'Double Close', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.28)' },
+  closed: { label: 'Closed', color: '#22c55e', soft: 'rgba(34,197,94,0.10)', glow: 'rgba(34,197,94,0.28)' },
+  dead: { label: 'Dead', color: '#94a3b8', soft: 'rgba(148,163,184,0.08)', glow: 'rgba(148,163,184,0.18)' },
 }
 
 function normalizeStatus(status: string | null | undefined) {
@@ -216,8 +225,6 @@ function normalizeLead(lead: LeadRow) {
     lead.mortgage_balance ??
     null
 
-  const normalized = normalizeStatus(lead.status)
-
   const ownershipYears =
     computeOwnershipYears({
       ...lead,
@@ -231,7 +238,7 @@ function normalizeLead(lead: LeadRow) {
 
   return {
     ...lead,
-    status: normalized,
+    status: normalizeStatus(lead.status),
     owner_name: ownerName,
     bedrooms: beds,
     bathrooms: baths,
@@ -269,15 +276,6 @@ function getStrengthBucket(score: number) {
   if (score >= 40) return '40-59'
   if (score >= 20) return '20-39'
   return '0-19'
-}
-
-type GraphSeriesItem = {
-  key: string
-  label: string
-  count: number
-  color: string
-  soft: string
-  glow: string
 }
 
 export default function DashboardPage() {
@@ -397,14 +395,12 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     setLoading(true)
-
     try {
       const [leadData, taskData, dealData] = await Promise.all([
         loadLeads(),
         loadTasks(),
         loadDeals(),
       ])
-
       setLeads(leadData)
       setTasks(taskData)
       setDeals(dealData)
@@ -427,9 +423,7 @@ export default function DashboardPage() {
   const activeCount = normalizedLeads.filter(
     (lead) => !['lead_inbox', 'closed', 'dead'].includes(lead.status || '')
   ).length
-  const underContractCount = normalizedLeads.filter(
-    (lead) => lead.status === 'under_contract'
-  ).length
+  const underContractCount = normalizedLeads.filter((lead) => lead.status === 'under_contract').length
   const highRiskCount = normalizedLeads.filter((lead) => getLeadStrength(lead) <= 20).length
   const avgStrength =
     normalizedLeads.length > 0
@@ -459,12 +453,11 @@ export default function DashboardPage() {
 
   const leadTypeSeries: GraphSeriesItem[] = useMemo(() => {
     const items = [
-      { key: 'standard', label: 'Standard', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.35)' },
-      { key: 'foreclosure', label: 'Foreclosure', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.35)' },
-      { key: 'tax_lien', label: 'Tax Lien', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.35)' },
-      { key: 'foreclosure_tax_lien', label: 'Foreclosure + Tax', color: '#8b5cf6', soft: 'rgba(139,92,246,0.10)', glow: 'rgba(139,92,246,0.35)' },
+      { key: 'standard', label: 'Standard', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.32)' },
+      { key: 'foreclosure', label: 'Foreclosure', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.28)' },
+      { key: 'tax_lien', label: 'Tax Lien', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.28)' },
+      { key: 'foreclosure_tax_lien', label: 'Foreclosure + Tax', color: '#8b5cf6', soft: 'rgba(139,92,246,0.10)', glow: 'rgba(139,92,246,0.28)' },
     ]
-
     return items.map((item) => ({
       ...item,
       count: normalizedLeads.filter((lead) => normalizeLeadType(lead.lead_type) === item.key).length,
@@ -473,13 +466,12 @@ export default function DashboardPage() {
 
   const strengthSeries: GraphSeriesItem[] = useMemo(() => {
     const items = [
-      { key: '0-19', label: '0-19', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.35)' },
-      { key: '20-39', label: '20-39', color: '#f97316', soft: 'rgba(249,115,22,0.10)', glow: 'rgba(249,115,22,0.35)' },
-      { key: '40-59', label: '40-59', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.35)' },
-      { key: '60-79', label: '60-79', color: '#22d3ee', soft: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.35)' },
-      { key: '80-100', label: '80-100', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.38)' },
+      { key: '0-19', label: '0-19', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.28)' },
+      { key: '20-39', label: '20-39', color: '#f97316', soft: 'rgba(249,115,22,0.10)', glow: 'rgba(249,115,22,0.28)' },
+      { key: '40-59', label: '40-59', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.28)' },
+      { key: '60-79', label: '60-79', color: '#22d3ee', soft: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.28)' },
+      { key: '80-100', label: '80-100', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.32)' },
     ]
-
     return items.map((item) => ({
       ...item,
       count: normalizedLeads.filter((lead) => getStrengthBucket(getLeadStrength(lead)) === item.key).length,
@@ -585,7 +577,7 @@ export default function DashboardPage() {
                       ...chartBarStyle,
                       height: `${Math.max((item.count / maxGraphValue) * 100, item.count > 0 ? 10 : 0)}%`,
                       background: `linear-gradient(180deg, ${item.color}, ${item.color}cc 55%, ${item.color}88)`,
-                      boxShadow: `0 0 12px ${item.glow}, 0 0 28px ${item.glow}`,
+                      boxShadow: `0 0 12px ${item.glow}, 0 0 26px ${item.glow}`,
                     }}
                   />
                 </div>
@@ -613,13 +605,13 @@ export default function DashboardPage() {
                 key={item.key}
                 style={{
                   ...typeCardStyle,
-                  borderColor: `${item.color}66`,
-                  background: item.soft,
-                  boxShadow: `0 0 18px ${item.glow} inset`,
+                  borderColor: `${item.color}55`,
+                  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+                  boxShadow: `inset 0 0 14px ${item.glow}`,
                 }}
               >
                 <div style={typeLabelStyle}>{item.label}</div>
-                <div style={{ ...typeCountStyle, color: item.color, textShadow: `0 0 16px ${item.glow}` }}>
+                <div style={{ ...typeCountStyle, color: item.color, textShadow: `0 0 14px ${item.glow}` }}>
                   {item.count}
                 </div>
               </div>
@@ -634,9 +626,9 @@ export default function DashboardPage() {
                 key={item.key}
                 style={{
                   ...stageHealthRowStyle,
-                  background: item.soft,
-                  boxShadow: `0 0 12px ${item.glow} inset`,
-                  borderColor: `${item.color}33`,
+                  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+                  boxShadow: `inset 0 0 10px ${item.glow}`,
+                  borderColor: `${item.color}26`,
                 }}
               >
                 <div style={stageHealthLeftStyle}>
@@ -719,16 +711,16 @@ function GraphToggle({
       onClick={onClick}
       style={{
         borderRadius: 999,
-        border: `1px solid ${active ? 'rgba(34,211,238,0.55)' : 'rgba(255,255,255,0.08)'}`,
+        border: `1px solid ${active ? 'rgba(34,211,238,0.42)' : 'rgba(255,255,255,0.08)'}`,
         background: active
-          ? 'linear-gradient(180deg, rgba(34,211,238,0.16), rgba(34,211,238,0.08))'
-          : 'rgba(255,255,255,0.03)',
-        color: active ? '#8ff6ff' : 'var(--text-soft)',
+          ? 'linear-gradient(180deg, rgba(34,211,238,0.14), rgba(34,211,238,0.05))'
+          : 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+        color: active ? '#8ff6ff' : 'var(--white-soft)',
         padding: '7px 12px',
         fontSize: 12,
         fontWeight: 700,
         cursor: 'pointer',
-        boxShadow: active ? '0 0 16px rgba(34,211,238,0.26)' : 'none',
+        boxShadow: active ? '0 0 14px rgba(34,211,238,0.18)' : 'none',
       }}
     >
       {children}
@@ -747,24 +739,24 @@ function HeroMetric({
 }) {
   const tones: Record<string, CSSProperties> = {
     cyan: {
-      background: 'linear-gradient(180deg, rgba(56,189,248,0.14), rgba(56,189,248,0.05))',
-      borderColor: 'rgba(56,189,248,0.30)',
-      boxShadow: '0 0 20px rgba(56,189,248,0.16), 0 18px 38px rgba(0,0,0,0.22)',
+      borderColor: 'rgba(56,189,248,0.28)',
+      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      boxShadow: 'inset 0 0 16px rgba(56,189,248,0.10), 0 0 18px rgba(56,189,248,0.08)',
     },
     teal: {
-      background: 'linear-gradient(180deg, rgba(34,211,238,0.14), rgba(34,211,238,0.05))',
-      borderColor: 'rgba(34,211,238,0.30)',
-      boxShadow: '0 0 20px rgba(34,211,238,0.16), 0 18px 38px rgba(0,0,0,0.22)',
+      borderColor: 'rgba(34,211,238,0.28)',
+      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      boxShadow: 'inset 0 0 16px rgba(34,211,238,0.10), 0 0 18px rgba(34,211,238,0.08)',
     },
     amber: {
-      background: 'linear-gradient(180deg, rgba(245,158,11,0.14), rgba(245,158,11,0.05))',
-      borderColor: 'rgba(245,158,11,0.30)',
-      boxShadow: '0 0 20px rgba(245,158,11,0.14), 0 18px 38px rgba(0,0,0,0.22)',
+      borderColor: 'rgba(245,158,11,0.28)',
+      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      boxShadow: 'inset 0 0 16px rgba(245,158,11,0.10), 0 0 18px rgba(245,158,11,0.08)',
     },
     violet: {
-      background: 'linear-gradient(180deg, rgba(139,92,246,0.14), rgba(139,92,246,0.05))',
-      borderColor: 'rgba(139,92,246,0.30)',
-      boxShadow: '0 0 20px rgba(139,92,246,0.14), 0 18px 38px rgba(0,0,0,0.22)',
+      borderColor: 'rgba(139,92,246,0.28)',
+      background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+      boxShadow: 'inset 0 0 16px rgba(139,92,246,0.10), 0 0 18px rgba(139,92,246,0.08)',
     },
   }
 
@@ -809,7 +801,7 @@ const heroLabelStyle: CSSProperties = {
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'var(--text-faint)',
+  color: 'var(--white-faint)',
 }
 
 const heroValueStyle: CSSProperties = {
@@ -817,7 +809,6 @@ const heroValueStyle: CSSProperties = {
   fontWeight: 800,
   color: '#f6fbff',
   lineHeight: 1,
-  textShadow: '0 0 18px rgba(125,211,252,0.14)',
 }
 
 const statsGridStyle: CSSProperties = {
@@ -868,19 +859,20 @@ const chartColumnWrapStyle: CSSProperties = {
 const chartValueStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  color: 'var(--text-soft)',
+  color: 'var(--white-soft)',
   textAlign: 'center',
 }
+
 const chartTrackStyle: CSSProperties = {
   height: 220,
   borderRadius: 14,
-  background: 'linear-gradient(180deg, rgba(6,8,14,0.92), rgba(2,4,10,0.98))',
-  border: '1px solid rgba(125,211,252,0.08)',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
+  border: '1px solid rgba(255,255,255,0.05)',
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
   padding: '8px 8px 10px',
-  boxShadow: 'inset 0 0 18px rgba(56,189,248,0.03)',
+  boxShadow: 'inset 0 0 16px rgba(255,255,255,0.02)',
 }
 
 const chartBarStyle: CSSProperties = {
@@ -892,7 +884,7 @@ const chartBarStyle: CSSProperties = {
 const chartLabelStyle: CSSProperties = {
   fontSize: 11,
   lineHeight: 1.35,
-  color: 'var(--text-soft)',
+  color: 'var(--white-soft)',
   textAlign: 'center',
 }
 
@@ -905,19 +897,19 @@ const valueGridStyle: CSSProperties = {
 
 const miniMetricStyle: CSSProperties = {
   borderRadius: 16,
-  border: '1px solid rgba(56,189,248,0.12)',
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
+  border: '1px solid rgba(255,255,255,0.05)',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
   padding: 12,
   display: 'grid',
   gap: 6,
-  boxShadow: 'inset 0 0 14px rgba(56,189,248,0.03)',
+  boxShadow: 'inset 0 0 12px rgba(255,255,255,0.02)',
 }
 
 const miniMetricLabelStyle: CSSProperties = {
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'var(--text-faint)',
+  color: 'var(--white-faint)',
 }
 
 const miniMetricValueStyle: CSSProperties = {
@@ -944,7 +936,7 @@ const typeCardStyle: CSSProperties = {
 const typeLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  color: 'var(--text-soft)',
+  color: 'var(--white-soft)',
 }
 
 const typeCountStyle: CSSProperties = {
@@ -987,7 +979,7 @@ const stageDotStyle: CSSProperties = {
 
 const stageHealthLabelStyle: CSSProperties = {
   fontSize: 12,
-  color: 'var(--text-soft)',
+  color: 'var(--white-soft)',
 }
 
 const stageHealthValueStyle: CSSProperties = {
@@ -1003,12 +995,12 @@ const leadListStyle: CSSProperties = {
 
 const leadCardStyle: CSSProperties = {
   borderRadius: 18,
-  border: '1px solid rgba(56,189,248,0.10)',
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
+  border: '1px solid rgba(255,255,255,0.05)',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
   padding: 14,
   display: 'grid',
   gap: 10,
-  boxShadow: 'inset 0 0 14px rgba(56,189,248,0.03)',
+  boxShadow: 'inset 0 0 10px rgba(255,255,255,0.02)',
 }
 
 const leadTopStyle: CSSProperties = {
@@ -1027,7 +1019,7 @@ const leadTitleStyle: CSSProperties = {
 const leadSubStyle: CSSProperties = {
   marginTop: 4,
   fontSize: 12,
-  color: 'var(--text-soft)',
+  color: 'var(--white-soft)',
 }
 
 const leadMetricRowStyle: CSSProperties = {
@@ -1035,7 +1027,7 @@ const leadMetricRowStyle: CSSProperties = {
   gap: 12,
   flexWrap: 'wrap',
   fontSize: 12,
-  color: 'var(--text-soft)',
+  color: 'var(--white-soft)',
 }
 
 const leadActionRowStyle: CSSProperties = {
@@ -1053,10 +1045,10 @@ const actionListStyle: CSSProperties = {
 
 const actionItemStyle: CSSProperties = {
   borderRadius: 14,
-  border: '1px solid rgba(56,189,248,0.10)',
-  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
+  border: '1px solid rgba(255,255,255,0.05)',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(0,0,0,1))',
   padding: 12,
   fontSize: 13,
-  color: 'var(--text-soft)',
-  boxShadow: 'inset 0 0 10px rgba(56,189,248,0.03)',
+  color: 'var(--white-soft)',
+  boxShadow: 'inset 0 0 10px rgba(255,255,255,0.02)',
 }

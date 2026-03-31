@@ -1,47 +1,47 @@
 :root {
   --bg-0: #000000;
-  --bg-1: #010101;
-  --bg-2: #030303;
-  --bg-3: #060606;
-  --bg-4: #090909;
+  --bg-1: #020202;
+  --bg-2: #050505;
+  --bg-3: #090909;
+  --bg-4: #0d0d0d;
 
-  --panel-base: rgba(0, 0, 0, 0.28);
-  --panel-base-strong: rgba(0, 0, 0, 0.38);
-  --panel-base-soft: rgba(0, 0, 0, 0.2);
+  --panel-base: rgba(0, 0, 0, 0.96);
+  --panel-base-strong: rgba(0, 0, 0, 0.985);
+  --panel-base-soft: rgba(8, 8, 8, 0.92);
 
-  --panel-glass-top: rgba(255, 255, 255, 0.045);
-  --panel-glass-bottom: rgba(255, 255, 255, 0.008);
+  --panel-glass-top: rgba(255, 255, 255, 0.022);
+  --panel-glass-bottom: rgba(255, 255, 255, 0.004);
 
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-border-strong: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-strong: rgba(255, 255, 255, 0.11);
   --glass-line: rgba(255, 255, 255, 0.05);
-  --glass-line-soft: rgba(255, 255, 255, 0.03);
+  --glass-line-soft: rgba(255, 255, 255, 0.025);
 
   --white-hi: rgba(255, 255, 255, 0.985);
-  --white-soft: rgba(255, 255, 255, 0.74);
+  --white-soft: rgba(255, 255, 255, 0.72);
   --white-faint: rgba(255, 255, 255, 0.42);
 
   --gold: #d6a64b;
   --gold-2: #ebc477;
-  --gold-soft: rgba(214, 166, 75, 0.14);
-  --gold-border: rgba(214, 166, 75, 0.28);
-  --gold-glow-soft: rgba(214, 166, 75, 0.08);
-  --gold-glow-mid: rgba(214, 166, 75, 0.14);
+  --gold-soft: rgba(214, 166, 75, 0.12);
+  --gold-border: rgba(214, 166, 75, 0.24);
 
-  --success: #46df8b;
-  --warn: #f2c470;
-  --danger: #f07b7b;
+  --neon-blue: #38bdf8;
+  --neon-cyan: #58e6ff;
+  --neon-purple: #9a7cff;
+  --neon-green: #22c55e;
+  --neon-orange: #f59e0b;
+  --neon-pink: #fb7185;
 
   --shadow-soft: 0 16px 42px rgba(0, 0, 0, 0.34);
   --shadow-strong: 0 28px 80px rgba(0, 0, 0, 0.58);
   --glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 24px 80px rgba(0, 0, 0, 0.78),
-    0 0 22px rgba(214, 166, 75, 0.045);
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 24px 80px rgba(0, 0, 0, 0.82);
 
-  --glass-blur: blur(28px);
-  --glass-blur-soft: blur(22px);
-  --glass-sat: saturate(145%);
+  --glass-blur: blur(24px);
+  --glass-blur-soft: blur(18px);
+  --glass-sat: saturate(135%);
 
   --radius-2xl: 28px;
   --radius-xl: 22px;
@@ -51,10 +51,16 @@
 
   --rail-width: 88px;
   --content-max: 1720px;
+  --border: rgba(255, 255, 255, 0.06);
+  --text-main: var(--white-hi);
+  --text-soft: var(--white-soft);
+  --text-faint: var(--white-faint);
 }
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
 html {
@@ -68,12 +74,9 @@ body {
   padding: 0;
   color: var(--white-hi);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
     sans-serif;
-  background:
-    radial-gradient(circle at 18% 10%, rgba(214, 166, 75, 0.07), transparent 18%),
-    radial-gradient(circle at 80% 18%, rgba(255, 255, 255, 0.03), transparent 14%),
-    linear-gradient(180deg, #000000 0%, #010101 24%, #030303 60%, #060606 100%);
+  background: linear-gradient(180deg, #000000 0%, #000000 56%, #020202 100%);
 }
 
 body {
@@ -86,12 +89,12 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
   background-size: 48px 48px;
-  opacity: 0.03;
-  mask-image: radial-gradient(circle at center, black 28%, transparent 88%);
-  -webkit-mask-image: radial-gradient(circle at center, black 28%, transparent 88%);
+  opacity: 0.025;
+  mask-image: radial-gradient(circle at center, black 30%, transparent 88%);
+  -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 88%);
 }
 
 a {
@@ -104,9 +107,6 @@ input,
 select,
 textarea {
   font: inherit;
-}
-
-button {
   color: inherit;
 }
 
@@ -116,12 +116,13 @@ textarea::placeholder {
 }
 
 ::selection {
-  background: rgba(214, 166, 75, 0.24);
+  background: rgba(88, 230, 255, 0.16);
+  color: #ffffff;
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -143,15 +144,14 @@ textarea::placeholder {
   position: sticky;
   top: 0;
   height: 100vh;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.58));
+  border-right: 1px solid rgba(255, 255, 255, 0.045);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.98), rgba(3, 3, 3, 0.98));
   backdrop-filter: var(--glass-blur) var(--glass-sat);
   -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
   padding: 14px 10px;
   box-shadow:
-    inset -1px 0 0 rgba(255, 255, 255, 0.025),
-    0 0 40px rgba(0, 0, 0, 0.5);
+    inset -1px 0 0 rgba(255, 255, 255, 0.02),
+    0 0 40px rgba(0, 0, 0, 0.55);
 }
 
 .crm-sidebar-inner {
@@ -174,13 +174,10 @@ textarea::placeholder {
   display: grid;
   place-items: center;
   border: 1px solid var(--glass-border);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012)),
-    rgba(0, 0, 0, 0.24);
+  background: linear-gradient(180deg, rgba(6, 6, 6, 0.98), rgba(0, 0, 0, 1));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 16px 36px rgba(0, 0, 0, 0.45),
-    0 0 18px rgba(214, 166, 75, 0.04);
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 14px 30px rgba(0, 0, 0, 0.52);
   color: var(--white-hi);
 }
 
@@ -214,31 +211,25 @@ textarea::placeholder {
     border-color 160ms ease,
     background 160ms ease,
     box-shadow 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease;
+    color 160ms ease;
 }
 
 .crm-nav-link:hover {
   transform: translateY(-1px);
   color: var(--white-hi);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-    rgba(0, 0, 0, 0.2);
+  background: linear-gradient(180deg, rgba(8, 8, 8, 0.98), rgba(0, 0, 0, 1));
   border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.28);
 }
 
 .crm-nav-link.active {
   color: var(--white-hi);
   background:
-    radial-gradient(circle at top center, rgba(214, 166, 75, 0.12), transparent 72%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
-    rgba(0, 0, 0, 0.24);
+    linear-gradient(180deg, rgba(8, 8, 8, 0.98), rgba(0, 0, 0, 1));
   border-color: rgba(214, 166, 75, 0.22);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 12px 28px rgba(0, 0, 0, 0.34),
-    0 0 24px rgba(214, 166, 75, 0.08);
+    inset 0 0 10px rgba(214, 166, 75, 0.08),
+    0 0 20px rgba(214, 166, 75, 0.06);
 }
 
 .crm-nav-link-icon {
@@ -265,12 +256,10 @@ textarea::placeholder {
 .crm-sidebar-footer-card {
   border: 1px solid var(--glass-border);
   border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.014)),
-    rgba(0, 0, 0, 0.24);
+  background: linear-gradient(180deg, rgba(8, 8, 8, 0.98), rgba(0, 0, 0, 1));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 12px 30px rgba(0, 0, 0, 0.42);
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 12px 28px rgba(0, 0, 0, 0.44);
   padding: 12px;
   display: grid;
   justify-items: center;
@@ -290,8 +279,7 @@ textarea::placeholder {
   z-index: 50;
   height: 74px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.42));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.96), rgba(4, 4, 4, 0.96));
   backdrop-filter: var(--glass-blur) var(--glass-sat);
   -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
   display: flex;
@@ -304,7 +292,7 @@ textarea::placeholder {
 
 .crm-topbar-left {
   display: flex;
-  align-items: center;
+  alignItems: center;
   gap: 14px;
   min-width: 0;
 }
@@ -369,7 +357,6 @@ textarea::placeholder {
   font-weight: 760;
   letter-spacing: -0.04em;
   color: var(--white-hi);
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.04);
 }
 
 .crm-page-subtitle {
@@ -392,16 +379,14 @@ textarea::placeholder {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.058) !important;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.032), rgba(255,255,255,0.006)),
-    rgba(0, 0, 0, 0.26) !important;
+  border: 1px solid rgba(255, 255, 255, 0.055) !important;
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.02),
-    0 20px 60px rgba(0,0,0,0.72),
-    0 0 18px rgba(214,166,75,0.035) !important;
-  backdrop-filter: var(--glass-blur) var(--glass-sat);
-  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 18px 44px rgba(0, 0, 0, 0.76),
+    0 0 10px rgba(255, 255, 255, 0.02) !important;
+  backdrop-filter: var(--glass-blur-soft) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur-soft) var(--glass-sat);
 }
 
 .crm-section-card::before {
@@ -409,8 +394,7 @@ textarea::placeholder {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 22%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 22%);
 }
 
 .crm-section-card::after {
@@ -419,7 +403,7 @@ textarea::placeholder {
   inset: 1px;
   border-radius: calc(var(--radius-2xl) - 1px);
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.012);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.01);
 }
 
 .crm-section-card-header {
@@ -444,7 +428,6 @@ textarea::placeholder {
   font-weight: 730;
   letter-spacing: -0.02em;
   color: var(--white-hi);
-  text-shadow: 0 0 18px rgba(255, 255, 255, 0.04);
 }
 
 .crm-section-card-subtitle {
@@ -470,7 +453,7 @@ textarea::placeholder {
 
 .crm-btn {
   appearance: none;
-  border: 1px solid rgba(255,255,255,0.068) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
   min-height: 34px;
   padding: 0 12px;
   border-radius: 13px;
@@ -483,14 +466,10 @@ textarea::placeholder {
   font-weight: 670;
   letter-spacing: -0.01em;
   color: var(--white-hi);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.01)),
-    rgba(0,0,0,0.18) !important;
-  backdrop-filter: blur(18px) saturate(145%);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.02),
-    0 10px 24px rgba(0,0,0,0.32) !important;
+    0 8px 18px rgba(0,0,0,0.34) !important;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
@@ -502,9 +481,6 @@ textarea::placeholder {
 .crm-btn:hover {
   transform: translateY(-1px);
   border-color: var(--glass-border-strong);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.016)),
-    rgba(0, 0, 0, 0.24);
 }
 
 .crm-btn:disabled {
@@ -514,18 +490,16 @@ textarea::placeholder {
 }
 
 .crm-btn.gold {
-  background:
-    linear-gradient(180deg, #ebc477 0%, #d6a64b 100%) !important;
+  background: linear-gradient(180deg, #ebc477 0%, #d6a64b 100%) !important;
   color: #171108 !important;
-  border-color: rgba(214, 166, 75, 0.3) !important;
+  border-color: rgba(214, 166, 75, 0.30) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.16),
     0 12px 24px rgba(214,166,75,0.16) !important;
 }
 
 .crm-btn.gold:hover {
-  background:
-    linear-gradient(180deg, #f0ca7e 0%, #daad51 100%) !important;
+  background: linear-gradient(180deg, #f0ca7e 0%, #daad51 100%) !important;
 }
 
 .crm-btn.ghost {
@@ -544,18 +518,14 @@ textarea::placeholder {
   min-height: 30px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.055) !important;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.006)),
-    rgba(0,0,0,0.24) !important;
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 0 10px;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.018),
-    0 10px 20px rgba(0,0,0,0.24) !important;
-  backdrop-filter: var(--glass-blur-soft) var(--glass-sat);
-  -webkit-backdrop-filter: var(--glass-blur-soft) var(--glass-sat);
+    0 8px 18px rgba(0,0,0,0.26) !important;
 }
 
 .crm-stat-pill-label {
@@ -615,7 +585,7 @@ textarea::placeholder {
 
 .crm-score-segment.active {
   background: linear-gradient(180deg, var(--gold-2), var(--gold));
-  box-shadow: 0 0 16px rgba(214, 166, 75, 0.22);
+  box-shadow: 0 0 16px rgba(214, 166, 75, 0.18);
 }
 
 .crm-input,
@@ -623,13 +593,9 @@ textarea::placeholder {
 .crm-textarea {
   width: 100%;
   color: var(--white-hi);
-  border: 1px solid rgba(255,255,255,0.065) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
   border-radius: 13px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.006)),
-    rgba(0,0,0,0.18) !important;
-  backdrop-filter: blur(22px) saturate(145%);
-  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
   outline: none;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.018),
@@ -657,10 +623,10 @@ textarea::placeholder {
 .crm-input:focus,
 .crm-select:focus,
 .crm-textarea:focus {
-  border-color: rgba(214, 166, 75, 0.28);
+  border-color: rgba(214, 166, 75, 0.26);
   box-shadow:
-    0 0 0 3px rgba(214, 166, 75, 0.1),
-    0 0 24px rgba(214, 166, 75, 0.06);
+    0 0 0 3px rgba(214, 166, 75, 0.08),
+    0 0 20px rgba(214, 166, 75, 0.04);
 }
 
 .crm-badge {
@@ -671,8 +637,7 @@ textarea::placeholder {
   align-items: center;
   gap: 6px;
   border: 1px solid var(--glass-border);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  background: linear-gradient(180deg, rgba(12,12,12,0.96), rgba(0,0,0,1));
   color: var(--white-hi);
   font-size: 11px;
   font-weight: 700;
@@ -704,12 +669,8 @@ textarea::placeholder {
   overflow: auto;
   border-radius: 20px;
   border: 1px solid var(--glass-border);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.006)),
-    rgba(0,0,0,0.26) !important;
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1)) !important;
   box-shadow: var(--glass-shadow);
-  backdrop-filter: var(--glass-blur) var(--glass-sat);
-  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
 }
 
 .crm-table {
@@ -730,16 +691,12 @@ textarea::placeholder {
   position: sticky;
   top: 0;
   z-index: 1;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008)),
-    rgba(0, 0, 0, 0.48);
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.98), rgba(0, 0, 0, 1));
   color: var(--white-faint);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.11em;
   font-weight: 720;
-  backdrop-filter: blur(18px) saturate(145%);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
 }
 
 .crm-table td {
@@ -748,14 +705,14 @@ textarea::placeholder {
 }
 
 .crm-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.028);
+  background: rgba(255, 255, 255, 0.022);
 }
 
 .crm-modal-overlay {
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: rgba(0, 0, 0, 0.66);
+  background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   display: grid;
@@ -768,14 +725,10 @@ textarea::placeholder {
   max-width: 620px;
   border-radius: 28px;
   border: 1px solid var(--glass-border);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008)),
-    rgba(0, 0, 0, 0.34);
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.98), rgba(0, 0, 0, 1));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 28px 80px rgba(0, 0, 0, 0.76);
-  backdrop-filter: var(--glass-blur) var(--glass-sat);
-  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 28px 80px rgba(0, 0, 0, 0.78);
   padding: 18px;
 }
 
@@ -806,47 +759,4 @@ textarea::placeholder {
   .crm-page-actions {
     justify-content: flex-start;
   }
-}
-:root {
-  --bg-main: #02050c;
-  --bg-soft: #050914;
-
-  --panel-dark: #04070f;
-  --panel-darker: #02050c;
-
-  --neon-blue: #38bdf8;
-  --neon-cyan: #58e6ff;
-  --neon-purple: #9a7cff;
-  --neon-green: #22c55e;
-  --neon-orange: #f59e0b;
-
-  --text-main: #f7fcff;
-  --text-soft: rgba(255,255,255,0.65);
-  --text-faint: rgba(255,255,255,0.4);
-
-  --border: rgba(88,230,255,0.12);
-}
-::selection {
-  background: rgba(88,230,255,0.2);
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(88,230,255,0.3) transparent;
-}
-
-::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(88,230,255,0.3);
-  border-radius: 999px;
-}
-body {
-  background:
-    radial-gradient(circle at 20% 0%, rgba(0, 0, 0, 0.06), transparent 25%),
-    radial-gradient(circle at 80% 10%, rgba(0, 0, 0, 0.05), transparent 25%),
-    linear-gradient(180deg, #000000 0%, #000000 60%, #000000 100%);
 }

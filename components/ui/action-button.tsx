@@ -74,31 +74,31 @@ const compactStyle: CSSProperties = {
 }
 
 const defaultStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(88,230,255,0.16), rgba(77,163,255,0.08))',
+  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
   borderColor: 'rgba(88,230,255,0.28)',
   color: '#d8f8ff',
-  boxShadow: '0 0 14px rgba(88,230,255,0.18), 0 12px 26px rgba(0,0,0,0.22)',
+  boxShadow: '0 0 14px rgba(88,230,255,0.16), inset 0 0 0 1px rgba(88,230,255,0.03)',
 }
 
 const goldStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(255,179,71,0.18), rgba(255,179,71,0.08))',
-  borderColor: 'rgba(255,179,71,0.32)',
+  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
+  borderColor: 'rgba(255,179,71,0.30)',
   color: '#ffe2b7',
-  boxShadow: '0 0 14px rgba(255,179,71,0.16), 0 12px 26px rgba(0,0,0,0.22)',
+  boxShadow: '0 0 14px rgba(255,179,71,0.14), inset 0 0 0 1px rgba(255,179,71,0.03)',
 }
 
 const ghostStyle: CSSProperties = {
-  background: 'rgba(255,255,255,0.025)',
+  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
   borderColor: 'rgba(88,230,255,0.12)',
   color: 'var(--text)',
-  boxShadow: 'inset 0 0 18px rgba(88,230,255,0.04)',
+  boxShadow: 'inset 0 0 12px rgba(88,230,255,0.03)',
 }
 
 const dangerStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(255,107,143,0.16), rgba(255,107,143,0.08))',
+  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
   borderColor: 'rgba(255,107,143,0.28)',
   color: '#ffd6e0',
-  boxShadow: '0 0 14px rgba(255,107,143,0.14), 0 12px 26px rgba(0,0,0,0.22)',
+  boxShadow: '0 0 14px rgba(255,107,143,0.12), inset 0 0 0 1px rgba(255,107,143,0.03)',
 }
 
 const disabledStyle: CSSProperties = {
