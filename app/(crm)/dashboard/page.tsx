@@ -325,97 +325,123 @@ export default function DashboardPage() {
     return (data || []) as LeadRow[]
   }
 
-  async function loadTasks() {
-    const attempts = [
-      `
-        id,
-        title,
-        status,
-        priority,
-        created_at,
-        due_at,
-        lead_id
-      `,
-      `
-        id,
-        title,
-        status,
-        priority,
-        created_at,
-        due_date,
-        lead_id
-      `,
-      `
-        id,
-        title,
-        status,
-        priority,
-        created_at,
-        lead_id
-      `,
-    ]
+async function loadDeals() {
+  const attempts = [
+    `
+      id,
+      assignment_fee,
+      created_at
+    `,
+    `
+      id,
+      fee,
+      created_at
+    `,
+    `
+      id,
+      created_at
+    `,
+  ]
 
-    for (const selectClause of attempts) {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select(selectClause)
-        .order('created_at', { ascending: false })
-
-      if (!error) {
-        return ((data ?? []) as unknown[]).map((row) => ({
-          id: String((row as any).id),
-          title: ((row as any).title ?? null) as string | null,
-          status: ((row as any).status ?? null) as string | null,
-          priority: ((row as any).priority ?? null) as string | null,
-          created_at: ((row as any).created_at ?? null) as string | null,
-          due_at: ((row as any).due_at ?? null) as string | null,
-          due_date: ((row as any).due_date ?? null) as string | null,
-          lead_id: ((row as any).lead_id ?? null) as string | null,
-        }))
-      }
-    }
-
-    return []
-  }
-
-  async function loadDeals() {
+  for (const selectClause of attempts) {
     const { data, error } = await supabase
       .from('deals')
-      .select(`
-        id,
-        status,
-        assignment_fee,
-        created_at
-      `)
+      .select(selectClause)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
-    return (data || []) as DealRow[]
-  }
-
-  async function loadDashboard() {
-    setLoading(true)
-    try {
-      const [leadData, taskData, dealData] = await Promise.all([
-        loadLeads(),
-        loadTasks(),
-        loadDeals(),
-      ])
-      setLeads(leadData)
-      setTasks(taskData)
-      setDeals(dealData)
-    } catch (error: any) {
-      console.error(error)
-      alert(error?.message || 'Failed to load dashboard.')
-    } finally {
-      setLoading(false)
+    if (!error) {
+      return ((data ?? []) as unknown[]).map((row) => ({
+        id: String((row as any).id),
+        status: null,
+        assignment_fee:
+          typeof (row as any).assignment_fee === 'number'
+            ? (row as any).assignment_fee
+            : typeof (row as any).fee === 'number'
+              ? (row as any).fee
+              : null,
+        created_at: ((row as any).created_at ?? null) as string | null,
+      }))
     }
   }
+
+  return []
+}
+async function loadTasks() {
+  const attempts = [
+    `
+      id,
+      title,
+      status,
+      priority,
+      created_at,
+      due_at,
+      lead_id
+    `,
+    `
+      id,
+      title,
+      status,
+      priority,
+      created_at,
+      due_date,
+      lead_id
+    `,
+    `
+      id,
+      title,
+      status,
+      priority,
+      created_at,
+      lead_id
+    `,
+  ]
+
+  for (const selectClause of attempts) {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(selectClause)
+      .order('created_at', { ascending: false })
+
+    if (!error) {
+      return ((data ?? []) as unknown[]).map((row) => ({
+        id: String((row as any).id),
+        title: ((row as any).title ?? null) as string | null,
+        status: ((row as any).status ?? null) as string | null,
+        priority: ((row as any).priority ?? null) as string | null,
+        created_at: ((row as any).created_at ?? null) as string | null,
+        due_at: ((row as any).due_at ?? null) as string | null,
+        due_date: ((row as any).due_date ?? null) as string | null,
+        lead_id: ((row as any).lead_id ?? null) as string | null,
+      }))
+    }
+  }
+
+  return []
+}
 
   useEffect(() => {
     void loadDashboard()
   }, [])
+async function loadDashboard() {
+  setLoading(true)
 
+  try {
+    const [leadData, taskData, dealData] = await Promise.all([
+      loadLeads(),
+      loadTasks(),
+      loadDeals(),
+    ])
+
+    setLeads(leadData)
+    setTasks(taskData)
+    setDeals(dealData)
+  } catch (error: any) {
+    console.error(error)
+    alert(error?.message || 'Failed to load dashboard.')
+  } finally {
+    setLoading(false)
+  }
+}
   const normalizedLeads = useMemo(() => leads.map(normalizeLead), [leads])
 
   const totalLeads = normalizedLeads.length
