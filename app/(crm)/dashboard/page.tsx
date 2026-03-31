@@ -78,17 +78,20 @@ function normalizeStatus(status: string | null | undefined) {
   const value = (status || '').trim().toLowerCase()
 
   if (!value) return 'lead_inbox'
-  if (['lead_inbox', 'lead inbox', 'inbox'].includes(value)) return 'lead_inbox'
-  if (['new_lead', 'new lead', 'new', 'active', 'lead'].includes(value)) return 'new_lead'
-  if (['contact_attempted', 'contact attempted'].includes(value)) return 'contact_attempted'
-  if (['contacted', 'contact'].includes(value)) return 'contacted'
-  if (['follow_up', 'follow up'].includes(value)) return 'follow_up'
-  if (['offer_sent', 'offer sent'].includes(value)) return 'offer_sent'
-  if (['negotiation', 'negotiating'].includes(value)) return 'negotiation'
-  if (['under_contract', 'under contract', 'contract'].includes(value)) return 'under_contract'
-  if (['closed', 'sold'].includes(value)) return 'closed'
 
-  return 'lead_inbox'
+  if (['lead_inbox', 'lead inbox', 'inbox', 'imported'].includes(value)) return 'lead_inbox'
+  if (['new_lead', 'new lead', 'new', 'open', 'active', 'fresh', 'lead'].includes(value)) return 'new_lead'
+  if (['contact_attempted', 'contact attempted', 'attempted', 'trying to contact'].includes(value)) {
+    return 'contact_attempted'
+  }
+  if (['contacted', 'contact', 'spoken to owner', 'owner contacted'].includes(value)) return 'contacted'
+  if (['follow_up', 'follow up', 'followup', 'callback', 'nurture'].includes(value)) return 'follow_up'
+  if (['offer_sent', 'offer sent', 'offer', 'sent offer'].includes(value)) return 'offer_sent'
+  if (['negotiation', 'negotiating', 'countered', 'counter offer'].includes(value)) return 'negotiation'
+  if (['under_contract', 'under contract', 'contract', 'contracted'].includes(value)) return 'under_contract'
+  if (['closed', 'sold', 'done'].includes(value)) return 'closed'
+
+  return 'new_lead'
 }
 
 function normalizeLeadType(type: string | null | undefined) {
@@ -406,6 +409,7 @@ export default function DashboardPage() {
     (lead) => lead.status === 'under_contract'
   ).length
   const highRiskCount = normalizedLeads.filter((lead) => getLeadStrength(lead) <= 20).length
+
   const avgStrength =
     normalizedLeads.length > 0
       ? Math.round(
@@ -529,6 +533,7 @@ export default function DashboardPage() {
                     style={{
                       ...barFillStyle,
                       width: `${(item.count / maxStageCount) * 100}%`,
+                      minWidth: item.count > 0 ? 8 : 0,
                       background: item.hex,
                     }}
                   />
@@ -657,7 +662,7 @@ const statsGridStyle: CSSProperties = {
 
 const topGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1.18fr) minmax(360px, 0.82fr)',
   gap: 18,
   width: '100%',
   alignItems: 'stretch',
@@ -665,7 +670,7 @@ const topGridStyle: CSSProperties = {
 
 const bottomGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1.18fr) minmax(360px, 0.82fr)',
   gap: 18,
   width: '100%',
   alignItems: 'stretch',

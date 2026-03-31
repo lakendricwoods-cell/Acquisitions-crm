@@ -40,9 +40,10 @@ const outerStyle: CSSProperties = {
 
 const innerStyle: CSSProperties = {
   width: '100%',
-  maxWidth: '100%',
+  maxWidth: 1480,
+  margin: '0 auto',
   minWidth: 0,
-  padding: '20px 24px 28px',
+  padding: '20px 20px 28px',
   boxSizing: 'border-box',
 }
 
@@ -84,7 +85,7 @@ const actionsStyle: CSSProperties = {
   gap: 10,
   flexWrap: 'wrap',
   minWidth: 0,
-  flex: '1 1 320px',
+  flex: '0 1 auto',
 }
 
 const contentStyle: CSSProperties = {
