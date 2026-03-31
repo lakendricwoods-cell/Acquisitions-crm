@@ -40,7 +40,7 @@ const outerStyle: CSSProperties = {
 
 const innerStyle: CSSProperties = {
   width: '100%',
-  maxWidth: 1480,
+  maxWidth: 1320,
   margin: '0 auto',
   minWidth: 0,
   padding: '20px 20px 28px',

@@ -588,18 +588,23 @@ const statsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
   gap: 12,
+  width: '100%',
 }
 
 const topGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 0.9fr)',
   gap: 18,
+  width: '100%',
+  alignItems: 'stretch',
 }
 
 const bottomGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)',
   gap: 18,
+  width: '100%',
+  alignItems: 'stretch',
 }
 
 const barListStyle: CSSProperties = {
