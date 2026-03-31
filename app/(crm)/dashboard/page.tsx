@@ -50,7 +50,6 @@ type TaskRow = {
   status: string | null
   priority: string | null
   created_at: string | null
-  due_at?: string | null
   due_date?: string | null
   lead_id?: string | null
 }
@@ -75,23 +74,7 @@ const STAGES = [
 ] as const
 
 function normalizeStatus(status: string | null | undefined) {
-  const value = (status || '').trim().toLowerCase()
-
-  if (!value) return 'lead_inbox'
-
-  if (['lead_inbox', 'lead inbox', 'inbox', 'imported'].includes(value)) return 'lead_inbox'
-  if (['new_lead', 'new lead', 'new', 'open', 'active', 'fresh', 'lead'].includes(value)) return 'new_lead'
-  if (['contact_attempted', 'contact attempted', 'attempted', 'trying to contact'].includes(value)) {
-    return 'contact_attempted'
-  }
-  if (['contacted', 'contact', 'spoken to owner', 'owner contacted'].includes(value)) return 'contacted'
-  if (['follow_up', 'follow up', 'followup', 'callback', 'nurture'].includes(value)) return 'follow_up'
-  if (['offer_sent', 'offer sent', 'offer', 'sent offer'].includes(value)) return 'offer_sent'
-  if (['negotiation', 'negotiating', 'countered', 'counter offer'].includes(value)) return 'negotiation'
-  if (['under_contract', 'under contract', 'contract', 'contracted'].includes(value)) return 'under_contract'
-  if (['closed', 'sold', 'done'].includes(value)) return 'closed'
-
-  return 'new_lead'
+  return status || 'lead_inbox'
 }
 
 function normalizeLeadType(type: string | null | undefined) {
@@ -134,17 +117,6 @@ function toText(value: unknown) {
   return text.length ? text : null
 }
 
-function getTaskDueValue(task: TaskRow) {
-  return task.due_at || task.due_date || null
-}
-
-function isOverdue(value: string | null | undefined) {
-  if (!value) return false
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return false
-  return date.getTime() < Date.now()
-}
-
 function normalizeLead(lead: LeadRow) {
   const beds = resolveNumericField(lead as any, FIELD_ALIASES.beds, null, {
     treatZeroAsMissing: true,
@@ -182,8 +154,6 @@ function normalizeLead(lead: LeadRow) {
     lead.mortgage_balance ??
     null
 
-  const normalized = normalizeStatus(lead.status)
-
   const ownershipYears =
     computeOwnershipYears({
       ...lead,
@@ -197,7 +167,6 @@ function normalizeLead(lead: LeadRow) {
 
   return {
     ...lead,
-    status: normalized,
     owner_name: ownerName,
     bedrooms: beds,
     bathrooms: baths,
@@ -227,6 +196,13 @@ function getLeadReadiness(lead: ReturnType<typeof normalizeLead>) {
   if (strength >= 80) return 'Ready'
   if (strength >= 50) return 'Building'
   return 'Early'
+}
+
+function isOverdue(value: string | null | undefined) {
+  if (!value) return false
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return false
+  return date.getTime() < Date.now()
 }
 
 const LEAD_TYPE_STYLES: Record<
@@ -265,133 +241,94 @@ export default function DashboardPage() {
   const [deals, setDeals] = useState<DealRow[]>([])
   const [loading, setLoading] = useState(true)
 
-  async function loadLeads() {
-    const { data, error } = await supabase
-      .from('leads')
-      .select(`
-        id,
-        property_address_1,
-        city,
-        state,
-        zip,
-        owner_name,
-        owner_phone_primary,
-        asking_price,
-        arv,
-        mao,
-        projected_spread,
-        next_action,
-        lead_source,
-        status,
-        created_at,
-        updated_at,
-        lead_type,
-        house_value,
-        estimated_value,
-        market_value,
-        equity_amount,
-        mortgage_balance,
-        bedrooms,
-        bathrooms,
-        ownership_length,
-        last_sale_date,
-        lead_intelligence,
-        raw_import_data,
-        source_columns
-      `)
-      .order('updated_at', { ascending: false, nullsFirst: false })
-
-    if (error) throw error
-    return (data || []) as LeadRow[]
-  }
-
-  async function loadTasks() {
-    const attempts = [
-      `
-        id,
-        title,
-        status,
-        priority,
-        created_at,
-        due_at,
-        lead_id
-      `,
-      `
-        id,
-        title,
-        status,
-        priority,
-        created_at,
-        due_date,
-        lead_id
-      `,
-      `
-        id,
-        title,
-        status,
-        priority,
-        created_at,
-        lead_id
-      `,
-    ]
-
-    for (const selectClause of attempts) {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select(selectClause)
-        .order('created_at', { ascending: false })
-
-      if (!error) {
-        return ((data ?? []) as unknown[]).map((row) => ({
-          id: String((row as any).id),
-          title: ((row as any).title ?? null) as string | null,
-          status: ((row as any).status ?? null) as string | null,
-          priority: ((row as any).priority ?? null) as string | null,
-          created_at: ((row as any).created_at ?? null) as string | null,
-          due_at: ((row as any).due_at ?? null) as string | null,
-          due_date: ((row as any).due_date ?? null) as string | null,
-          lead_id: ((row as any).lead_id ?? null) as string | null,
-        }))
-      }
-    }
-
-    return []
-  }
-
-  async function loadDeals() {
-    const { data, error } = await supabase
-      .from('deals')
-      .select(`
-        id,
-        status,
-        assignment_fee,
-        created_at
-      `)
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
-    return (data || []) as DealRow[]
-  }
-
   async function loadDashboard() {
     setLoading(true)
 
-    try {
-      const [leadData, taskData, dealData] = await Promise.all([
-        loadLeads(),
-        loadTasks(),
-        loadDeals(),
-      ])
+    const [
+      { data: leadData, error: leadError },
+      { data: taskData, error: taskError },
+      { data: dealData, error: dealError },
+    ] = await Promise.all([
+      supabase
+        .from('leads')
+        .select(`
+          id,
+          property_address_1,
+          city,
+          state,
+          zip,
+          owner_name,
+          owner_phone_primary,
+          asking_price,
+          arv,
+          mao,
+          projected_spread,
+          next_action,
+          lead_source,
+          status,
+          created_at,
+          updated_at,
+          lead_type,
+          house_value,
+          estimated_value,
+          market_value,
+          equity_amount,
+          mortgage_balance,
+          bedrooms,
+          bathrooms,
+          ownership_length,
+          last_sale_date,
+          lead_intelligence,
+          raw_import_data,
+          source_columns
+        `)
+        .order('updated_at', { ascending: false, nullsFirst: false }),
+      supabase
+        .from('tasks')
+        .select(`
+          id,
+          title,
+          status,
+          priority,
+          created_at,
+          due_date,
+          lead_id
+        `)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('deals')
+        .select(`
+          id,
+          status,
+          assignment_fee,
+          created_at
+        `)
+        .order('created_at', { ascending: false }),
+    ])
 
-      setLeads(leadData)
-      setTasks(taskData)
-      setDeals(dealData)
-    } catch (error: any) {
-      console.error(error)
-      alert(error?.message || 'Failed to load dashboard.')
-    } finally {
-      setLoading(false)
+    setLoading(false)
+
+    if (leadError) {
+      console.error(leadError)
+      alert(leadError.message)
+      return
     }
+
+    if (taskError) {
+      console.error(taskError)
+      alert(taskError.message)
+      return
+    }
+
+    if (dealError) {
+      console.error(dealError)
+      alert(dealError.message)
+      return
+    }
+
+    setLeads((leadData || []) as LeadRow[])
+    setTasks((taskData || []) as TaskRow[])
+    setDeals((dealData || []) as DealRow[])
   }
 
   useEffect(() => {
@@ -401,15 +338,14 @@ export default function DashboardPage() {
   const normalizedLeads = useMemo(() => leads.map(normalizeLead), [leads])
 
   const totalLeads = normalizedLeads.length
-  const inboxCount = normalizedLeads.filter((lead) => lead.status === 'lead_inbox').length
+  const inboxCount = normalizedLeads.filter((lead) => normalizeStatus(lead.status) === 'lead_inbox').length
   const activeCount = normalizedLeads.filter(
-    (lead) => !['lead_inbox', 'closed'].includes(lead.status || '')
+    (lead) => !['lead_inbox', 'closed'].includes(normalizeStatus(lead.status))
   ).length
   const underContractCount = normalizedLeads.filter(
-    (lead) => lead.status === 'under_contract'
+    (lead) => normalizeStatus(lead.status) === 'under_contract'
   ).length
   const highRiskCount = normalizedLeads.filter((lead) => getLeadStrength(lead) <= 20).length
-
   const avgStrength =
     normalizedLeads.length > 0
       ? Math.round(
@@ -423,19 +359,15 @@ export default function DashboardPage() {
   const visibleValue = normalizedLeads.reduce((sum, lead) => sum + (lead.resolved_value || 0), 0)
   const assignmentFeeTotal = deals.reduce((sum, deal) => sum + (deal.assignment_fee || 0), 0)
 
-  const stageSeries = useMemo(
-    () =>
-      STAGES.map((stage) => {
-        const count = normalizedLeads.filter((lead) => lead.status === stage).length
-        return {
-          stage,
-          label: getStageLabel(stage),
-          count,
-          hex: getStageHex(stage),
-        }
-      }),
-    [normalizedLeads]
-  )
+  const stageSeries = STAGES.map((stage) => {
+    const count = normalizedLeads.filter((lead) => normalizeStatus(lead.status) === stage).length
+    return {
+      stage,
+      label: getStageLabel(stage),
+      count,
+      hex: getStageHex(stage),
+    }
+  })
 
   const maxStageCount = Math.max(...stageSeries.map((item) => item.count), 1)
 
@@ -462,7 +394,7 @@ export default function DashboardPage() {
   const urgentTasks = openTasks.filter((task) =>
     ['urgent', 'high'].includes((task.priority || '').toLowerCase())
   )
-  const overdueTasks = openTasks.filter((task) => isOverdue(getTaskDueValue(task)))
+  const overdueTasks = openTasks.filter((task) => isOverdue(task.due_date))
 
   const suggestedActions = useMemo(() => {
     const items: string[] = []
@@ -476,7 +408,7 @@ export default function DashboardPage() {
     }
 
     const noActionCount = normalizedLeads.filter(
-      (lead) => lead.status !== 'closed' && !lead.next_action
+      (lead) => normalizeStatus(lead.status) !== 'closed' && !lead.next_action
     ).length
 
     if (noActionCount > 0) {
@@ -485,7 +417,7 @@ export default function DashboardPage() {
 
     const weakLeads = normalizedLeads.filter(
       (lead) =>
-        !['lead_inbox', 'closed'].includes(lead.status || '') &&
+        !['lead_inbox', 'closed'].includes(normalizeStatus(lead.status)) &&
         getLeadStrength(lead) <= 40
     ).length
 
@@ -533,7 +465,6 @@ export default function DashboardPage() {
                     style={{
                       ...barFillStyle,
                       width: `${(item.count / maxStageCount) * 100}%`,
-                      minWidth: item.count > 0 ? 8 : 0,
                       background: item.hex,
                     }}
                   />
@@ -657,23 +588,18 @@ const statsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
   gap: 12,
-  width: '100%',
 }
 
 const topGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.18fr) minmax(360px, 0.82fr)',
+  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 0.9fr)',
   gap: 18,
-  width: '100%',
-  alignItems: 'stretch',
 }
 
 const bottomGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.18fr) minmax(360px, 0.82fr)',
+  gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)',
   gap: 18,
-  width: '100%',
-  alignItems: 'stretch',
 }
 
 const barListStyle: CSSProperties = {
@@ -716,7 +642,6 @@ const valueGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 12,
-  width: '100%',
 }
 
 const miniMetricStyle: CSSProperties = {
@@ -745,7 +670,6 @@ const typeGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 12,
-  width: '100%',
 }
 
 const typeCardStyle: CSSProperties = {
@@ -770,7 +694,6 @@ const typeCountStyle: CSSProperties = {
 const leadListStyle: CSSProperties = {
   display: 'grid',
   gap: 12,
-  width: '100%',
 }
 
 const leadCardStyle: CSSProperties = {
@@ -819,7 +742,6 @@ const leadActionRowStyle: CSSProperties = {
 const actionListStyle: CSSProperties = {
   display: 'grid',
   gap: 10,
-  width: '100%',
 }
 
 const actionItemStyle: CSSProperties = {
