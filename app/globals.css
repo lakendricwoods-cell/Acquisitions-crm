@@ -846,7 +846,7 @@ textarea::placeholder {
 }
 body {
   background:
-    radial-gradient(circle at 20% 0%, rgba(56,189,248,0.06), transparent 25%),
-    radial-gradient(circle at 80% 10%, rgba(154,124,255,0.05), transparent 25%),
-    linear-gradient(180deg, #050914 0%, #02050c 60%, #01030a 100%);
+    radial-gradient(circle at 20% 0%, rgba(0, 0, 0, 0.06), transparent 25%),
+    radial-gradient(circle at 80% 10%, rgba(0, 0, 0, 0.05), transparent 25%),
+    linear-gradient(180deg, #000000 0%, #000000 60%, #000000 100%);
 }
