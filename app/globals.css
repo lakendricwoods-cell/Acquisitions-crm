@@ -760,3 +760,7 @@ textarea::placeholder {
     justify-content: flex-start;
   }
 }
+body {
+  background: #000000; /* PURE BLACK */
+  color: white;
+}

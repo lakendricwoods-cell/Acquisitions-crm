@@ -1,12 +1,40 @@
 'use client'
 
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode, CSSProperties } from 'react'
 
-type PageShellProps = {
+type Props = {
   title: string
   subtitle?: string
   actions?: ReactNode
   children: ReactNode
+}
+
+const containerStyle: CSSProperties = {
+  width: '100%',
+  minHeight: '100vh',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 20,
+  padding: '24px 28px',
+  background: 'transparent',
+}
+
+const headerStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 16,
+}
+
+const titleStyle: CSSProperties = {
+  fontSize: 20,
+  fontWeight: 600,
+  color: '#ffffff',
+}
+
+const subtitleStyle: CSSProperties = {
+  fontSize: 13,
+  color: 'rgba(255,255,255,0.6)',
 }
 
 export default function PageShell({
@@ -14,87 +42,19 @@ export default function PageShell({
   subtitle,
   actions,
   children,
-}: PageShellProps) {
+}: Props) {
   return (
-    <div style={outerStyle}>
-      <div style={innerStyle}>
-        <div style={headerStyle}>
-          <div style={titleWrapStyle}>
-            <h1 style={titleStyle}>{title}</h1>
-            {subtitle ? <p style={subtitleStyle}>{subtitle}</p> : null}
-          </div>
-
-          {actions ? <div style={actionsStyle}>{actions}</div> : null}
+    <div style={containerStyle}>
+      <div style={headerStyle}>
+        <div>
+          <div style={titleStyle}>{title}</div>
+          {subtitle && <div style={subtitleStyle}>{subtitle}</div>}
         </div>
 
-        <div style={contentStyle}>{children}</div>
+        <div style={{ display: 'flex', gap: 10 }}>{actions}</div>
       </div>
+
+      <div style={{ width: '100%' }}>{children}</div>
     </div>
   )
-}
-
-const outerStyle: CSSProperties = {
-  width: '100%',
-  minWidth: 0,
-  background: 'transparent',
-}
-
-const innerStyle: CSSProperties = {
-  width: '100%',
-  maxWidth: 1320,
-  margin: '0 auto',
-  minWidth: 0,
-  padding: '20px 20px 28px',
-  boxSizing: 'border-box',
-  background: 'transparent',
-}
-
-const headerStyle: CSSProperties = {
-  width: '100%',
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
-  gap: 16,
-  marginBottom: 18,
-  flexWrap: 'wrap',
-}
-
-const titleWrapStyle: CSSProperties = {
-  minWidth: 0,
-  flex: '1 1 420px',
-}
-
-const titleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 28,
-  fontWeight: 800,
-  lineHeight: 1.1,
-  color: '#f8fcff',
-  textShadow: '0 0 18px rgba(88,230,255,0.05)',
-}
-
-const subtitleStyle: CSSProperties = {
-  margin: '8px 0 0',
-  fontSize: 14,
-  lineHeight: 1.5,
-  color: 'var(--text-soft)',
-  maxWidth: '100%',
-}
-
-const actionsStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: 10,
-  flexWrap: 'wrap',
-  minWidth: 0,
-  flex: '0 1 auto',
-}
-
-const contentStyle: CSSProperties = {
-  width: '100%',
-  minWidth: 0,
-  display: 'grid',
-  gap: 18,
-  background: 'transparent',
 }
