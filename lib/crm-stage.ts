@@ -49,22 +49,22 @@ export function normalizeCrmStage(value: unknown): CrmStage {
   if (!raw) return 'lead_inbox'
 
   if (['lead_inbox', 'lead inbox', 'inbox', 'imported'].includes(raw)) return 'lead_inbox'
-  if (['new_lead', 'new lead', 'new', 'open', 'active', 'lead'].includes(raw)) return 'new_lead'
-  if (['skip_trace', 'skip trace'].includes(raw)) return 'skip_trace'
-  if (['contact_attempted', 'contact attempted', 'attempted'].includes(raw)) return 'contact_attempted'
-  if (['contacted', 'contact'].includes(raw)) return 'contacted'
-  if (['follow_up', 'follow up', 'followup', 'callback'].includes(raw)) return 'follow_up'
-  if (['appointment_set', 'appointment set'].includes(raw)) return 'appointment_set'
-  if (['offer_sent', 'offer sent', 'offer'].includes(raw)) return 'offer_sent'
-  if (['negotiation', 'negotiating'].includes(raw)) return 'negotiation'
-  if (['verbal_yes', 'verbal yes'].includes(raw)) return 'verbal_yes'
+  if (['new_lead', 'new lead', 'new', 'open', 'active', 'lead', 'fresh'].includes(raw)) return 'new_lead'
+  if (['skip_trace', 'skip trace', 'tracing'].includes(raw)) return 'skip_trace'
+  if (['contact_attempted', 'contact attempted', 'attempted', 'trying to contact'].includes(raw)) return 'contact_attempted'
+  if (['contacted', 'contact', 'owner contacted'].includes(raw)) return 'contacted'
+  if (['follow_up', 'follow up', 'followup', 'callback', 'nurture'].includes(raw)) return 'follow_up'
+  if (['appointment_set', 'appointment set', 'meeting set'].includes(raw)) return 'appointment_set'
+  if (['offer_sent', 'offer sent', 'offer', 'sent offer'].includes(raw)) return 'offer_sent'
+  if (['negotiation', 'negotiating', 'countered', 'counter offer'].includes(raw)) return 'negotiation'
+  if (['verbal_yes', 'verbal yes', 'agreed verbally'].includes(raw)) return 'verbal_yes'
   if (['under_contract', 'under contract', 'contract', 'contracted'].includes(raw)) return 'under_contract'
   if (['title_opened', 'title opened', 'title'].includes(raw)) return 'title_opened'
-  if (['buyer_marketing', 'buyer marketing'].includes(raw)) return 'buyer_marketing'
-  if (['assigned'].includes(raw)) return 'assigned'
+  if (['buyer_marketing', 'buyer marketing', 'blast to buyers'].includes(raw)) return 'buyer_marketing'
+  if (['assigned', 'assignment signed'].includes(raw)) return 'assigned'
   if (['double_close', 'double close'].includes(raw)) return 'double_close'
   if (['closed', 'sold', 'done'].includes(raw)) return 'closed'
-  if (['dead', 'lost'].includes(raw)) return 'dead'
+  if (['dead', 'dead lead', 'lost'].includes(raw)) return 'dead'
 
   return 'new_lead'
 }
@@ -77,4 +77,10 @@ export function resolveCrmStage(row: Record<string, any>): CrmStage {
       row.pipeline_stage ??
       row.stage
   )
+}
+
+export function getNextCrmStage(stage: CrmStage): CrmStage | null {
+  const index = CRM_STAGES.indexOf(stage)
+  if (index === -1 || index === CRM_STAGES.length - 1) return null
+  return CRM_STAGES[index + 1]
 }
