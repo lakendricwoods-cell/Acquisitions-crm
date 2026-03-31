@@ -131,6 +131,17 @@ function toText(value: unknown) {
   return text.length ? text : null
 }
 
+function getTaskDueValue(task: TaskRow) {
+  return task.due_at || task.due_date || null
+}
+
+function isOverdue(value: string | null | undefined) {
+  if (!value) return false
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return false
+  return date.getTime() < Date.now()
+}
+
 function normalizeLead(lead: LeadRow) {
   const beds = resolveNumericField(lead as any, FIELD_ALIASES.beds, null, {
     treatZeroAsMissing: true,
@@ -168,7 +179,7 @@ function normalizeLead(lead: LeadRow) {
     lead.mortgage_balance ??
     null
 
-  const resolvedStatus = normalizeStatus(lead.status)
+  const normalized = normalizeStatus(lead.status)
 
   const ownershipYears =
     computeOwnershipYears({
@@ -183,7 +194,7 @@ function normalizeLead(lead: LeadRow) {
 
   return {
     ...lead,
-    status: resolvedStatus,
+    status: normalized,
     owner_name: ownerName,
     bedrooms: beds,
     bathrooms: baths,
@@ -213,17 +224,6 @@ function getLeadReadiness(lead: ReturnType<typeof normalizeLead>) {
   if (strength >= 80) return 'Ready'
   if (strength >= 50) return 'Building'
   return 'Early'
-}
-
-function getTaskDueValue(task: TaskRow) {
-  return task.due_at || task.due_date || null
-}
-
-function isOverdue(value: string | null | undefined) {
-  if (!value) return false
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return false
-  return date.getTime() < Date.now()
 }
 
 const LEAD_TYPE_STYLES: Record<
@@ -340,15 +340,15 @@ export default function DashboardPage() {
 
       if (!error) {
         return ((data ?? []) as unknown[]).map((row) => ({
-  id: String((row as any).id),
-  title: ((row as any).title ?? null) as string | null,
-  status: ((row as any).status ?? null) as string | null,
-  priority: ((row as any).priority ?? null) as string | null,
-  created_at: ((row as any).created_at ?? null) as string | null,
-  due_at: ((row as any).due_at ?? null) as string | null,
-  due_date: ((row as any).due_date ?? null) as string | null,
-  lead_id: ((row as any).lead_id ?? null) as string | null,
-}))
+          id: String((row as any).id),
+          title: ((row as any).title ?? null) as string | null,
+          status: ((row as any).status ?? null) as string | null,
+          priority: ((row as any).priority ?? null) as string | null,
+          created_at: ((row as any).created_at ?? null) as string | null,
+          due_at: ((row as any).due_at ?? null) as string | null,
+          due_date: ((row as any).due_date ?? null) as string | null,
+          lead_id: ((row as any).lead_id ?? null) as string | null,
+        }))
       }
     }
 
@@ -406,7 +406,6 @@ export default function DashboardPage() {
     (lead) => lead.status === 'under_contract'
   ).length
   const highRiskCount = normalizedLeads.filter((lead) => getLeadStrength(lead) <= 20).length
-
   const avgStrength =
     normalizedLeads.length > 0
       ? Math.round(
@@ -420,17 +419,19 @@ export default function DashboardPage() {
   const visibleValue = normalizedLeads.reduce((sum, lead) => sum + (lead.resolved_value || 0), 0)
   const assignmentFeeTotal = deals.reduce((sum, deal) => sum + (deal.assignment_fee || 0), 0)
 
-  const stageSeries = useMemo(() => {
-    return STAGES.map((stage) => {
-      const count = normalizedLeads.filter((lead) => lead.status === stage).length
-      return {
-        stage,
-        label: getStageLabel(stage),
-        count,
-        hex: getStageHex(stage),
-      }
-    })
-  }, [normalizedLeads])
+  const stageSeries = useMemo(
+    () =>
+      STAGES.map((stage) => {
+        const count = normalizedLeads.filter((lead) => lead.status === stage).length
+        return {
+          stage,
+          label: getStageLabel(stage),
+          count,
+          hex: getStageHex(stage),
+        }
+      }),
+    [normalizedLeads]
+  )
 
   const maxStageCount = Math.max(...stageSeries.map((item) => item.count), 1)
 
@@ -518,7 +519,7 @@ export default function DashboardPage() {
       </div>
 
       <div style={topGridStyle}>
-        <SectionCard title="Pipeline Distribution" subtitle="Using live CRM lead status data.">
+        <SectionCard title="Pipeline Distribution" subtitle="Using live CRM lead rows, not placeholder data.">
           <div style={barListStyle}>
             {stageSeries.map((item) => (
               <div key={item.stage} style={barRowStyle}>
@@ -651,18 +652,23 @@ const statsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
   gap: 12,
+  width: '100%',
 }
 
 const topGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 0.9fr)',
+  gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)',
   gap: 18,
+  width: '100%',
+  alignItems: 'stretch',
 }
 
 const bottomGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)',
+  gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)',
   gap: 18,
+  width: '100%',
+  alignItems: 'stretch',
 }
 
 const barListStyle: CSSProperties = {
@@ -705,6 +711,7 @@ const valueGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 12,
+  width: '100%',
 }
 
 const miniMetricStyle: CSSProperties = {
@@ -733,6 +740,7 @@ const typeGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 12,
+  width: '100%',
 }
 
 const typeCardStyle: CSSProperties = {
@@ -757,6 +765,7 @@ const typeCountStyle: CSSProperties = {
 const leadListStyle: CSSProperties = {
   display: 'grid',
   gap: 12,
+  width: '100%',
 }
 
 const leadCardStyle: CSSProperties = {
@@ -805,6 +814,7 @@ const leadActionRowStyle: CSSProperties = {
 const actionListStyle: CSSProperties = {
   display: 'grid',
   gap: 10,
+  width: '100%',
 }
 
 const actionItemStyle: CSSProperties = {
