@@ -135,10 +135,7 @@ export default function PipelinePage() {
       actions={
         <>
           <StatPill label="Leads" value={leads.length} />
-          <StatPill
-            label="Contracts"
-            value={grouped.find((s) => s.key === 'under_contract')?.count ?? 0}
-          />
+          <StatPill label="Contracts" value={grouped.find((s) => s.key === 'under_contract')?.count ?? 0} />
           <StatPill label="Visible Value" value={money(totalValue)} />
         </>
       }
@@ -213,10 +210,7 @@ export default function PipelinePage() {
 
                         <div style={leadMetaGridStyle}>
                           <Meta label="Owner" value={lead.owner_name || '—'} />
-                          <Meta
-                            label="Value"
-                            value={money(lead.house_value ?? lead.estimated_value ?? lead.market_value)}
-                          />
+                          <Meta label="Value" value={money(lead.house_value ?? lead.estimated_value ?? lead.market_value)} />
                           <Meta label="Equity" value={money(lead.equity_amount)} />
                           <Meta label="Mortgage" value={money(lead.mortgage_balance)} />
                         </div>

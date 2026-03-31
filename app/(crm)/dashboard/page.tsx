@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import PageShell from '@/components/ui/page-shell'
@@ -83,10 +83,7 @@ const STAGES = [
   'dead',
 ] as const
 
-const STAGE_META: Record<
-  string,
-  { label: string; color: string; soft: string; glow: string }
-> = {
+const STAGE_META: Record<string, { label: string; color: string; soft: string; glow: string }> = {
   lead_inbox: { label: 'Lead Inbox', color: '#7dd3fc', soft: 'rgba(125,211,252,0.10)', glow: 'rgba(125,211,252,0.38)' },
   new_lead: { label: 'New Lead', color: '#22d3ee', soft: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.38)' },
   skip_trace: { label: 'Skip Trace', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.38)' },
@@ -274,42 +271,13 @@ function getStrengthBucket(score: number) {
   return '0-19'
 }
 
-const LEAD_TYPE_STYLES: Record<
-  string,
-  { label: string; bg: string; border: string; text: string; color: string; glow: string }
-> = {
-  standard: {
-    label: 'Standard',
-    bg: 'rgba(56,189,248,0.10)',
-    border: 'rgba(56,189,248,0.30)',
-    text: '#dcebff',
-    color: '#38bdf8',
-    glow: 'rgba(56,189,248,0.35)',
-  },
-  foreclosure: {
-    label: 'Foreclosure',
-    bg: 'rgba(251,113,133,0.10)',
-    border: 'rgba(251,113,133,0.30)',
-    text: '#ffd9d9',
-    color: '#fb7185',
-    glow: 'rgba(251,113,133,0.35)',
-  },
-  tax_lien: {
-    label: 'Tax Lien',
-    bg: 'rgba(245,158,11,0.10)',
-    border: 'rgba(245,158,11,0.30)',
-    text: '#f3d899',
-    color: '#f59e0b',
-    glow: 'rgba(245,158,11,0.35)',
-  },
-  foreclosure_tax_lien: {
-    label: 'Foreclosure + Tax',
-    bg: 'rgba(139,92,246,0.10)',
-    border: 'rgba(139,92,246,0.30)',
-    text: '#ede7ff',
-    color: '#8b5cf6',
-    glow: 'rgba(139,92,246,0.35)',
-  },
+type GraphSeriesItem = {
+  key: string
+  label: string
+  count: number
+  color: string
+  soft: string
+  glow: string
 }
 
 export default function DashboardPage() {
@@ -476,54 +444,45 @@ export default function DashboardPage() {
   const visibleValue = normalizedLeads.reduce((sum, lead) => sum + (lead.resolved_value || 0), 0)
   const assignmentFeeTotal = deals.reduce((sum, deal) => sum + (deal.assignment_fee || 0), 0)
 
-  const stageSeries = useMemo(
+  const stageSeries: GraphSeriesItem[] = useMemo(
     () =>
-      STAGES.map((stage) => {
-        const count = normalizedLeads.filter((lead) => lead.status === stage).length
-        return {
-          key: stage,
-          label: STAGE_META[stage].label,
-          count,
-          color: STAGE_META[stage].color,
-          soft: STAGE_META[stage].soft,
-          glow: STAGE_META[stage].glow,
-        }
-      }),
+      STAGES.map((stage) => ({
+        key: stage,
+        label: STAGE_META[stage].label,
+        count: normalizedLeads.filter((lead) => lead.status === stage).length,
+        color: STAGE_META[stage].color,
+        soft: STAGE_META[stage].soft,
+        glow: STAGE_META[stage].glow,
+      })),
     [normalizedLeads]
   )
 
-  const leadTypeSeries = useMemo(() => {
-    const buckets = ['standard', 'foreclosure', 'tax_lien', 'foreclosure_tax_lien'] as const
-    return buckets.map((key) => {
-      const style = LEAD_TYPE_STYLES[key]
-      return {
-        key,
-        label: style.label,
-        count: normalizedLeads.filter((lead) => normalizeLeadType(lead.lead_type) === key).length,
-        color: style.color,
-        bg: style.bg,
-        glow: style.glow,
-      }
-    })
+  const leadTypeSeries: GraphSeriesItem[] = useMemo(() => {
+    const items = [
+      { key: 'standard', label: 'Standard', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.35)' },
+      { key: 'foreclosure', label: 'Foreclosure', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.35)' },
+      { key: 'tax_lien', label: 'Tax Lien', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.35)' },
+      { key: 'foreclosure_tax_lien', label: 'Foreclosure + Tax', color: '#8b5cf6', soft: 'rgba(139,92,246,0.10)', glow: 'rgba(139,92,246,0.35)' },
+    ]
+
+    return items.map((item) => ({
+      ...item,
+      count: normalizedLeads.filter((lead) => normalizeLeadType(lead.lead_type) === item.key).length,
+    }))
   }, [normalizedLeads])
 
-  const strengthSeries = useMemo(() => {
-    const buckets = ['0-19', '20-39', '40-59', '60-79', '80-100']
-    const meta: Record<string, { color: string; bg: string; glow: string }> = {
-      '0-19': { color: '#fb7185', bg: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.34)' },
-      '20-39': { color: '#f97316', bg: 'rgba(249,115,22,0.10)', glow: 'rgba(249,115,22,0.34)' },
-      '40-59': { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.34)' },
-      '60-79': { color: '#22d3ee', bg: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.34)' },
-      '80-100': { color: '#38bdf8', bg: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.38)' },
-    }
+  const strengthSeries: GraphSeriesItem[] = useMemo(() => {
+    const items = [
+      { key: '0-19', label: '0-19', color: '#fb7185', soft: 'rgba(251,113,133,0.10)', glow: 'rgba(251,113,133,0.35)' },
+      { key: '20-39', label: '20-39', color: '#f97316', soft: 'rgba(249,115,22,0.10)', glow: 'rgba(249,115,22,0.35)' },
+      { key: '40-59', label: '40-59', color: '#f59e0b', soft: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.35)' },
+      { key: '60-79', label: '60-79', color: '#22d3ee', soft: 'rgba(34,211,238,0.10)', glow: 'rgba(34,211,238,0.35)' },
+      { key: '80-100', label: '80-100', color: '#38bdf8', soft: 'rgba(56,189,248,0.10)', glow: 'rgba(56,189,248,0.38)' },
+    ]
 
-    return buckets.map((bucket) => ({
-      key: bucket,
-      label: bucket,
-      count: normalizedLeads.filter((lead) => getStrengthBucket(getLeadStrength(lead)) === bucket).length,
-      color: meta[bucket].color,
-      bg: meta[bucket].bg,
-      glow: meta[bucket].glow,
+    return items.map((item) => ({
+      ...item,
+      count: normalizedLeads.filter((lead) => getStrengthBucket(getLeadStrength(lead)) === item.key).length,
     }))
   }, [normalizedLeads])
 
@@ -549,35 +508,22 @@ export default function DashboardPage() {
   const suggestedActions = useMemo(() => {
     const items: string[] = []
 
-    if (inboxCount > 0) {
-      items.push(`${inboxCount} leads are sitting in Lead Inbox and need first promotion.`)
-    }
-
-    if (urgentTasks.length > 0) {
-      items.push(`${urgentTasks.length} tasks are marked high priority and should be handled first.`)
-    }
+    if (inboxCount > 0) items.push(`${inboxCount} leads are sitting in Lead Inbox and need first promotion.`)
+    if (urgentTasks.length > 0) items.push(`${urgentTasks.length} tasks are marked high priority and should be handled first.`)
 
     const noActionCount = normalizedLeads.filter(
       (lead) => lead.status !== 'closed' && lead.status !== 'dead' && !lead.next_action
     ).length
-
-    if (noActionCount > 0) {
-      items.push(`${noActionCount} active leads do not have a next action set.`)
-    }
+    if (noActionCount > 0) items.push(`${noActionCount} active leads do not have a next action set.`)
 
     const weakLeads = normalizedLeads.filter(
       (lead) =>
         !['lead_inbox', 'closed', 'dead'].includes(lead.status || '') &&
         getLeadStrength(lead) <= 40
     ).length
+    if (weakLeads > 0) items.push(`${weakLeads} active leads are weakly filled and need more data.`)
 
-    if (weakLeads > 0) {
-      items.push(`${weakLeads} active leads are weakly filled and need more data.`)
-    }
-
-    if (items.length === 0) {
-      items.push('No major blockers right now. Keep advancing active stages.')
-    }
+    if (items.length === 0) items.push('No major blockers right now. Keep advancing active stages.')
 
     return items.slice(0, 5)
   }, [inboxCount, normalizedLeads, urgentTasks.length])
@@ -596,22 +542,10 @@ export default function DashboardPage() {
       }
     >
       <div style={heroStripStyle}>
-        <div style={{ ...heroCardStyle, ...heroBlueStyle }}>
-          <div style={heroLabelStyle}>Visible Pipeline Value</div>
-          <div style={heroValueStyle}>{compactMoney(visibleValue)}</div>
-        </div>
-        <div style={{ ...heroCardStyle, ...heroTealStyle }}>
-          <div style={heroLabelStyle}>Visible Equity</div>
-          <div style={heroValueStyle}>{compactMoney(visibleEquity)}</div>
-        </div>
-        <div style={{ ...heroCardStyle, ...heroAmberStyle }}>
-          <div style={heroLabelStyle}>Projected Spread</div>
-          <div style={heroValueStyle}>{compactMoney(projectedSpread)}</div>
-        </div>
-        <div style={{ ...heroCardStyle, ...heroPurpleStyle }}>
-          <div style={heroLabelStyle}>Assignment Fees</div>
-          <div style={heroValueStyle}>{compactMoney(assignmentFeeTotal)}</div>
-        </div>
+        <HeroMetric title="Visible Pipeline Value" value={compactMoney(visibleValue)} tone="cyan" />
+        <HeroMetric title="Visible Equity" value={compactMoney(visibleEquity)} tone="teal" />
+        <HeroMetric title="Projected Spread" value={compactMoney(projectedSpread)} tone="amber" />
+        <HeroMetric title="Assignment Fees" value={compactMoney(assignmentFeeTotal)} tone="violet" />
       </div>
 
       <div style={statsGridStyle}>
@@ -629,22 +563,13 @@ export default function DashboardPage() {
           subtitle="Switch between live stage distribution, lead types, and strength bands."
           actions={
             <div style={toggleRowStyle}>
-              <GraphToggle
-                active={graphMode === 'stage_distribution'}
-                onClick={() => setGraphMode('stage_distribution')}
-              >
+              <GraphToggle active={graphMode === 'stage_distribution'} onClick={() => setGraphMode('stage_distribution')}>
                 Stages
               </GraphToggle>
-              <GraphToggle
-                active={graphMode === 'lead_types'}
-                onClick={() => setGraphMode('lead_types')}
-              >
+              <GraphToggle active={graphMode === 'lead_types'} onClick={() => setGraphMode('lead_types')}>
                 Lead Types
               </GraphToggle>
-              <GraphToggle
-                active={graphMode === 'lead_strength'}
-                onClick={() => setGraphMode('lead_strength')}
-              >
+              <GraphToggle active={graphMode === 'lead_strength'} onClick={() => setGraphMode('lead_strength')}>
                 Strength
               </GraphToggle>
             </div>
@@ -689,7 +614,7 @@ export default function DashboardPage() {
                 style={{
                   ...typeCardStyle,
                   borderColor: `${item.color}66`,
-                  background: item.bg,
+                  background: item.soft,
                   boxShadow: `0 0 18px ${item.glow} inset`,
                 }}
               >
@@ -786,7 +711,7 @@ function GraphToggle({
 }: {
   active: boolean
   onClick: () => void
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <button
@@ -808,6 +733,46 @@ function GraphToggle({
     >
       {children}
     </button>
+  )
+}
+
+function HeroMetric({
+  title,
+  value,
+  tone,
+}: {
+  title: string
+  value: string
+  tone: 'cyan' | 'teal' | 'amber' | 'violet'
+}) {
+  const tones: Record<string, CSSProperties> = {
+    cyan: {
+      background: 'linear-gradient(180deg, rgba(56,189,248,0.14), rgba(56,189,248,0.05))',
+      borderColor: 'rgba(56,189,248,0.30)',
+      boxShadow: '0 0 20px rgba(56,189,248,0.16), 0 18px 38px rgba(0,0,0,0.22)',
+    },
+    teal: {
+      background: 'linear-gradient(180deg, rgba(34,211,238,0.14), rgba(34,211,238,0.05))',
+      borderColor: 'rgba(34,211,238,0.30)',
+      boxShadow: '0 0 20px rgba(34,211,238,0.16), 0 18px 38px rgba(0,0,0,0.22)',
+    },
+    amber: {
+      background: 'linear-gradient(180deg, rgba(245,158,11,0.14), rgba(245,158,11,0.05))',
+      borderColor: 'rgba(245,158,11,0.30)',
+      boxShadow: '0 0 20px rgba(245,158,11,0.14), 0 18px 38px rgba(0,0,0,0.22)',
+    },
+    violet: {
+      background: 'linear-gradient(180deg, rgba(139,92,246,0.14), rgba(139,92,246,0.05))',
+      borderColor: 'rgba(139,92,246,0.30)',
+      boxShadow: '0 0 20px rgba(139,92,246,0.14), 0 18px 38px rgba(0,0,0,0.22)',
+    },
+  }
+
+  return (
+    <div style={{ ...heroCardStyle, ...tones[tone] }}>
+      <div style={heroLabelStyle}>{title}</div>
+      <div style={heroValueStyle}>{value}</div>
+    </div>
   )
 }
 
@@ -838,31 +803,6 @@ const heroCardStyle: CSSProperties = {
   border: '1px solid transparent',
   display: 'grid',
   gap: 8,
-  boxShadow: '0 18px 38px rgba(0,0,0,0.22)',
-}
-
-const heroBlueStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(56,189,248,0.14), rgba(56,189,248,0.05))',
-  borderColor: 'rgba(56,189,248,0.30)',
-  boxShadow: '0 0 20px rgba(56,189,248,0.16), 0 18px 38px rgba(0,0,0,0.22)',
-}
-
-const heroTealStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(34,211,238,0.14), rgba(34,211,238,0.05))',
-  borderColor: 'rgba(34,211,238,0.30)',
-  boxShadow: '0 0 20px rgba(34,211,238,0.16), 0 18px 38px rgba(0,0,0,0.22)',
-}
-
-const heroAmberStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(245,158,11,0.14), rgba(245,158,11,0.05))',
-  borderColor: 'rgba(245,158,11,0.30)',
-  boxShadow: '0 0 20px rgba(245,158,11,0.14), 0 18px 38px rgba(0,0,0,0.22)',
-}
-
-const heroPurpleStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(139,92,246,0.14), rgba(139,92,246,0.05))',
-  borderColor: 'rgba(139,92,246,0.30)',
-  boxShadow: '0 0 20px rgba(139,92,246,0.14), 0 18px 38px rgba(0,0,0,0.22)',
 }
 
 const heroLabelStyle: CSSProperties = {

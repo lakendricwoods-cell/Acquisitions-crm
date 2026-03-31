@@ -46,7 +46,7 @@ export default function ActionButton({
 
 const baseStyle: CSSProperties = {
   appearance: 'none',
-  borderRadius: 12,
+  borderRadius: 14,
   border: '1px solid transparent',
   display: 'inline-flex',
   alignItems: 'center',
@@ -55,9 +55,9 @@ const baseStyle: CSSProperties = {
   fontWeight: 700,
   lineHeight: 1,
   cursor: 'pointer',
-  transition:
-    'transform 120ms ease, opacity 120ms ease, background 120ms ease, border-color 120ms ease',
   whiteSpace: 'nowrap',
+  transition:
+    'transform 140ms ease, opacity 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease',
 }
 
 const regularStyle: CSSProperties = {
@@ -74,29 +74,31 @@ const compactStyle: CSSProperties = {
 }
 
 const defaultStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(214,166,75,0.20), rgba(214,166,75,0.12))',
-  borderColor: 'rgba(214,166,75,0.28)',
-  color: '#f5dfab',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.22)',
+  background: 'linear-gradient(180deg, rgba(88,230,255,0.16), rgba(77,163,255,0.08))',
+  borderColor: 'rgba(88,230,255,0.28)',
+  color: '#d8f8ff',
+  boxShadow: '0 0 14px rgba(88,230,255,0.18), 0 12px 26px rgba(0,0,0,0.22)',
 }
 
 const goldStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(214,166,75,0.24), rgba(214,166,75,0.14))',
-  borderColor: 'rgba(214,166,75,0.34)',
-  color: '#f6dfa0',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.22)',
+  background: 'linear-gradient(180deg, rgba(255,179,71,0.18), rgba(255,179,71,0.08))',
+  borderColor: 'rgba(255,179,71,0.32)',
+  color: '#ffe2b7',
+  boxShadow: '0 0 14px rgba(255,179,71,0.16), 0 12px 26px rgba(0,0,0,0.22)',
 }
 
 const ghostStyle: CSSProperties = {
-  background: 'rgba(255,255,255,0.02)',
-  borderColor: 'rgba(255,255,255,0.10)',
-  color: 'var(--text, #f5f7fb)',
+  background: 'rgba(255,255,255,0.025)',
+  borderColor: 'rgba(88,230,255,0.12)',
+  color: 'var(--text)',
+  boxShadow: 'inset 0 0 18px rgba(88,230,255,0.04)',
 }
 
 const dangerStyle: CSSProperties = {
-  background: 'rgba(239,68,68,0.12)',
-  borderColor: 'rgba(239,68,68,0.24)',
-  color: '#ffd4d4',
+  background: 'linear-gradient(180deg, rgba(255,107,143,0.16), rgba(255,107,143,0.08))',
+  borderColor: 'rgba(255,107,143,0.28)',
+  color: '#ffd6e0',
+  boxShadow: '0 0 14px rgba(255,107,143,0.14), 0 12px 26px rgba(0,0,0,0.22)',
 }
 
 const disabledStyle: CSSProperties = {
