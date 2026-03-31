@@ -34,10 +34,9 @@ export default function SectionCard({
 const cardStyle: CSSProperties = {
   borderRadius: 20,
   border: '1px solid rgba(88,230,255,0.12)',
-  background:
-    'linear-gradient(180deg, rgba(11,19,36,0.94), rgba(8,14,28,0.96))',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.98), rgba(1,3,8,0.99))',
   boxShadow:
-    'inset 0 0 24px rgba(88,230,255,0.035), 0 20px 44px rgba(0,0,0,0.26)',
+    'inset 0 0 0 1px rgba(88,230,255,0.03), 0 0 16px rgba(88,230,255,0.04), 0 20px 44px rgba(0,0,0,0.38)',
   padding: 16,
   minWidth: 0,
 }

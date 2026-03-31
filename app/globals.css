@@ -807,3 +807,46 @@ textarea::placeholder {
     justify-content: flex-start;
   }
 }
+:root {
+  --bg-main: #02050c;
+  --bg-soft: #050914;
+
+  --panel-dark: #04070f;
+  --panel-darker: #02050c;
+
+  --neon-blue: #38bdf8;
+  --neon-cyan: #58e6ff;
+  --neon-purple: #9a7cff;
+  --neon-green: #22c55e;
+  --neon-orange: #f59e0b;
+
+  --text-main: #f7fcff;
+  --text-soft: rgba(255,255,255,0.65);
+  --text-faint: rgba(255,255,255,0.4);
+
+  --border: rgba(88,230,255,0.12);
+}
+::selection {
+  background: rgba(88,230,255,0.2);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(88,230,255,0.3) transparent;
+}
+
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(88,230,255,0.3);
+  border-radius: 999px;
+}
+body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(56,189,248,0.06), transparent 25%),
+    radial-gradient(circle at 80% 10%, rgba(154,124,255,0.05), transparent 25%),
+    linear-gradient(180deg, #050914 0%, #02050c 60%, #01030a 100%);
+}

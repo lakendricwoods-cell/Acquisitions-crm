@@ -871,17 +871,16 @@ const chartValueStyle: CSSProperties = {
   color: 'var(--text-soft)',
   textAlign: 'center',
 }
-
 const chartTrackStyle: CSSProperties = {
   height: 220,
   borderRadius: 14,
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015))',
+  background: 'linear-gradient(180deg, rgba(6,8,14,0.92), rgba(2,4,10,0.98))',
   border: '1px solid rgba(125,211,252,0.08)',
   display: 'flex',
   alignItems: 'flex-end',
   justifyContent: 'center',
   padding: '8px 8px 10px',
-  boxShadow: 'inset 0 0 24px rgba(56,189,248,0.05)',
+  boxShadow: 'inset 0 0 18px rgba(56,189,248,0.03)',
 }
 
 const chartBarStyle: CSSProperties = {
@@ -907,11 +906,11 @@ const valueGridStyle: CSSProperties = {
 const miniMetricStyle: CSSProperties = {
   borderRadius: 16,
   border: '1px solid rgba(56,189,248,0.12)',
-  background: 'rgba(255,255,255,0.02)',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
   padding: 12,
   display: 'grid',
   gap: 6,
-  boxShadow: 'inset 0 0 18px rgba(56,189,248,0.04)',
+  boxShadow: 'inset 0 0 14px rgba(56,189,248,0.03)',
 }
 
 const miniMetricLabelStyle: CSSProperties = {
@@ -1005,11 +1004,11 @@ const leadListStyle: CSSProperties = {
 const leadCardStyle: CSSProperties = {
   borderRadius: 18,
   border: '1px solid rgba(56,189,248,0.10)',
-  background: 'rgba(255,255,255,0.02)',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
   padding: 14,
   display: 'grid',
   gap: 10,
-  boxShadow: 'inset 0 0 18px rgba(56,189,248,0.04)',
+  boxShadow: 'inset 0 0 14px rgba(56,189,248,0.03)',
 }
 
 const leadTopStyle: CSSProperties = {
@@ -1055,9 +1054,9 @@ const actionListStyle: CSSProperties = {
 const actionItemStyle: CSSProperties = {
   borderRadius: 14,
   border: '1px solid rgba(56,189,248,0.10)',
-  background: 'rgba(255,255,255,0.02)',
+  background: 'linear-gradient(180deg, rgba(4,6,12,0.96), rgba(1,3,8,0.99))',
   padding: 12,
   fontSize: 13,
   color: 'var(--text-soft)',
-  boxShadow: 'inset 0 0 14px rgba(56,189,248,0.04)',
+  boxShadow: 'inset 0 0 10px rgba(56,189,248,0.03)',
 }
