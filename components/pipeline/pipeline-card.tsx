@@ -40,13 +40,12 @@ export default function PipelineCard({
   onMoveToStage: (lead: PipelineLead, nextStage: CrmStage) => void
 }) {
   const nextStage = getNextCrmStage(stage)
+  const accent = CRM_STAGE_META[stage].color
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     event.dataTransfer.setData('text/plain', lead.id)
     event.dataTransfer.effectAllowed = 'move'
   }
-
-  const accent = CRM_STAGE_META[stage].color
 
   return (
     <article
@@ -54,8 +53,8 @@ export default function PipelineCard({
       onDragStart={handleDragStart}
       style={{
         ...cardStyle,
-        borderColor: `${accent}30`,
-        boxShadow: `inset 0 0 16px ${accent}12`,
+        borderColor: `${accent}55`,
+        boxShadow: `inset 0 0 18px ${accent}14, 0 0 12px ${accent}10`,
       }}
     >
       <div style={topRowStyle}>
@@ -63,8 +62,8 @@ export default function PipelineCard({
         <span
           className="crm-badge soft"
           style={{
-            background: `${accent}12`,
-            borderColor: `${accent}30`,
+            background: `${accent}16`,
+            borderColor: `${accent}44`,
             color: accent,
           }}
         >
@@ -87,7 +86,7 @@ export default function PipelineCard({
       </div>
 
       <div style={actionRowStyle}>
-        <span style={dragHintStyle}>Drag to move</span>
+        <span style={{ ...dragHintStyle, color: accent }}>Drag to move</span>
         {nextStage ? (
           <ActionButton compact onClick={() => onMoveToStage(lead, nextStage)}>
             Next Stage
@@ -109,8 +108,8 @@ function Meta({ label, value }: { label: string; value: string }) {
 
 const cardStyle: CSSProperties = {
   borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
   padding: 13,
   display: 'grid',
   gap: 10,
@@ -146,7 +145,7 @@ const metaGridStyle: CSSProperties = {
 const metaStyle: CSSProperties = {
   borderRadius: 12,
   border: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(6,8,14,0.94), rgba(1,3,8,0.98))',
+  background: 'linear-gradient(180deg, rgba(8,8,8,0.94), rgba(2,2,2,0.98))',
   padding: '8px 9px',
 }
 
@@ -174,5 +173,4 @@ const actionRowStyle: CSSProperties = {
 
 const dragHintStyle: CSSProperties = {
   fontSize: 11,
-  color: 'rgba(255,255,255,0.40)',
 }

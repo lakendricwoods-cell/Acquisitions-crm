@@ -1,19 +1,16 @@
 export const CRM_STAGES = [
-  'lead_inbox',
   'new_lead',
-  'skip_trace',
   'contact_attempted',
   'contacted',
   'follow_up',
-  'appointment_set',
-  'offer_sent',
+  'appointment',
+  'offers',
   'negotiation',
-  'verbal_yes',
+  'verbals',
   'under_contract',
   'title_opened',
-  'buyer_marketing',
+  'buyers_market',
   'assigned',
-  'double_close',
   'closed',
   'dead',
 ] as const
@@ -24,47 +21,82 @@ export const CRM_STAGE_META: Record<
   CrmStage,
   { label: string; color: string; bg: string }
 > = {
-  lead_inbox: { label: 'Lead Inbox', color: '#67e8f9', bg: 'rgba(103,232,249,0.08)' },
-  new_lead: { label: 'New Lead', color: '#22d3ee', bg: 'rgba(34,211,238,0.08)' },
-  skip_trace: { label: 'Skip Trace', color: '#38bdf8', bg: 'rgba(56,189,248,0.08)' },
-  contact_attempted: { label: 'Contact Attempted', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  contacted: { label: 'Contacted', color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)' },
-  follow_up: { label: 'Follow Up', color: '#818cf8', bg: 'rgba(129,140,248,0.08)' },
-  appointment_set: { label: 'Appointment Set', color: '#06b6d4', bg: 'rgba(6,182,212,0.08)' },
-  offer_sent: { label: 'Offer Sent', color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
-  negotiation: { label: 'Negotiation', color: '#c084fc', bg: 'rgba(192,132,252,0.08)' },
-  verbal_yes: { label: 'Verbal Yes', color: '#a3e635', bg: 'rgba(163,230,53,0.08)' },
-  under_contract: { label: 'Under Contract', color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
-  title_opened: { label: 'Title Opened', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' },
-  buyer_marketing: { label: 'Buyer Marketing', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
-  assigned: { label: 'Assigned', color: '#14b8a6', bg: 'rgba(20,184,166,0.08)' },
-  double_close: { label: 'Double Close', color: '#fb7185', bg: 'rgba(251,113,133,0.08)' },
-  closed: { label: 'Closed', color: '#22c55e', bg: 'rgba(34,197,94,0.08)' },
-  dead: { label: 'Dead', color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
+  new_lead: { label: 'New Lead', color: '#e0b84f', bg: 'rgba(224,184,79,0.10)' },
+  contact_attempted: { label: 'Contact Attempted', color: '#d97706', bg: 'rgba(217,119,6,0.10)' },
+  contacted: { label: 'Contacted', color: '#14b8a6', bg: 'rgba(20,184,166,0.10)' },
+  follow_up: { label: 'Follow Up', color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)' },
+  appointment: { label: 'Appointment', color: '#06b6d4', bg: 'rgba(6,182,212,0.10)' },
+  offers: { label: 'Offers', color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
+  negotiation: { label: 'Negotiation', color: '#c084fc', bg: 'rgba(192,132,252,0.10)' },
+  verbals: { label: 'Verbals', color: '#84cc16', bg: 'rgba(132,204,22,0.10)' },
+  under_contract: { label: 'Under Contract', color: '#10b981', bg: 'rgba(16,185,129,0.10)' },
+  title_opened: { label: 'Title Opened', color: '#38bdf8', bg: 'rgba(56,189,248,0.10)' },
+  buyers_market: { label: 'Buyers Market', color: '#a855f7', bg: 'rgba(168,85,247,0.10)' },
+  assigned: { label: 'Assigned', color: '#22c55e', bg: 'rgba(34,197,94,0.10)' },
+  closed: { label: 'Closed', color: '#f97316', bg: 'rgba(249,115,22,0.10)' },
+  dead: { label: 'Dead', color: '#64748b', bg: 'rgba(100,116,139,0.10)' },
 }
 
 export function normalizeCrmStage(value: unknown): CrmStage {
   const raw = String(value ?? '').trim().toLowerCase()
 
-  if (!raw) return 'lead_inbox'
+  if (!raw) return 'new_lead'
 
-  if (['lead_inbox', 'lead inbox', 'inbox', 'imported'].includes(raw)) return 'lead_inbox'
-  if (['new_lead', 'new lead', 'new', 'open', 'active', 'lead', 'fresh'].includes(raw)) return 'new_lead'
-  if (['skip_trace', 'skip trace', 'tracing'].includes(raw)) return 'skip_trace'
-  if (['contact_attempted', 'contact attempted', 'attempted', 'trying to contact'].includes(raw)) return 'contact_attempted'
-  if (['contacted', 'contact', 'owner contacted'].includes(raw)) return 'contacted'
-  if (['follow_up', 'follow up', 'followup', 'callback', 'nurture'].includes(raw)) return 'follow_up'
-  if (['appointment_set', 'appointment set', 'meeting set'].includes(raw)) return 'appointment_set'
-  if (['offer_sent', 'offer sent', 'offer', 'sent offer'].includes(raw)) return 'offer_sent'
-  if (['negotiation', 'negotiating', 'countered', 'counter offer'].includes(raw)) return 'negotiation'
-  if (['verbal_yes', 'verbal yes', 'agreed verbally'].includes(raw)) return 'verbal_yes'
-  if (['under_contract', 'under contract', 'contract', 'contracted'].includes(raw)) return 'under_contract'
-  if (['title_opened', 'title opened', 'title'].includes(raw)) return 'title_opened'
-  if (['buyer_marketing', 'buyer marketing', 'blast to buyers'].includes(raw)) return 'buyer_marketing'
-  if (['assigned', 'assignment signed'].includes(raw)) return 'assigned'
-  if (['double_close', 'double close'].includes(raw)) return 'double_close'
-  if (['closed', 'sold', 'done'].includes(raw)) return 'closed'
-  if (['dead', 'dead lead', 'lost'].includes(raw)) return 'dead'
+  if (['new_lead', 'new lead', 'new', 'lead', 'open', 'active', 'fresh', 'inbox', 'lead_inbox', 'lead inbox', 'imported'].includes(raw)) {
+    return 'new_lead'
+  }
+
+  if (['contact_attempted', 'contact attempted', 'attempted', 'trying to contact'].includes(raw)) {
+    return 'contact_attempted'
+  }
+
+  if (['contacted', 'contact', 'owner contacted'].includes(raw)) {
+    return 'contacted'
+  }
+
+  if (['follow_up', 'follow up', 'followup', 'callback', 'nurture'].includes(raw)) {
+    return 'follow_up'
+  }
+
+  if (['appointment', 'appointment_set', 'appointment set', 'meeting set'].includes(raw)) {
+    return 'appointment'
+  }
+
+  if (['offers', 'offer', 'offer_sent', 'offer sent', 'sent offer'].includes(raw)) {
+    return 'offers'
+  }
+
+  if (['negotiation', 'negotiating', 'countered', 'counter offer'].includes(raw)) {
+    return 'negotiation'
+  }
+
+  if (['verbals', 'verbal', 'verbal_yes', 'verbal yes', 'agreed verbally'].includes(raw)) {
+    return 'verbals'
+  }
+
+  if (['under_contract', 'under contract', 'contract', 'contracted'].includes(raw)) {
+    return 'under_contract'
+  }
+
+  if (['title_opened', 'title opened', 'title'].includes(raw)) {
+    return 'title_opened'
+  }
+
+  if (['buyers_market', 'buyers market', 'buyer_marketing', 'buyer marketing', 'blast to buyers'].includes(raw)) {
+    return 'buyers_market'
+  }
+
+  if (['assigned', 'assignment signed'].includes(raw)) {
+    return 'assigned'
+  }
+
+  if (['closed', 'sold', 'done'].includes(raw)) {
+    return 'closed'
+  }
+
+  if (['dead', 'dead lead', 'lost'].includes(raw)) {
+    return 'dead'
+  }
 
   return 'new_lead'
 }

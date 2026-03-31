@@ -48,7 +48,19 @@ export default function PipelinePage() {
       console.error(error)
       setLeads([])
     } else {
-      setLeads((data || []) as PipelineLead[])
+      const rows = ((data || []) as PipelineLead[]).map((lead) => {
+        const resolved = resolveCrmStage(lead)
+        return {
+          ...lead,
+          status: resolved,
+          deal_status: resolved,
+          lead_status: resolved,
+          pipeline_stage: resolved,
+          stage: resolved,
+        }
+      })
+
+      setLeads(rows)
     }
 
     setLoading(false)
@@ -100,7 +112,6 @@ export default function PipelinePage() {
   return (
     <PageShell
       title="Pipeline"
-      subtitle="Smooth kanban board for moving leads through every stage."
       actions={
         <>
           <StatPill label="Leads" value={leads.length} />
