@@ -2,11 +2,9 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { supabase } from '@/lib/supabase'
 import PageShell from '@/components/ui/page-shell'
-import SectionCard from '@/components/ui/section-card'
 import StatPill from '@/components/ui/stat-pill'
-import ActionButton from '@/components/ui/action-button'
+import { supabase } from '@/lib/supabase'
 
 type LeadRecord = {
   id: string
@@ -24,107 +22,54 @@ type LeadRecord = {
   mortgage_balance: number | null
 }
 
-type StageConfig = {
-  key: string
-  label: string
-  description: string
-  border: string
-  glow: string
-  chipBg: string
-  chipText: string
-  panelBg: string
-}
+const PIPELINE_STAGES = [
+  { key: 'lead_inbox', label: 'Lead Inbox', color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
+  { key: 'new_lead', label: 'New Lead', color: '#d6a64b', bg: 'rgba(214,166,75,0.08)' },
+  { key: 'skip_trace', label: 'Skip Trace', color: '#0ea5e9', bg: 'rgba(14,165,233,0.08)' },
+  { key: 'contact_attempted', label: 'Contact Attempted', color: '#f97316', bg: 'rgba(249,115,22,0.08)' },
+  { key: 'contacted', label: 'Contacted', color: '#22c55e', bg: 'rgba(34,197,94,0.08)' },
+  { key: 'follow_up', label: 'Follow Up', color: '#a855f7', bg: 'rgba(168,85,247,0.08)' },
+  { key: 'appointment_set', label: 'Appointment Set', color: '#06b6d4', bg: 'rgba(6,182,212,0.08)' },
+  { key: 'offer_sent', label: 'Offer Sent', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+  { key: 'negotiation', label: 'Negotiation', color: '#ec4899', bg: 'rgba(236,72,153,0.08)' },
+  { key: 'verbal_yes', label: 'Verbal Yes', color: '#84cc16', bg: 'rgba(132,204,22,0.08)' },
+  { key: 'under_contract', label: 'Under Contract', color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
+  { key: 'title_opened', label: 'Title Opened', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
+  { key: 'buyer_marketing', label: 'Buyer Marketing', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
+  { key: 'assigned', label: 'Assigned', color: '#14b8a6', bg: 'rgba(20,184,166,0.08)' },
+  { key: 'double_close', label: 'Double Close', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+  { key: 'closed', label: 'Closed', color: '#22c55e', bg: 'rgba(34,197,94,0.10)' },
+  { key: 'dead', label: 'Dead', color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
+] as const
 
-const PIPELINE_STAGES: StageConfig[] = [
-  {
-    key: 'new_lead',
-    label: 'New Lead',
-    description: 'Fresh imports and first-pass review.',
-    border: 'rgba(147,197,253,0.38)',
-    glow: 'rgba(147,197,253,0.16)',
-    chipBg: 'rgba(147,197,253,0.12)',
-    chipText: '#dcebff',
-    panelBg:
-      'radial-gradient(circle at top left, rgba(147,197,253,0.16), transparent 48%), linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.008)), rgba(0,0,0,0.22)',
-  },
-  {
-    key: 'researching',
-    label: 'Researching',
-    description: 'Signal validation and underwriting.',
-    border: 'rgba(214,166,75,0.36)',
-    glow: 'rgba(214,166,75,0.16)',
-    chipBg: 'rgba(214,166,75,0.12)',
-    chipText: '#f3d899',
-    panelBg:
-      'radial-gradient(circle at top left, rgba(214,166,75,0.16), transparent 48%), linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.008)), rgba(0,0,0,0.22)',
-  },
-  {
-    key: 'contacted',
-    label: 'Contacted',
-    description: 'Seller reached and posture assessed.',
-    border: 'rgba(94,234,212,0.34)',
-    glow: 'rgba(94,234,212,0.14)',
-    chipBg: 'rgba(94,234,212,0.12)',
-    chipText: '#d8fffb',
-    panelBg:
-      'radial-gradient(circle at top left, rgba(94,234,212,0.15), transparent 48%), linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.008)), rgba(0,0,0,0.22)',
-  },
-  {
-    key: 'negotiating',
-    label: 'Negotiating',
-    description: 'Price shaping and deal framing.',
-    border: 'rgba(196,181,253,0.36)',
-    glow: 'rgba(196,181,253,0.16)',
-    chipBg: 'rgba(196,181,253,0.12)',
-    chipText: '#ede7ff',
-    panelBg:
-      'radial-gradient(circle at top left, rgba(196,181,253,0.16), transparent 48%), linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.008)), rgba(0,0,0,0.22)',
-  },
-  {
-    key: 'under_contract',
-    label: 'Under Contract',
-    description: 'Agreement secured and buyer side begins.',
-    border: 'rgba(74,222,128,0.34)',
-    glow: 'rgba(74,222,128,0.16)',
-    chipBg: 'rgba(74,222,128,0.12)',
-    chipText: '#d8ffe6',
-    panelBg:
-      'radial-gradient(circle at top left, rgba(74,222,128,0.15), transparent 48%), linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.008)), rgba(0,0,0,0.22)',
-  },
-  {
-    key: 'dead',
-    label: 'Dead / Parked',
-    description: 'Inactive or parked leads.',
-    border: 'rgba(248,113,113,0.34)',
-    glow: 'rgba(248,113,113,0.16)',
-    chipBg: 'rgba(248,113,113,0.12)',
-    chipText: '#ffd9d9',
-    panelBg:
-      'radial-gradient(circle at top left, rgba(248,113,113,0.14), transparent 48%), linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.008)), rgba(0,0,0,0.22)',
-  },
-]
-
-function normalizeStage(status: string | null | undefined) {
+function normalizeStatus(status: string | null | undefined) {
   const value = (status || '').trim().toLowerCase()
-  if (!value) return 'new_lead'
-  if (value === 'new' || value === 'new lead') return 'new_lead'
-  if (value === 'researching' || value === 'research') return 'researching'
-  if (value === 'contacted' || value === 'contact') return 'contacted'
-  if (value === 'negotiating' || value === 'negotiation') return 'negotiating'
-  if (value === 'under contract' || value === 'under_contract' || value === 'contract') {
-    return 'under_contract'
-  }
-  if (value === 'dead' || value === 'parked' || value === 'closed_lost') return 'dead'
+
+  if (!value) return 'lead_inbox'
+  if (['lead_inbox', 'lead inbox', 'inbox', 'imported'].includes(value)) return 'lead_inbox'
+  if (['new_lead', 'new lead', 'new', 'open', 'active', 'fresh', 'lead'].includes(value)) return 'new_lead'
+  if (['skip_trace', 'skip trace', 'tracing'].includes(value)) return 'skip_trace'
+  if (['contact_attempted', 'contact attempted', 'attempted', 'trying to contact'].includes(value)) return 'contact_attempted'
+  if (['contacted', 'contact', 'spoken to owner', 'owner contacted'].includes(value)) return 'contacted'
+  if (['follow_up', 'follow up', 'followup', 'callback', 'nurture'].includes(value)) return 'follow_up'
+  if (['appointment_set', 'appointment set', 'meeting set'].includes(value)) return 'appointment_set'
+  if (['offer_sent', 'offer sent', 'offer', 'sent offer'].includes(value)) return 'offer_sent'
+  if (['negotiation', 'negotiating', 'countered', 'counter offer'].includes(value)) return 'negotiation'
+  if (['verbal_yes', 'verbal yes', 'agreed verbally'].includes(value)) return 'verbal_yes'
+  if (['under_contract', 'under contract', 'contract', 'contracted'].includes(value)) return 'under_contract'
+  if (['title_opened', 'title opened', 'title'].includes(value)) return 'title_opened'
+  if (['buyer_marketing', 'buyer marketing', 'blast to buyers'].includes(value)) return 'buyer_marketing'
+  if (['assigned', 'assignment signed'].includes(value)) return 'assigned'
+  if (['double_close', 'double close'].includes(value)) return 'double_close'
+  if (['closed', 'sold', 'done'].includes(value)) return 'closed'
+  if (['dead', 'dead lead', 'lost'].includes(value)) return 'dead'
+
   return 'new_lead'
 }
 
 function money(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(value)) return '—'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value)
+  if (value == null || Number.isNaN(value)) return '—'
+  return `$${Math.round(value).toLocaleString()}`
 }
 
 export default function PipelinePage() {
@@ -168,7 +113,7 @@ export default function PipelinePage() {
 
   const grouped = useMemo(() => {
     return PIPELINE_STAGES.map((stage) => {
-      const items = leads.filter((lead) => normalizeStage(lead.status) === stage.key)
+      const items = leads.filter((lead) => normalizeStatus(lead.status) === stage.key)
       return {
         ...stage,
         items,
@@ -186,191 +131,188 @@ export default function PipelinePage() {
   return (
     <PageShell
       title="Pipeline"
-      subtitle="Color-coded deal flow with per-stage scrolling and imported value signals."
+      subtitle="Full multi-stage deal flow with every stage color-coded."
       actions={
         <>
           <StatPill label="Leads" value={leads.length} />
-          <StatPill label="Contracts" value={grouped.find((s) => s.key === 'under_contract')?.count ?? 0} />
+          <StatPill
+            label="Contracts"
+            value={grouped.find((s) => s.key === 'under_contract')?.count ?? 0}
+          />
           <StatPill label="Visible Value" value={money(totalValue)} />
         </>
       }
     >
-      <div style={pipelineShellStyle}>
-        {grouped.map((stage) => (
-          <section
-            key={stage.key}
-            style={{
-              ...columnStyle,
-              borderColor: stage.border,
-              background: stage.panelBg,
-              boxShadow: `0 0 0 1px ${stage.glow} inset, 0 24px 48px rgba(0,0,0,0.34)`,
-            }}
-          >
-            <div style={columnHeaderStyle}>
-              <div style={columnTopRowStyle}>
-                <div>
-                  <div style={columnTitleStyle}>{stage.label}</div>
-                  <div style={columnSubtitleStyle}>{stage.description}</div>
-                </div>
-                <span
-                  className="crm-badge"
-                  style={{
-                    background: stage.chipBg,
-                    borderColor: stage.border,
-                    color: stage.chipText,
-                  }}
-                >
-                  {stage.count}
-                </span>
-              </div>
-            </div>
-
-            <div style={columnScrollStyle}>
-              {loading ? (
-                <div style={emptyStyle}>Loading stage...</div>
-              ) : stage.items.length === 0 ? (
-                <div style={emptyStyle}>No leads here.</div>
-              ) : (
-                stage.items.map((lead) => (
-                  <Link
-                    key={lead.id}
-                    href={`/leads/${lead.id}`}
-                    style={{ textDecoration: 'none' }}
+      <div style={pipelineScrollOuterStyle}>
+        <div style={pipelineShellStyle}>
+          {grouped.map((stage) => (
+            <section
+              key={stage.key}
+              style={{
+                ...columnStyle,
+                borderColor: `${stage.color}44`,
+                background: stage.bg,
+                boxShadow: `0 0 0 1px ${stage.color}22 inset, 0 24px 48px rgba(0,0,0,0.24)`,
+              }}
+            >
+              <div style={columnHeaderStyle}>
+                <div style={columnTopRowStyle}>
+                  <div>
+                    <div style={columnTitleStyle}>{stage.label}</div>
+                    <div style={columnSubtitleStyle}>{stage.count} lead{stage.count === 1 ? '' : 's'}</div>
+                  </div>
+                  <span
+                    className="crm-badge"
+                    style={{
+                      background: `${stage.color}22`,
+                      borderColor: `${stage.color}55`,
+                      color: stage.color,
+                    }}
                   >
-                    <article
-                      style={{
-                        ...leadCardStyle,
-                        borderColor: stage.border,
-                      }}
-                    >
-                      <div style={leadTopStyle}>
-                        <div style={leadTitleStyle}>
-                          {lead.property_address_1 || 'Unknown property'}
+                    {stage.count}
+                  </span>
+                </div>
+              </div>
+
+              <div style={columnScrollStyle}>
+                {loading ? (
+                  <div style={emptyStyle}>Loading stage...</div>
+                ) : stage.items.length === 0 ? (
+                  <div style={emptyStyle}>No leads here.</div>
+                ) : (
+                  stage.items.map((lead) => (
+                    <Link key={lead.id} href={`/leads/${lead.id}`} style={{ textDecoration: 'none' }}>
+                      <article
+                        style={{
+                          ...leadCardStyle,
+                          borderColor: `${stage.color}44`,
+                        }}
+                      >
+                        <div style={leadTopStyle}>
+                          <div style={leadTitleStyle}>
+                            {lead.property_address_1 || 'Unknown property'}
+                          </div>
+                          <span
+                            className="crm-badge soft"
+                            style={{
+                              background: `${stage.color}18`,
+                              borderColor: `${stage.color}44`,
+                              color: stage.color,
+                            }}
+                          >
+                            {lead.lead_type || 'standard'}
+                          </span>
                         </div>
-                        <span
-                          className="crm-badge soft"
-                          style={{
-                            background: stage.chipBg,
-                            borderColor: stage.border,
-                            color: stage.chipText,
-                          }}
-                        >
-                          {lead.lead_type || 'standard'}
-                        </span>
-                      </div>
 
-                      <div style={leadSubStyle}>
-                        {[lead.city, lead.state].filter(Boolean).join(', ') || 'No city/state'}
-                      </div>
+                        <div style={leadSubStyle}>
+                          {[lead.city, lead.state, lead.zip].filter(Boolean).join(', ') || 'Location pending'}
+                        </div>
 
-                      <div style={signalGridStyle}>
-                        <SignalMini
-                          label="Value"
-                          value={money(lead.house_value ?? lead.estimated_value ?? lead.market_value ?? null)}
-                        />
-                        <SignalMini
-                          label="Equity"
-                          value={money(lead.equity_amount)}
-                        />
-                        <SignalMini
-                          label="Mortgage"
-                          value={money(lead.mortgage_balance)}
-                        />
-                      </div>
-
-                      <div style={leadOwnerStyle}>{lead.owner_name || 'No owner name'}</div>
-
-                      <div style={leadFooterStyle}>
-                        <ActionButton tone="gold">
-                          Open Workspace
-                        </ActionButton>
-                      </div>
-                    </article>
-                  </Link>
-                ))
-              )}
-            </div>
-          </section>
-        ))}
+                        <div style={leadMetaGridStyle}>
+                          <Meta label="Owner" value={lead.owner_name || '—'} />
+                          <Meta
+                            label="Value"
+                            value={money(lead.house_value ?? lead.estimated_value ?? lead.market_value)}
+                          />
+                          <Meta label="Equity" value={money(lead.equity_amount)} />
+                          <Meta label="Mortgage" value={money(lead.mortgage_balance)} />
+                        </div>
+                      </article>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </PageShell>
   )
 }
 
-function SignalMini({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
+function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div style={signalMiniStyle}>
-      <div style={signalMiniLabelStyle}>{label}</div>
-      <div style={signalMiniValueStyle}>{value}</div>
+    <div style={metaStyle}>
+      <div style={metaLabelStyle}>{label}</div>
+      <div style={metaValueStyle}>{value}</div>
     </div>
   )
 }
 
-const pipelineShellStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(6, minmax(280px, 1fr))',
-  gap: 14,
+const pipelineScrollOuterStyle: CSSProperties = {
   overflowX: 'auto',
-  alignItems: 'start',
-  minHeight: 'calc(100vh - 170px)',
+  overflowY: 'hidden',
+  width: '100%',
   paddingBottom: 4,
 }
 
+const pipelineShellStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(17, minmax(300px, 300px))',
+  gap: 16,
+  alignItems: 'start',
+  minWidth: 'max-content',
+}
+
 const columnStyle: CSSProperties = {
-  minWidth: 280,
-  height: 'calc(100vh - 170px)',
-  borderRadius: 22,
-  border: '1px solid rgba(255,255,255,0.08)',
   display: 'grid',
   gridTemplateRows: 'auto minmax(0, 1fr)',
+  minHeight: 'calc(100vh - 220px)',
+  maxHeight: 'calc(100vh - 220px)',
+  borderRadius: 22,
+  border: '1px solid var(--border)',
   overflow: 'hidden',
 }
 
 const columnHeaderStyle: CSSProperties = {
   padding: 14,
-  borderBottom: '1px solid rgba(255,255,255,0.06)',
+  borderBottom: '1px solid var(--line)',
 }
 
 const columnTopRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: 10,
+  gap: 12,
 }
 
 const columnTitleStyle: CSSProperties = {
-  fontSize: 15,
-  fontWeight: 760,
-  color: 'var(--white-hi)',
+  fontSize: 14,
+  fontWeight: 700,
+  color: 'var(--text)',
 }
 
 const columnSubtitleStyle: CSSProperties = {
   marginTop: 4,
-  fontSize: 11,
-  lineHeight: 1.45,
-  color: 'var(--white-faint)',
+  fontSize: 12,
+  color: 'var(--text-soft)',
+  lineHeight: 1.4,
 }
 
 const columnScrollStyle: CSSProperties = {
   overflowY: 'auto',
-  padding: 14,
+  overflowX: 'hidden',
+  padding: 12,
   display: 'grid',
   alignContent: 'start',
   gap: 12,
 }
 
+const emptyStyle: CSSProperties = {
+  minHeight: 120,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: 16,
+  border: '1px dashed var(--border)',
+  color: 'var(--text-faint)',
+  fontSize: 12,
+}
+
 const leadCardStyle: CSSProperties = {
-  padding: 14,
   borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background:
-    'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008)), rgba(0,0,0,0.18)',
+  border: '1px solid var(--border)',
+  background: 'rgba(255,255,255,0.03)',
+  padding: 13,
   display: 'grid',
   gap: 10,
 }
@@ -383,60 +325,40 @@ const leadTopStyle: CSSProperties = {
 }
 
 const leadTitleStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 740,
-  lineHeight: 1.4,
-  color: 'var(--white-hi)',
+  fontSize: 14,
+  fontWeight: 700,
+  color: 'var(--text)',
 }
 
 const leadSubStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--white-faint)',
+  fontSize: 12,
+  color: 'var(--text-soft)',
 }
 
-const signalGridStyle: CSSProperties = {
+const leadMetaGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 8,
 }
 
-const signalMiniStyle: CSSProperties = {
-  padding: 10,
+const metaStyle: CSSProperties = {
   borderRadius: 12,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.05)',
+  border: '1px solid var(--line)',
+  background: 'rgba(255,255,255,0.02)',
+  padding: '8px 9px',
 }
 
-const signalMiniLabelStyle: CSSProperties = {
-  fontSize: 9,
-  letterSpacing: '0.12em',
+const metaLabelStyle: CSSProperties = {
+  fontSize: 10,
   textTransform: 'uppercase',
-  color: 'var(--white-faint)',
+  letterSpacing: '0.08em',
+  color: 'var(--text-faint)',
+  marginBottom: 4,
 }
 
-const signalMiniValueStyle: CSSProperties = {
-  marginTop: 6,
-  fontSize: 11,
-  fontWeight: 700,
-  color: 'var(--white-hi)',
-}
-
-const leadOwnerStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--white-soft)',
-}
-
-const leadFooterStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-start',
-}
-
-const emptyStyle: CSSProperties = {
-  padding: 14,
-  borderRadius: 16,
-  background: 'rgba(255,255,255,0.03)',
-  border: '1px solid rgba(255,255,255,0.05)',
-  color: 'var(--white-faint)',
+const metaValueStyle: CSSProperties = {
   fontSize: 12,
-  textAlign: 'center',
+  fontWeight: 650,
+  color: 'var(--text)',
+  lineHeight: 1.3,
 }

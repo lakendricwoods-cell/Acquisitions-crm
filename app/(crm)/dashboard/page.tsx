@@ -7,7 +7,6 @@ import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
 import ActionButton from '@/components/ui/action-button'
 import StatPill from '@/components/ui/stat-pill'
-import { getStageHex, getStageLabel } from '@/lib/ui/stage-colors'
 import { resolveField, resolveNumericField } from '@/lib/resolve-field'
 import { FIELD_ALIASES } from '@/lib/field-aliases'
 import { computeOwnershipYears } from '@/lib/compute-fields'
@@ -50,6 +49,7 @@ type TaskRow = {
   status: string | null
   priority: string | null
   created_at: string | null
+  due_at?: string | null
   due_date?: string | null
   lead_id?: string | null
 }
@@ -61,20 +61,74 @@ type DealRow = {
   created_at: string | null
 }
 
+type GraphMode = 'stage_distribution' | 'lead_types' | 'lead_strength'
+
 const STAGES = [
   'lead_inbox',
   'new_lead',
+  'skip_trace',
   'contact_attempted',
   'contacted',
   'follow_up',
+  'appointment_set',
   'offer_sent',
   'negotiation',
+  'verbal_yes',
   'under_contract',
+  'title_opened',
+  'buyer_marketing',
+  'assigned',
+  'double_close',
   'closed',
+  'dead',
 ] as const
 
+const STAGE_META: Record<
+  string,
+  { label: string; color: string; soft: string }
+> = {
+  lead_inbox: { label: 'Lead Inbox', color: '#64748b', soft: 'rgba(100,116,139,0.16)' },
+  new_lead: { label: 'New Lead', color: '#d6a64b', soft: 'rgba(214,166,75,0.16)' },
+  skip_trace: { label: 'Skip Trace', color: '#0ea5e9', soft: 'rgba(14,165,233,0.16)' },
+  contact_attempted: { label: 'Contact Attempted', color: '#f97316', soft: 'rgba(249,115,22,0.16)' },
+  contacted: { label: 'Contacted', color: '#22c55e', soft: 'rgba(34,197,94,0.16)' },
+  follow_up: { label: 'Follow Up', color: '#a855f7', soft: 'rgba(168,85,247,0.16)' },
+  appointment_set: { label: 'Appointment Set', color: '#06b6d4', soft: 'rgba(6,182,212,0.16)' },
+  offer_sent: { label: 'Offer Sent', color: '#f59e0b', soft: 'rgba(245,158,11,0.16)' },
+  negotiation: { label: 'Negotiation', color: '#ec4899', soft: 'rgba(236,72,153,0.16)' },
+  verbal_yes: { label: 'Verbal Yes', color: '#84cc16', soft: 'rgba(132,204,22,0.16)' },
+  under_contract: { label: 'Under Contract', color: '#10b981', soft: 'rgba(16,185,129,0.16)' },
+  title_opened: { label: 'Title Opened', color: '#3b82f6', soft: 'rgba(59,130,246,0.16)' },
+  buyer_marketing: { label: 'Buyer Marketing', color: '#8b5cf6', soft: 'rgba(139,92,246,0.16)' },
+  assigned: { label: 'Assigned', color: '#14b8a6', soft: 'rgba(20,184,166,0.16)' },
+  double_close: { label: 'Double Close', color: '#ef4444', soft: 'rgba(239,68,68,0.16)' },
+  closed: { label: 'Closed', color: '#22c55e', soft: 'rgba(34,197,94,0.18)' },
+  dead: { label: 'Dead', color: '#94a3b8', soft: 'rgba(148,163,184,0.16)' },
+}
+
 function normalizeStatus(status: string | null | undefined) {
-  return status || 'lead_inbox'
+  const value = (status || '').trim().toLowerCase()
+
+  if (!value) return 'lead_inbox'
+  if (['lead_inbox', 'lead inbox', 'inbox', 'imported'].includes(value)) return 'lead_inbox'
+  if (['new_lead', 'new lead', 'new', 'open', 'active', 'fresh', 'lead'].includes(value)) return 'new_lead'
+  if (['skip_trace', 'skip trace', 'tracing'].includes(value)) return 'skip_trace'
+  if (['contact_attempted', 'contact attempted', 'attempted', 'trying to contact'].includes(value)) return 'contact_attempted'
+  if (['contacted', 'contact', 'spoken to owner', 'owner contacted'].includes(value)) return 'contacted'
+  if (['follow_up', 'follow up', 'followup', 'callback', 'nurture'].includes(value)) return 'follow_up'
+  if (['appointment_set', 'appointment set', 'meeting set'].includes(value)) return 'appointment_set'
+  if (['offer_sent', 'offer sent', 'offer', 'sent offer'].includes(value)) return 'offer_sent'
+  if (['negotiation', 'negotiating', 'countered', 'counter offer'].includes(value)) return 'negotiation'
+  if (['verbal_yes', 'verbal yes', 'agreed verbally'].includes(value)) return 'verbal_yes'
+  if (['under_contract', 'under contract', 'contract', 'contracted'].includes(value)) return 'under_contract'
+  if (['title_opened', 'title opened', 'title'].includes(value)) return 'title_opened'
+  if (['buyer_marketing', 'buyer marketing', 'blast to buyers'].includes(value)) return 'buyer_marketing'
+  if (['assigned', 'assignment signed'].includes(value)) return 'assigned'
+  if (['double_close', 'double close'].includes(value)) return 'double_close'
+  if (['closed', 'sold', 'done'].includes(value)) return 'closed'
+  if (['dead', 'dead lead', 'lost'].includes(value)) return 'dead'
+
+  return 'new_lead'
 }
 
 function normalizeLeadType(type: string | null | undefined) {
@@ -117,6 +171,17 @@ function toText(value: unknown) {
   return text.length ? text : null
 }
 
+function getTaskDueValue(task: TaskRow) {
+  return task.due_at || task.due_date || null
+}
+
+function isOverdue(value: string | null | undefined) {
+  if (!value) return false
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return false
+  return date.getTime() < Date.now()
+}
+
 function normalizeLead(lead: LeadRow) {
   const beds = resolveNumericField(lead as any, FIELD_ALIASES.beds, null, {
     treatZeroAsMissing: true,
@@ -154,6 +219,8 @@ function normalizeLead(lead: LeadRow) {
     lead.mortgage_balance ??
     null
 
+  const normalized = normalizeStatus(lead.status)
+
   const ownershipYears =
     computeOwnershipYears({
       ...lead,
@@ -167,6 +234,7 @@ function normalizeLead(lead: LeadRow) {
 
   return {
     ...lead,
+    status: normalized,
     owner_name: ownerName,
     bedrooms: beds,
     bathrooms: baths,
@@ -198,40 +266,45 @@ function getLeadReadiness(lead: ReturnType<typeof normalizeLead>) {
   return 'Early'
 }
 
-function isOverdue(value: string | null | undefined) {
-  if (!value) return false
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return false
-  return date.getTime() < Date.now()
+function getStrengthBucket(score: number) {
+  if (score >= 80) return '80-100'
+  if (score >= 60) return '60-79'
+  if (score >= 40) return '40-59'
+  if (score >= 20) return '20-39'
+  return '0-19'
 }
 
 const LEAD_TYPE_STYLES: Record<
   string,
-  { label: string; bg: string; border: string; text: string }
+  { label: string; bg: string; border: string; text: string; color: string }
 > = {
   standard: {
     label: 'Standard',
-    bg: 'rgba(147,197,253,0.12)',
-    border: 'rgba(147,197,253,0.24)',
+    bg: 'rgba(59,130,246,0.12)',
+    border: 'rgba(59,130,246,0.28)',
     text: '#dcebff',
+    color: '#60a5fa',
   },
   foreclosure: {
     label: 'Foreclosure',
-    bg: 'rgba(248,113,113,0.12)',
-    border: 'rgba(248,113,113,0.24)',
+    bg: 'rgba(239,68,68,0.12)',
+    border: 'rgba(239,68,68,0.28)',
     text: '#ffd9d9',
+    color: '#f87171',
   },
   tax_lien: {
     label: 'Tax Lien',
     bg: 'rgba(214,166,75,0.12)',
-    border: 'rgba(214,166,75,0.24)',
+    border: 'rgba(214,166,75,0.28)',
     text: '#f3d899',
+    color: '#d6a64b',
   },
   foreclosure_tax_lien: {
     label: 'Foreclosure + Tax',
-    bg: 'rgba(196,181,253,0.12)',
-    border: 'rgba(196,181,253,0.24)',
+    bg: 'rgba(168,85,247,0.12)',
+    border: 'rgba(168,85,247,0.28)',
     text: '#ede7ff',
+    color: '#a855f7',
   },
 }
 
@@ -240,95 +313,135 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([])
   const [deals, setDeals] = useState<DealRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [graphMode, setGraphMode] = useState<GraphMode>('stage_distribution')
+
+  async function loadLeads() {
+    const { data, error } = await supabase
+      .from('leads')
+      .select(`
+        id,
+        property_address_1,
+        city,
+        state,
+        zip,
+        owner_name,
+        owner_phone_primary,
+        asking_price,
+        arv,
+        mao,
+        projected_spread,
+        next_action,
+        lead_source,
+        status,
+        created_at,
+        updated_at,
+        lead_type,
+        house_value,
+        estimated_value,
+        market_value,
+        equity_amount,
+        mortgage_balance,
+        bedrooms,
+        bathrooms,
+        ownership_length,
+        last_sale_date,
+        lead_intelligence,
+        raw_import_data,
+        source_columns
+      `)
+      .order('updated_at', { ascending: false, nullsFirst: false })
+
+    if (error) throw error
+    return (data || []) as LeadRow[]
+  }
+
+  async function loadTasks() {
+    const attempts = [
+      `
+        id,
+        title,
+        status,
+        priority,
+        created_at,
+        due_at,
+        lead_id
+      `,
+      `
+        id,
+        title,
+        status,
+        priority,
+        created_at,
+        due_date,
+        lead_id
+      `,
+      `
+        id,
+        title,
+        status,
+        priority,
+        created_at,
+        lead_id
+      `,
+    ]
+
+    for (const selectClause of attempts) {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(selectClause)
+        .order('created_at', { ascending: false })
+
+      if (!error) {
+        return ((data ?? []) as unknown[]).map((row) => ({
+          id: String((row as any).id),
+          title: ((row as any).title ?? null) as string | null,
+          status: ((row as any).status ?? null) as string | null,
+          priority: ((row as any).priority ?? null) as string | null,
+          created_at: ((row as any).created_at ?? null) as string | null,
+          due_at: ((row as any).due_at ?? null) as string | null,
+          due_date: ((row as any).due_date ?? null) as string | null,
+          lead_id: ((row as any).lead_id ?? null) as string | null,
+        }))
+      }
+    }
+
+    return []
+  }
+
+  async function loadDeals() {
+    const { data, error } = await supabase
+      .from('deals')
+      .select(`
+        id,
+        status,
+        assignment_fee,
+        created_at
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as DealRow[]
+  }
 
   async function loadDashboard() {
     setLoading(true)
 
-    const [
-      { data: leadData, error: leadError },
-      { data: taskData, error: taskError },
-      { data: dealData, error: dealError },
-    ] = await Promise.all([
-      supabase
-        .from('leads')
-        .select(`
-          id,
-          property_address_1,
-          city,
-          state,
-          zip,
-          owner_name,
-          owner_phone_primary,
-          asking_price,
-          arv,
-          mao,
-          projected_spread,
-          next_action,
-          lead_source,
-          status,
-          created_at,
-          updated_at,
-          lead_type,
-          house_value,
-          estimated_value,
-          market_value,
-          equity_amount,
-          mortgage_balance,
-          bedrooms,
-          bathrooms,
-          ownership_length,
-          last_sale_date,
-          lead_intelligence,
-          raw_import_data,
-          source_columns
-        `)
-        .order('updated_at', { ascending: false, nullsFirst: false }),
-      supabase
-        .from('tasks')
-        .select(`
-          id,
-          title,
-          status,
-          priority,
-          created_at,
-          due_date,
-          lead_id
-        `)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('deals')
-        .select(`
-          id,
-          status,
-          assignment_fee,
-          created_at
-        `)
-        .order('created_at', { ascending: false }),
-    ])
+    try {
+      const [leadData, taskData, dealData] = await Promise.all([
+        loadLeads(),
+        loadTasks(),
+        loadDeals(),
+      ])
 
-    setLoading(false)
-
-    if (leadError) {
-      console.error(leadError)
-      alert(leadError.message)
-      return
+      setLeads(leadData)
+      setTasks(taskData)
+      setDeals(dealData)
+    } catch (error: any) {
+      console.error(error)
+      alert(error?.message || 'Failed to load dashboard.')
+    } finally {
+      setLoading(false)
     }
-
-    if (taskError) {
-      console.error(taskError)
-      alert(taskError.message)
-      return
-    }
-
-    if (dealError) {
-      console.error(dealError)
-      alert(dealError.message)
-      return
-    }
-
-    setLeads((leadData || []) as LeadRow[])
-    setTasks((taskData || []) as TaskRow[])
-    setDeals((dealData || []) as DealRow[])
   }
 
   useEffect(() => {
@@ -338,12 +451,12 @@ export default function DashboardPage() {
   const normalizedLeads = useMemo(() => leads.map(normalizeLead), [leads])
 
   const totalLeads = normalizedLeads.length
-  const inboxCount = normalizedLeads.filter((lead) => normalizeStatus(lead.status) === 'lead_inbox').length
+  const inboxCount = normalizedLeads.filter((lead) => lead.status === 'lead_inbox').length
   const activeCount = normalizedLeads.filter(
-    (lead) => !['lead_inbox', 'closed'].includes(normalizeStatus(lead.status))
+    (lead) => !['lead_inbox', 'closed', 'dead'].includes(lead.status || '')
   ).length
   const underContractCount = normalizedLeads.filter(
-    (lead) => normalizeStatus(lead.status) === 'under_contract'
+    (lead) => lead.status === 'under_contract'
   ).length
   const highRiskCount = normalizedLeads.filter((lead) => getLeadStrength(lead) <= 20).length
   const avgStrength =
@@ -359,17 +472,20 @@ export default function DashboardPage() {
   const visibleValue = normalizedLeads.reduce((sum, lead) => sum + (lead.resolved_value || 0), 0)
   const assignmentFeeTotal = deals.reduce((sum, deal) => sum + (deal.assignment_fee || 0), 0)
 
-  const stageSeries = STAGES.map((stage) => {
-    const count = normalizedLeads.filter((lead) => normalizeStatus(lead.status) === stage).length
-    return {
-      stage,
-      label: getStageLabel(stage),
-      count,
-      hex: getStageHex(stage),
-    }
-  })
-
-  const maxStageCount = Math.max(...stageSeries.map((item) => item.count), 1)
+  const stageSeries = useMemo(
+    () =>
+      STAGES.map((stage) => {
+        const count = normalizedLeads.filter((lead) => lead.status === stage).length
+        return {
+          key: stage,
+          label: STAGE_META[stage].label,
+          count,
+          color: STAGE_META[stage].color,
+          soft: STAGE_META[stage].soft,
+        }
+      }),
+    [normalizedLeads]
+  )
 
   const leadTypeSeries = useMemo(() => {
     const buckets = ['standard', 'foreclosure', 'tax_lien', 'foreclosure_tax_lien'] as const
@@ -379,12 +495,38 @@ export default function DashboardPage() {
         key,
         label: style.label,
         count: normalizedLeads.filter((lead) => normalizeLeadType(lead.lead_type) === key).length,
+        color: style.color,
         bg: style.bg,
-        border: style.border,
-        text: style.text,
       }
     })
   }, [normalizedLeads])
+
+  const strengthSeries = useMemo(() => {
+    const buckets = ['0-19', '20-39', '40-59', '60-79', '80-100']
+    const colors: Record<string, string> = {
+      '0-19': '#ef4444',
+      '20-39': '#f97316',
+      '40-59': '#eab308',
+      '60-79': '#22c55e',
+      '80-100': '#06b6d4',
+    }
+
+    return buckets.map((bucket) => ({
+      key: bucket,
+      label: bucket,
+      count: normalizedLeads.filter((lead) => getStrengthBucket(getLeadStrength(lead)) === bucket).length,
+      color: colors[bucket],
+      bg: `${colors[bucket]}22`,
+    }))
+  }, [normalizedLeads])
+
+  const graphSeries = graphMode === 'stage_distribution'
+    ? stageSeries
+    : graphMode === 'lead_types'
+      ? leadTypeSeries
+      : strengthSeries
+
+  const maxGraphValue = Math.max(...graphSeries.map((item) => item.count), 1)
 
   const strongestLeads = [...normalizedLeads]
     .sort((a, b) => getLeadStrength(b) - getLeadStrength(a))
@@ -394,7 +536,7 @@ export default function DashboardPage() {
   const urgentTasks = openTasks.filter((task) =>
     ['urgent', 'high'].includes((task.priority || '').toLowerCase())
   )
-  const overdueTasks = openTasks.filter((task) => isOverdue(task.due_date))
+  const overdueTasks = openTasks.filter((task) => isOverdue(getTaskDueValue(task)))
 
   const suggestedActions = useMemo(() => {
     const items: string[] = []
@@ -408,7 +550,7 @@ export default function DashboardPage() {
     }
 
     const noActionCount = normalizedLeads.filter(
-      (lead) => normalizeStatus(lead.status) !== 'closed' && !lead.next_action
+      (lead) => lead.status !== 'closed' && lead.status !== 'dead' && !lead.next_action
     ).length
 
     if (noActionCount > 0) {
@@ -417,7 +559,7 @@ export default function DashboardPage() {
 
     const weakLeads = normalizedLeads.filter(
       (lead) =>
-        !['lead_inbox', 'closed'].includes(normalizeStatus(lead.status)) &&
+        !['lead_inbox', 'closed', 'dead'].includes(lead.status || '') &&
         getLeadStrength(lead) <= 40
     ).length
 
@@ -445,6 +587,25 @@ export default function DashboardPage() {
         </>
       }
     >
+      <div style={heroStripStyle}>
+        <div style={{ ...heroCardStyle, ...heroBlueStyle }}>
+          <div style={heroLabelStyle}>Visible Pipeline Value</div>
+          <div style={heroValueStyle}>{compactMoney(visibleValue)}</div>
+        </div>
+        <div style={{ ...heroCardStyle, ...heroGreenStyle }}>
+          <div style={heroLabelStyle}>Visible Equity</div>
+          <div style={heroValueStyle}>{compactMoney(visibleEquity)}</div>
+        </div>
+        <div style={{ ...heroCardStyle, ...heroGoldStyle }}>
+          <div style={heroLabelStyle}>Projected Spread</div>
+          <div style={heroValueStyle}>{compactMoney(projectedSpread)}</div>
+        </div>
+        <div style={{ ...heroCardStyle, ...heroPurpleStyle }}>
+          <div style={heroLabelStyle}>Assignment Fees</div>
+          <div style={heroValueStyle}>{compactMoney(assignmentFeeTotal)}</div>
+        </div>
+      </div>
+
       <div style={statsGridStyle}>
         <StatPill label="Total Leads" value={totalLeads} />
         <StatPill label="Inbox" value={inboxCount} />
@@ -455,32 +616,58 @@ export default function DashboardPage() {
       </div>
 
       <div style={topGridStyle}>
-        <SectionCard title="Pipeline Distribution" subtitle="Using live CRM lead rows, not placeholder data.">
-          <div style={barListStyle}>
-            {stageSeries.map((item) => (
-              <div key={item.stage} style={barRowStyle}>
-                <div style={barLabelStyle}>{item.label}</div>
-                <div style={barTrackStyle}>
+        <SectionCard
+          title="Performance Graphs"
+          subtitle="Switch between live stage distribution, lead types, and strength bands."
+          actions={
+            <div style={toggleRowStyle}>
+              <GraphToggle
+                active={graphMode === 'stage_distribution'}
+                onClick={() => setGraphMode('stage_distribution')}
+              >
+                Stages
+              </GraphToggle>
+              <GraphToggle
+                active={graphMode === 'lead_types'}
+                onClick={() => setGraphMode('lead_types')}
+              >
+                Lead Types
+              </GraphToggle>
+              <GraphToggle
+                active={graphMode === 'lead_strength'}
+                onClick={() => setGraphMode('lead_strength')}
+              >
+                Strength
+              </GraphToggle>
+            </div>
+          }
+        >
+          <div style={verticalChartStyle}>
+            {graphSeries.map((item) => (
+              <div key={item.key} style={chartColumnWrapStyle}>
+                <div style={chartValueStyle}>{item.count}</div>
+                <div style={chartTrackStyle}>
                   <div
                     style={{
-                      ...barFillStyle,
-                      width: `${(item.count / maxStageCount) * 100}%`,
-                      background: item.hex,
+                      ...chartBarStyle,
+                      height: `${Math.max((item.count / maxGraphValue) * 100, item.count > 0 ? 10 : 0)}%`,
+                      background: item.color,
+                      boxShadow: `0 0 24px ${item.color}55`,
                     }}
                   />
                 </div>
-                <div style={barCountStyle}>{item.count}</div>
+                <div style={chartLabelStyle}>{item.label}</div>
               </div>
             ))}
           </div>
         </SectionCard>
 
-        <SectionCard title="Value Snapshot" subtitle="Totals from normalized CRM values.">
+        <SectionCard title="Task Pressure" subtitle="What needs attention today.">
           <div style={valueGridStyle}>
-            <MiniMetric label="Visible Value" value={compactMoney(visibleValue)} />
-            <MiniMetric label="Visible Equity" value={compactMoney(visibleEquity)} />
-            <MiniMetric label="Projected Spread" value={compactMoney(projectedSpread)} />
-            <MiniMetric label="Assignment Fees" value={compactMoney(assignmentFeeTotal)} />
+            <MiniMetric label="Open Tasks" value={openTasks.length} />
+            <MiniMetric label="Urgent" value={urgentTasks.length} />
+            <MiniMetric label="Overdue" value={overdueTasks.length} />
+            <MiniMetric label="Deals" value={deals.length} />
           </div>
         </SectionCard>
       </div>
@@ -493,24 +680,28 @@ export default function DashboardPage() {
                 key={item.key}
                 style={{
                   ...typeCardStyle,
+                  borderColor: item.color,
                   background: item.bg,
-                  borderColor: item.border,
-                  color: item.text,
                 }}
               >
                 <div style={typeLabelStyle}>{item.label}</div>
-                <div style={typeCountStyle}>{item.count}</div>
+                <div style={{ ...typeCountStyle, color: item.color }}>{item.count}</div>
               </div>
             ))}
           </div>
         </SectionCard>
 
-        <SectionCard title="Task Pressure" subtitle="What needs attention today.">
-          <div style={valueGridStyle}>
-            <MiniMetric label="Open Tasks" value={openTasks.length} />
-            <MiniMetric label="Urgent" value={urgentTasks.length} />
-            <MiniMetric label="Overdue" value={overdueTasks.length} />
-            <MiniMetric label="Deals" value={deals.length} />
+        <SectionCard title="Stage Health" subtitle="Where leads are currently sitting.">
+          <div style={stageHealthStyle}>
+            {stageSeries.map((item) => (
+              <div key={item.key} style={{ ...stageHealthRowStyle, background: item.soft }}>
+                <div style={stageHealthLeftStyle}>
+                  <span style={{ ...stageDotStyle, background: item.color }} />
+                  <span style={stageHealthLabelStyle}>{item.label}</span>
+                </div>
+                <span style={stageHealthValueStyle}>{item.count}</span>
+              </div>
+            ))}
           </div>
         </SectionCard>
       </div>
@@ -569,6 +760,35 @@ export default function DashboardPage() {
   )
 }
 
+function GraphToggle({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        borderRadius: 999,
+        border: `1px solid ${active ? 'rgba(214,166,75,0.35)' : 'rgba(255,255,255,0.08)'}`,
+        background: active ? 'rgba(214,166,75,0.16)' : 'rgba(255,255,255,0.03)',
+        color: active ? '#f3d899' : 'var(--text-soft)',
+        padding: '7px 12px',
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 function MiniMetric({
   label,
   value,
@@ -584,6 +804,55 @@ function MiniMetric({
   )
 }
 
+const heroStripStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gap: 12,
+}
+
+const heroCardStyle: CSSProperties = {
+  borderRadius: 18,
+  padding: 16,
+  border: '1px solid transparent',
+  display: 'grid',
+  gap: 8,
+  boxShadow: '0 16px 36px rgba(0,0,0,0.18)',
+}
+
+const heroBlueStyle: CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06))',
+  borderColor: 'rgba(59,130,246,0.22)',
+}
+
+const heroGreenStyle: CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(34,197,94,0.14), rgba(34,197,94,0.06))',
+  borderColor: 'rgba(34,197,94,0.22)',
+}
+
+const heroGoldStyle: CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(214,166,75,0.14), rgba(214,166,75,0.06))',
+  borderColor: 'rgba(214,166,75,0.22)',
+}
+
+const heroPurpleStyle: CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(168,85,247,0.14), rgba(168,85,247,0.06))',
+  borderColor: 'rgba(168,85,247,0.22)',
+}
+
+const heroLabelStyle: CSSProperties = {
+  fontSize: 11,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--text-faint)',
+}
+
+const heroValueStyle: CSSProperties = {
+  fontSize: 26,
+  fontWeight: 800,
+  color: 'var(--text)',
+  lineHeight: 1,
+}
+
 const statsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
@@ -593,7 +862,7 @@ const statsGridStyle: CSSProperties = {
 
 const topGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 0.9fr)',
+  gridTemplateColumns: 'minmax(0, 1.18fr) minmax(360px, 0.82fr)',
   gap: 18,
   width: '100%',
   alignItems: 'stretch',
@@ -601,52 +870,70 @@ const topGridStyle: CSSProperties = {
 
 const bottomGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)',
+  gridTemplateColumns: 'minmax(0, 1.18fr) minmax(360px, 0.82fr)',
   gap: 18,
   width: '100%',
   alignItems: 'stretch',
 }
 
-const barListStyle: CSSProperties = {
+const toggleRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  flexWrap: 'wrap',
+}
+
+const verticalChartStyle: CSSProperties = {
   display: 'grid',
-  gap: 12,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(58px, 1fr))',
+  gap: 14,
+  alignItems: 'end',
+  minHeight: 300,
+  paddingTop: 10,
 }
 
-const barRowStyle: CSSProperties = {
+const chartColumnWrapStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '140px minmax(0, 1fr) 36px',
-  gap: 10,
-  alignItems: 'center',
+  gridTemplateRows: 'auto 220px auto',
+  gap: 8,
+  alignItems: 'end',
 }
 
-const barLabelStyle: CSSProperties = {
+const chartValueStyle: CSSProperties = {
   fontSize: 12,
-  color: 'var(--text-soft)',
-}
-
-const barTrackStyle: CSSProperties = {
-  height: 10,
-  borderRadius: 999,
-  background: 'rgba(255,255,255,0.06)',
-  overflow: 'hidden',
-}
-
-const barFillStyle: CSSProperties = {
-  height: '100%',
-  borderRadius: 999,
-}
-
-const barCountStyle: CSSProperties = {
-  fontSize: 12,
-  color: 'var(--text)',
   fontWeight: 700,
-  textAlign: 'right',
+  color: 'var(--text-soft)',
+  textAlign: 'center',
+}
+
+const chartTrackStyle: CSSProperties = {
+  height: 220,
+  borderRadius: 14,
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+  border: '1px solid rgba(255,255,255,0.06)',
+  display: 'flex',
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  padding: '8px 8px 10px',
+}
+
+const chartBarStyle: CSSProperties = {
+  width: '100%',
+  borderRadius: 10,
+  minHeight: 0,
+}
+
+const chartLabelStyle: CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.35,
+  color: 'var(--text-soft)',
+  textAlign: 'center',
 }
 
 const valueGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 12,
+  width: '100%',
 }
 
 const miniMetricStyle: CSSProperties = {
@@ -675,6 +962,7 @@ const typeGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 12,
+  width: '100%',
 }
 
 const typeCardStyle: CSSProperties = {
@@ -688,6 +976,7 @@ const typeCardStyle: CSSProperties = {
 const typeLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
+  color: 'var(--text-soft)',
 }
 
 const typeCountStyle: CSSProperties = {
@@ -696,9 +985,53 @@ const typeCountStyle: CSSProperties = {
   lineHeight: 1,
 }
 
+const stageHealthStyle: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+  maxHeight: 390,
+  overflowY: 'auto',
+  paddingRight: 4,
+}
+
+const stageHealthRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '10px 12px',
+  borderRadius: 12,
+  border: '1px solid rgba(255,255,255,0.05)',
+}
+
+const stageHealthLeftStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  minWidth: 0,
+}
+
+const stageDotStyle: CSSProperties = {
+  width: 10,
+  height: 10,
+  borderRadius: 999,
+  flexShrink: 0,
+}
+
+const stageHealthLabelStyle: CSSProperties = {
+  fontSize: 12,
+  color: 'var(--text-soft)',
+}
+
+const stageHealthValueStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  color: 'var(--text)',
+}
+
 const leadListStyle: CSSProperties = {
   display: 'grid',
   gap: 12,
+  width: '100%',
 }
 
 const leadCardStyle: CSSProperties = {
@@ -747,6 +1080,7 @@ const leadActionRowStyle: CSSProperties = {
 const actionListStyle: CSSProperties = {
   display: 'grid',
   gap: 10,
+  width: '100%',
 }
 
 const actionItemStyle: CSSProperties = {
