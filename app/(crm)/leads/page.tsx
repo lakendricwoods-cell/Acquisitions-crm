@@ -63,6 +63,7 @@ type LeadRow = GenericLeadRecord & {
 type ScoreType = 'overall' | 'motivation' | 'contactability' | 'marketability'
 
 export default function LeadsPage() {
+  const isMobile = useIsMobile()
   const [leads, setLeads] = useState<LeadRow[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
