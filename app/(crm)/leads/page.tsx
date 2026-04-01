@@ -1,5 +1,7 @@
 'use client'
 
+import LeadsMobile from '@/components/leads/leads-mobile'
+import { useIsMobile } from '@/components/shared/use-is-mobile'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import PageShell from '@/components/ui/page-shell'
