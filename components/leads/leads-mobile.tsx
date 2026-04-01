@@ -1,270 +1,168 @@
 'use client'
 
-import Link from 'next/link'
-import type { CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import PageShell from '@/components/ui/page-shell'
+import SectionCard from '@/components/ui/section-card'
+import StatPill from '@/components/ui/stat-pill'
+import MobileLeadCard, {
+  type MobileLeadCardData,
+} from '@/components/leads/mobile-lead-card'
+import { supabase } from '@/lib/supabase'
 
-export type MobileLeadCardData = {
+type LeadRow = {
   id: string
-  address: string
-  cityStateZip: string
-  owner: string
-  stage: string
-  strength: number
-  motivation: number
-  contact: number
-  market: number
-  priceText: string
-  arvText: string
-  phoneText: string
+  property_address_1?: string | null
+  property_address?: string | null
+  owner_name?: string | null
+  owner_phone_primary?: string | null
+  phone1?: string | null
+  city?: string | null
+  property_city?: string | null
+  state?: string | null
+  property_state?: string | null
+  zip?: string | null
+  property_zip?: string | null
+  status?: string | null
+  stage?: string | null
+  arv?: number | null
+  estimated_value?: number | null
+  market_value?: number | null
 }
 
-export default function MobileLeadCard({
-  lead,
-}: {
-  lead: MobileLeadCardData
-}) {
-  return (
-    <Link href={`/leads/${lead.id}`} style={linkStyle}>
-      <article style={cardStyle}>
-        <div style={topRowStyle}>
-          <div style={addressWrapStyle}>
-            <div style={addressStyle}>{lead.address}</div>
-            <div style={subStyle}>{lead.cityStateZip}</div>
-          </div>
-
-          <span style={stageBadgeStyle}>{lead.stage}</span>
-        </div>
-
-        <div style={ownerRowStyle}>
-          <div style={labelStyle}>Owner</div>
-          <div style={valueStyle}>{lead.owner}</div>
-        </div>
-
-        <div style={ownerRowStyle}>
-          <div style={labelStyle}>Contact</div>
-          <div style={valueStyle}>{lead.phoneText}</div>
-        </div>
-
-        <div style={metricGridStyle}>
-          <Metric label="Strength" value={lead.strength} tone="gold" />
-          <Metric label="Motivation" value={lead.motivation} tone="gold" />
-          <Metric label="Contact" value={lead.contact} tone="blue" />
-          <Metric label="Market" value={lead.market} tone="green" />
-        </div>
-
-        <div style={bottomGridStyle}>
-          <MiniStat label="Price" value={lead.priceText} />
-          <MiniStat label="ARV" value={lead.arvText} />
-        </div>
-
-        <div style={actionRowStyle}>
-          <span style={openTextStyle}>Open Workspace</span>
-        </div>
-      </article>
-    </Link>
-  )
+function firstNonEmpty(...values: Array<string | null | undefined>) {
+  return values.find((value) => typeof value === 'string' && value.trim().length > 0)
 }
 
-function Metric({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: number
-  tone: 'gold' | 'blue' | 'green'
-}) {
-  const toneMap = {
-    gold: {
-      border: 'rgba(214,166,75,0.28)',
-      bg: 'rgba(214,166,75,0.10)',
-      color: '#e7bf6a',
-    },
-    blue: {
-      border: 'rgba(90,150,255,0.22)',
-      bg: 'rgba(90,150,255,0.08)',
-      color: '#93b9ff',
-    },
-    green: {
-      border: 'rgba(34,197,94,0.24)',
-      bg: 'rgba(34,197,94,0.08)',
-      color: '#7ce39f',
-    },
-  }[tone]
+function formatMoney(value: number | null | undefined) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '—'
+  return `$${Math.round(value).toLocaleString()}`
+}
+
+function mapLeadToMobileCard(lead: LeadRow): MobileLeadCardData {
+  return {
+    id: lead.id,
+    address:
+      firstNonEmpty(lead.property_address_1, lead.property_address) || 'Unknown property',
+    cityStateZip:
+      [
+        firstNonEmpty(lead.city, lead.property_city),
+        firstNonEmpty(lead.state, lead.property_state),
+        firstNonEmpty(lead.zip, lead.property_zip),
+      ]
+        .filter(Boolean)
+        .join(', ') || 'Location pending',
+    owner: lead.owner_name || 'Unknown owner',
+    stage: firstNonEmpty(lead.status, lead.stage) || 'New Lead',
+    strength: 82,
+    motivation: 95,
+    contact: firstNonEmpty(lead.owner_phone_primary, lead.phone1) ? 75 : 35,
+    market: lead.arv || lead.estimated_value || lead.market_value ? 90 : 55,
+    priceText: formatMoney(lead.market_value ?? lead.estimated_value ?? null),
+    arvText: formatMoney(lead.arv ?? null),
+    phoneText: firstNonEmpty(lead.owner_phone_primary, lead.phone1) || 'No phone',
+  }
+}
+
+export default function LeadsMobile() {
+  const [rows, setRows] = useState<LeadRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error(error)
+        setRows([])
+      } else {
+        setRows((data as LeadRow[]) || [])
+      }
+
+      setLoading(false)
+    }
+
+    void load()
+  }, [])
+
+  const cards = useMemo(() => {
+    return rows
+      .map(mapLeadToMobileCard)
+      .filter((lead) => {
+        const q = query.trim().toLowerCase()
+        if (!q) return true
+
+        const haystack = [
+          lead.address,
+          lead.cityStateZip,
+          lead.owner,
+          lead.phoneText,
+          lead.stage,
+        ]
+          .join(' ')
+          .toLowerCase()
+
+        return haystack.includes(q)
+      })
+  }, [rows, query])
 
   return (
-    <div
-      style={{
-        ...metricStyle,
-        borderColor: toneMap.border,
-        background: toneMap.bg,
-      }}
+    <PageShell
+      title="Leads"
+      subtitle="Portrait mobile lead list built for fast scanning and one-tap workspace access."
+      actions={
+        <>
+          <StatPill label="Total" value={rows.length} />
+          <StatPill label="Visible" value={cards.length} />
+        </>
+      }
     >
-      <div style={metricLabelStyle}>{label}</div>
-      <div style={{ ...metricValueStyle, color: toneMap.color }}>{value}</div>
-    </div>
+      <SectionCard
+        title="Lead Control Center"
+        subtitle="Search and open leads without using the desktop table on phone."
+      >
+        <div style={toolbarStyle}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="crm-input"
+            placeholder="Search address, owner, phone, city..."
+            style={searchStyle}
+          />
+        </div>
+
+        {loading ? (
+          <div className="crm-muted">Loading leads...</div>
+        ) : cards.length === 0 ? (
+          <div className="crm-muted">No leads found.</div>
+        ) : (
+          <div style={listStyle}>
+            {cards.map((lead) => (
+              <MobileLeadCard key={lead.id} lead={lead} />
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </PageShell>
   )
 }
 
-function MiniStat({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <div style={miniStatStyle}>
-      <div style={miniLabelStyle}>{label}</div>
-      <div style={miniValueStyle}>{value}</div>
-    </div>
-  )
-}
-
-const linkStyle: CSSProperties = {
-  textDecoration: 'none',
-  color: 'inherit',
-}
-
-const cardStyle: CSSProperties = {
+const toolbarStyle: CSSProperties = {
   display: 'grid',
   gap: 12,
-  padding: 14,
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(6,6,6,0.98), rgba(0,0,0,1))',
-  boxShadow:
-    'inset 0 1px 0 rgba(255,255,255,0.02), 0 0 12px rgba(214,166,75,0.05)',
 }
 
-const topRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  justifyContent: 'space-between',
+const searchStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 44,
+}
+
+const listStyle: CSSProperties = {
+  display: 'grid',
   gap: 12,
-}
-
-const addressWrapStyle: CSSProperties = {
-  minWidth: 0,
-  display: 'grid',
-  gap: 4,
-  flex: 1,
-}
-
-const addressStyle: CSSProperties = {
-  fontSize: 22,
-  lineHeight: 1.04,
-  fontWeight: 800,
-  color: '#ffffff',
-  letterSpacing: '-0.03em',
-  wordBreak: 'break-word',
-}
-
-const subStyle: CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.45,
-  color: 'rgba(255,255,255,0.52)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-}
-
-const stageBadgeStyle: CSSProperties = {
-  minHeight: 30,
-  padding: '0 10px',
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(61,110,255,0.12)',
-  border: '1px solid rgba(61,110,255,0.28)',
-  color: '#76a1ff',
-  fontSize: 11,
-  fontWeight: 700,
-  flexShrink: 0,
-}
-
-const ownerRowStyle: CSSProperties = {
-  display: 'grid',
-  gap: 3,
-}
-
-const labelStyle: CSSProperties = {
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.12em',
-  color: 'rgba(255,255,255,0.38)',
-}
-
-const valueStyle: CSSProperties = {
-  fontSize: 16,
-  fontWeight: 650,
-  color: '#ffffff',
-  lineHeight: 1.25,
-  wordBreak: 'break-word',
-}
-
-const metricGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
-}
-
-const metricStyle: CSSProperties = {
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.06)',
-  padding: '10px 12px',
-  display: 'grid',
-  gap: 4,
-}
-
-const metricLabelStyle: CSSProperties = {
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.12em',
-  color: 'rgba(255,255,255,0.45)',
-}
-
-const metricValueStyle: CSSProperties = {
-  fontSize: 18,
-  fontWeight: 800,
-}
-
-const bottomGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
-}
-
-const miniStatStyle: CSSProperties = {
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'rgba(255,255,255,0.02)',
-  padding: '10px 12px',
-  display: 'grid',
-  gap: 4,
-}
-
-const miniLabelStyle: CSSProperties = {
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.12em',
-  color: 'rgba(255,255,255,0.40)',
-}
-
-const miniValueStyle: CSSProperties = {
-  fontSize: 16,
-  fontWeight: 750,
-  color: '#ffffff',
-}
-
-const actionRowStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  paddingTop: 2,
-}
-
-const openTextStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  color: '#e0b84f',
 }
