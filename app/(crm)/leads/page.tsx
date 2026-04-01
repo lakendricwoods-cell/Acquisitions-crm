@@ -1,7 +1,25 @@
 'use client'
 
 import LeadsMobile from '@/components/leads/leads-mobile'
-import { useIsMobile } from '@/components/shared/use-is-mobile'
+import { useIsMobile } from '@/hooks/use-is-mobile'
+
+export default function LeadsPage() {
+
+  const isMobile = useIsMobile()
+
+  // ✅ THIS MUST BE INSIDE FUNCTION
+  if (isMobile) {
+    return <LeadsMobile />
+  }
+
+  // ✅ DESKTOP UI BELOW
+  return (
+    <div>
+      {/* your existing desktop UI */}
+    </div>
+  )
+}
+
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import PageShell from '@/components/ui/page-shell'
