@@ -963,3 +963,9 @@ body,
     display: none;
   }
 }
+@media (max-width: 900px) {
+  .crm-table-wrap,
+  .crm-table {
+    display: none;
+  }
+}
