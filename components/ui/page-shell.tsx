@@ -1,6 +1,6 @@
 'use client'
 
-import type { CSSProperties, ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 
 type PageShellProps = {
   title: string
@@ -15,15 +15,55 @@ export default function PageShell({
   actions,
   children,
 }: PageShellProps) {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    function sync() {
+      setIsMobile(window.innerWidth <= 860)
+    }
+
+    sync()
+    window.addEventListener('resize', sync)
+    return () => window.removeEventListener('resize', sync)
+  }, [])
+
   return (
-    <div style={outerStyle}>
-      <div style={headerStyle}>
+    <div
+      style={{
+        ...outerStyle,
+        padding: isMobile ? '16px 14px 20px' : '22px 22px 28px',
+        gap: isMobile ? 14 : 18,
+      }}
+    >
+      <div
+        style={{
+          ...headerStyle,
+          gap: isMobile ? 12 : 16,
+        }}
+      >
         <div style={titleWrapStyle}>
-          <h1 style={titleStyle}>{title}</h1>
+          <h1
+            style={{
+              ...titleStyle,
+              fontSize: isMobile ? 24 : 28,
+            }}
+          >
+            {title}
+          </h1>
           {subtitle ? <p style={subtitleStyle}>{subtitle}</p> : null}
         </div>
 
-        {actions ? <div style={actionsStyle}>{actions}</div> : null}
+        {actions ? (
+          <div
+            style={{
+              ...actionsStyle,
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: isMobile ? 'flex-start' : 'flex-end',
+            }}
+          >
+            {actions}
+          </div>
+        ) : null}
       </div>
 
       <div style={contentStyle}>{children}</div>
@@ -36,10 +76,8 @@ const outerStyle: CSSProperties = {
   minWidth: 0,
   maxWidth: 1680,
   margin: '0 auto',
-  padding: '22px 22px 28px',
   boxSizing: 'border-box',
   display: 'grid',
-  gap: 18,
   background: 'transparent',
 }
 
@@ -47,7 +85,6 @@ const headerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: 16,
   flexWrap: 'wrap',
 }
 
@@ -59,7 +96,6 @@ const titleWrapStyle: CSSProperties = {
 
 const titleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 28,
   fontWeight: 800,
   lineHeight: 1.08,
   color: '#ffffff',
