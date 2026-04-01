@@ -1137,18 +1137,3 @@ const fieldValueStyle: React.CSSProperties = {
   fontSize: 12,
   textAlign: 'right',
 }
-export default function LeadsPage() {
-  // your existing state / hooks
-
-  const isMobile = useIsMobile()
-
-  // 🔥 MOBILE SWITCH
-  if (isMobile) {
-    return <LeadsMobile />
-  }
-
-  // 👇 your current desktop UI stays untouched
-  return (
-    <YourCurrentLeadsUI />
-  )
-}
