@@ -2,7 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import ActionButton from '@/components/ui/action-button'
 
 type CrmShellProps = {
@@ -12,7 +18,7 @@ type CrmShellProps = {
 type NavItem = {
   href: string
   label: string
-  shortLabel: string
+  bottomLabel?: string
   icon: ReactNode
 }
 
@@ -107,43 +113,61 @@ function IconSettings() {
   )
 }
 
+function IconMenu() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={iconSvgStyle}>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </svg>
+  )
+}
+
+function IconClose() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={iconSvgStyle}>
+      <path d="M6 6l12 12" />
+      <path d="M18 6 6 18" />
+    </svg>
+  )
+}
+
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', shortLabel: 'Home', icon: <IconDashboard /> },
-  { href: '/pipeline', label: 'Pipeline', shortLabel: 'Pipeline', icon: <IconPipeline /> },
-  { href: '/leads', label: 'Leads', shortLabel: 'Leads', icon: <IconLeads /> },
-  { href: '/deals', label: 'Deals', shortLabel: 'Deals', icon: <IconDeals /> },
-  { href: '/buyers', label: 'Buyers', shortLabel: 'Buyers', icon: <IconBuyers /> },
-  { href: '/imports', label: 'Imports', shortLabel: 'Imports', icon: <IconImports /> },
-  { href: '/tasks', label: 'Tasks', shortLabel: 'Tasks', icon: <IconTasks /> },
-  { href: '/reports', label: 'Reports', shortLabel: 'Reports', icon: <IconReports /> },
-  { href: '/settings', label: 'Settings', shortLabel: 'Settings', icon: <IconSettings /> },
+  { href: '/dashboard', label: 'Dashboard', bottomLabel: 'Home', icon: <IconDashboard /> },
+  { href: '/pipeline', label: 'Pipeline', bottomLabel: 'Pipeline', icon: <IconPipeline /> },
+  { href: '/tasks', label: 'Tasks', bottomLabel: 'Tasks', icon: <IconTasks /> },
+  { href: '/leads', label: 'Leads', bottomLabel: 'Leads', icon: <IconLeads /> },
+  { href: '/deals', label: 'Deals', icon: <IconDeals /> },
+  { href: '/buyers', label: 'Buyers', icon: <IconBuyers /> },
+  { href: '/imports', label: 'Imports', icon: <IconImports /> },
+  { href: '/reports', label: 'Reports', icon: <IconReports /> },
+  { href: '/settings', label: 'Settings', icon: <IconSettings /> },
 ]
 
 function getPageTitle(pathname: string) {
   if (pathname.startsWith('/dashboard')) return 'Dashboard'
   if (pathname.startsWith('/pipeline')) return 'Pipeline'
+  if (pathname.startsWith('/tasks')) return 'Tasks'
   if (pathname.startsWith('/leads')) return 'Leads'
   if (pathname.startsWith('/deals')) return 'Deals'
   if (pathname.startsWith('/buyers')) return 'Buyers'
   if (pathname.startsWith('/imports')) return 'Imports'
-  if (pathname.startsWith('/tasks')) return 'Tasks'
   if (pathname.startsWith('/reports')) return 'Reports'
   if (pathname.startsWith('/settings')) return 'Settings'
   return 'Foundation OS'
-}
-
-function getMobileNavItems() {
-  return NAV_ITEMS.slice(0, 5)
 }
 
 export default function CrmShell({ children }: CrmShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobile, setIsMobile] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     function sync() {
-      setIsMobile(window.innerWidth <= 860)
+      const mobile = window.innerWidth <= 900
+      setIsMobile(mobile)
+      if (!mobile) setMenuOpen(false)
     }
 
     sync()
@@ -151,14 +175,51 @@ export default function CrmShell({ children }: CrmShellProps) {
     return () => window.removeEventListener('resize', sync)
   }, [])
 
-  const mobileNavItems = useMemo(() => getMobileNavItems(), [])
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
+
+  const bottomNavItems = useMemo(
+    () => NAV_ITEMS.filter((item) => ['/dashboard', '/pipeline', '/tasks', '/leads'].includes(item.href)),
+    []
+  )
 
   function handleLogout() {
     router.push('/login')
   }
 
+  function renderNav(vertical = true) {
+    return (
+      <nav style={vertical ? navStyle : mobileDrawerNavStyle}>
+        {NAV_ITEMS.map((item) => {
+          const active =
+            pathname === item.href || pathname.startsWith(`${item.href}/`)
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                ...(vertical ? navItemStyle : mobileDrawerItemStyle),
+                ...(active ? navItemActiveStyle : null),
+              }}
+            >
+              <span style={navIconStyle}>{item.icon}</span>
+              <span style={navLabelStyle}>{item.label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+    )
+  }
+
   return (
-    <div style={shellStyle}>
+    <div
+      style={{
+        ...shellStyle,
+        gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '272px minmax(0, 1fr)',
+      }}
+    >
       {!isMobile ? (
         <aside style={sidebarStyle}>
           <div style={brandWrapStyle}>
@@ -169,31 +230,12 @@ export default function CrmShell({ children }: CrmShellProps) {
             </div>
           </div>
 
-          <nav style={navStyle}>
-            {NAV_ITEMS.map((item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(`${item.href}/`)
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  style={{
-                    ...navItemStyle,
-                    ...(active ? navItemActiveStyle : null),
-                  }}
-                >
-                  <span style={navIconStyle}>{item.icon}</span>
-                  <span style={navLabelStyle}>{item.label}</span>
-                </Link>
-              )
-            })}
-          </nav>
+          {renderNav(true)}
 
           <div style={sidebarFooterStyle}>
             <div style={footerCardStyle}>
               <div style={footerCardTitleStyle}>System</div>
-              <div style={footerCardTextStyle}>Mobile-ready CRM shell active</div>
+              <div style={footerCardTextStyle}>Responsive CRM shell active</div>
             </div>
 
             <ActionButton tone="ghost" onClick={handleLogout}>
@@ -204,50 +246,43 @@ export default function CrmShell({ children }: CrmShellProps) {
       ) : null}
 
       <main style={mainStyle}>
-        <header style={topbarStyle}>
+        <header
+          style={{
+            ...topbarStyle,
+            padding: isMobile ? '0 14px' : '0 22px',
+            height: isMobile ? 68 : 74,
+          }}
+        >
           <div style={topbarLeftStyle}>
-            <div style={pageKickerStyle}>Foundation Acquisitions LLC</div>
-            <div style={pageTitleStyle}>{getPageTitle(pathname)}</div>
+            {isMobile ? (
+              <button
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                style={menuButtonStyle}
+              >
+                <IconMenu />
+              </button>
+            ) : null}
+
+            <div style={pageTitleWrapStyle}>
+              <div style={pageKickerStyle}>Foundation Acquisitions LLC</div>
+              <div style={pageTitleStyle}>{getPageTitle(pathname)}</div>
+            </div>
           </div>
 
-          {!isMobile ? (
-            <div style={topbarRightStyle}>
-              <Link href="/leads">
-                <ActionButton compact tone="gold">
-                  + Lead
-                </ActionButton>
-              </Link>
-              <Link href="/tasks">
-                <ActionButton compact>
-                  + Task
-                </ActionButton>
-              </Link>
-              <Link href="/buyers">
-                <ActionButton compact>
-                  + Buyer
-                </ActionButton>
-              </Link>
-              <Link href="/imports">
-                <ActionButton compact>
-                  Import
-                </ActionButton>
-              </Link>
-            </div>
-          ) : (
-            <div style={mobileTopbarActionsStyle}>
-              <Link href="/leads">
-                <ActionButton compact tone="gold">
-                  + Lead
-                </ActionButton>
-              </Link>
-            </div>
-          )}
+          <div style={topbarRightStyle}>
+            <Link href="/leads">
+              <ActionButton compact tone="gold">
+                + Lead
+              </ActionButton>
+            </Link>
+          </div>
         </header>
 
         <div
           style={{
             ...contentAreaStyle,
-            paddingBottom: isMobile ? 84 : 0,
+            paddingBottom: isMobile ? 92 : 0,
           }}
         >
           {children}
@@ -255,7 +290,7 @@ export default function CrmShell({ children }: CrmShellProps) {
 
         {isMobile ? (
           <nav style={mobileBottomNavStyle}>
-            {mobileNavItems.map((item) => {
+            {bottomNavItems.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`)
 
@@ -269,34 +304,67 @@ export default function CrmShell({ children }: CrmShellProps) {
                   }}
                 >
                   <span style={mobileNavIconStyle}>{item.icon}</span>
-                  <span style={mobileNavLabelStyle}>{item.shortLabel}</span>
+                  <span style={mobileNavLabelStyle}>{item.bottomLabel || item.label}</span>
                 </Link>
               )
             })}
           </nav>
         ) : null}
       </main>
+
+      {isMobile && menuOpen ? (
+        <>
+          <div style={mobileOverlayStyle} onClick={() => setMenuOpen(false)} />
+          <aside style={mobileDrawerStyle}>
+            <div style={mobileDrawerTopStyle}>
+              <div style={brandWrapStyle}>
+                <div style={brandMarkStyle}>F</div>
+                <div style={brandTextWrapStyle}>
+                  <div style={brandTitleStyle}>Foundation OS</div>
+                  <div style={brandSubtitleStyle}>Acquisitions CRM</div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                style={menuButtonStyle}
+              >
+                <IconClose />
+              </button>
+            </div>
+
+            {renderNav(false)}
+
+            <div style={mobileDrawerFooterStyle}>
+              <ActionButton tone="ghost" onClick={handleLogout}>
+                Sign Out
+              </ActionButton>
+            </div>
+          </aside>
+        </>
+      ) : null}
     </div>
   )
 }
 
 const iconSvgStyle: CSSProperties = {
-  width: 17,
-  height: 17,
+  width: 18,
+  height: 18,
   strokeWidth: 1.8,
 }
 
 const shellStyle: CSSProperties = {
-  minHeight: '100vh',
+  minHeight: '100dvh',
+  width: '100%',
   display: 'grid',
-  gridTemplateColumns: '268px minmax(0, 1fr)',
   background: '#000000',
 }
 
 const sidebarStyle: CSSProperties = {
   position: 'sticky',
   top: 0,
-  height: '100vh',
+  height: '100dvh',
   display: 'grid',
   gridTemplateRows: 'auto 1fr auto',
   gap: 18,
@@ -311,12 +379,11 @@ const brandWrapStyle: CSSProperties = {
   alignItems: 'center',
   gap: 12,
   minWidth: 0,
-  paddingBottom: 6,
 }
 
 const brandMarkStyle: CSSProperties = {
-  width: 46,
-  height: 46,
+  width: 44,
+  height: 44,
   borderRadius: 14,
   display: 'grid',
   placeItems: 'center',
@@ -326,6 +393,7 @@ const brandMarkStyle: CSSProperties = {
   border: '1px solid rgba(214,166,75,0.28)',
   background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
   boxShadow: '0 0 16px rgba(214,166,75,0.10)',
+  flexShrink: 0,
 }
 
 const brandTextWrapStyle: CSSProperties = {
@@ -354,12 +422,31 @@ const navStyle: CSSProperties = {
 }
 
 const navItemStyle: CSSProperties = {
-  minHeight: 44,
+  minHeight: 46,
   display: 'flex',
   alignItems: 'center',
   gap: 10,
   padding: '0 12px',
   borderRadius: 13,
+  border: '1px solid transparent',
+  color: 'rgba(255,255,255,0.72)',
+  background: 'transparent',
+  textDecoration: 'none',
+}
+
+const mobileDrawerNavStyle: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+  paddingTop: 8,
+}
+
+const mobileDrawerItemStyle: CSSProperties = {
+  minHeight: 48,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  padding: '0 12px',
+  borderRadius: 14,
   border: '1px solid transparent',
   color: 'rgba(255,255,255,0.72)',
   background: 'transparent',
@@ -413,29 +500,35 @@ const footerCardTextStyle: CSSProperties = {
 
 const mainStyle: CSSProperties = {
   minWidth: 0,
+  width: '100%',
   display: 'grid',
-  gridTemplateRows: '74px minmax(0, 1fr)',
+  gridTemplateRows: 'auto minmax(0, 1fr)',
   background: '#000000',
 }
 
 const topbarStyle: CSSProperties = {
   position: 'sticky',
   top: 0,
-  zIndex: 20,
-  height: 74,
+  zIndex: 30,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  gap: 18,
-  padding: '0 22px',
+  gap: 16,
   borderBottom: '1px solid rgba(255,255,255,0.05)',
   background: 'linear-gradient(180deg, rgba(4,4,4,0.96), rgba(0,0,0,0.98))',
   boxShadow: 'inset 0 -1px 0 rgba(214,166,75,0.05)',
 }
 
 const topbarLeftStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  minWidth: 0,
+}
+
+const pageTitleWrapStyle: CSSProperties = {
   display: 'grid',
-  gap: 4,
+  gap: 2,
   minWidth: 0,
 }
 
@@ -461,14 +554,22 @@ const topbarRightStyle: CSSProperties = {
   justifyContent: 'flex-end',
 }
 
-const mobileTopbarActionsStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
+const menuButtonStyle: CSSProperties = {
+  width: 42,
+  height: 42,
+  borderRadius: 12,
+  border: '1px solid rgba(214,166,75,0.2)',
+  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
+  color: '#ffffff',
+  display: 'grid',
+  placeItems: 'center',
+  flexShrink: 0,
+  cursor: 'pointer',
 }
 
 const contentAreaStyle: CSSProperties = {
   minWidth: 0,
+  width: '100%',
   background: '#000000',
 }
 
@@ -479,7 +580,7 @@ const mobileBottomNavStyle: CSSProperties = {
   bottom: 0,
   zIndex: 40,
   display: 'grid',
-  gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
   gap: 8,
   padding: '10px 10px calc(10px + env(safe-area-inset-bottom))',
   borderTop: '1px solid rgba(255,255,255,0.06)',
@@ -488,7 +589,7 @@ const mobileBottomNavStyle: CSSProperties = {
 }
 
 const mobileNavItemStyle: CSSProperties = {
-  minHeight: 56,
+  minHeight: 58,
   borderRadius: 14,
   display: 'grid',
   justifyItems: 'center',
@@ -518,4 +619,40 @@ const mobileNavLabelStyle: CSSProperties = {
   fontSize: 10,
   fontWeight: 700,
   lineHeight: 1,
+}
+
+const mobileOverlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 49,
+  background: 'rgba(0,0,0,0.62)',
+  backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)',
+}
+
+const mobileDrawerStyle: CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  bottom: 0,
+  zIndex: 50,
+  width: 'min(84vw, 320px)',
+  background: 'linear-gradient(180deg, rgba(4,4,4,0.985), rgba(0,0,0,1))',
+  borderRight: '1px solid rgba(255,255,255,0.06)',
+  boxShadow: '20px 0 50px rgba(0,0,0,0.45)',
+  padding: 16,
+  display: 'grid',
+  gridTemplateRows: 'auto 1fr auto',
+  gap: 16,
+}
+
+const mobileDrawerTopStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+}
+
+const mobileDrawerFooterStyle: CSSProperties = {
+  display: 'grid',
 }

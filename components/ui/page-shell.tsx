@@ -19,7 +19,7 @@ export default function PageShell({
 
   useEffect(() => {
     function sync() {
-      setIsMobile(window.innerWidth <= 860)
+      setIsMobile(window.innerWidth <= 900)
     }
 
     sync()
@@ -31,7 +31,7 @@ export default function PageShell({
     <div
       style={{
         ...outerStyle,
-        padding: isMobile ? '16px 14px 20px' : '22px 22px 28px',
+        padding: isMobile ? '14px 14px 22px' : '22px 24px 28px',
         gap: isMobile ? 14 : 18,
       }}
     >
@@ -74,7 +74,7 @@ export default function PageShell({
 const outerStyle: CSSProperties = {
   width: '100%',
   minWidth: 0,
-  maxWidth: 1680,
+  maxWidth: '100%',
   margin: '0 auto',
   boxSizing: 'border-box',
   display: 'grid',
@@ -106,6 +106,7 @@ const subtitleStyle: CSSProperties = {
   fontSize: 13,
   lineHeight: 1.5,
   color: 'rgba(255,255,255,0.58)',
+  maxWidth: 720,
 }
 
 const actionsStyle: CSSProperties = {
