@@ -1,5 +1,7 @@
 'use client'
 
+import LeadsMobile from '@/components/leads/leads-mobile'
+import { useIsMobile } from '@/components/shared/use-is-mobile'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import PageShell from '@/components/ui/page-shell'
@@ -65,6 +67,7 @@ function getMotivation() {
 }
 
 export default function LeadsMobile() {
+  const isMobile = useIsMobile()
   const [rows, setRows] = useState<LeadRow[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -426,4 +429,7 @@ const openTextStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   color: '#e0b84f',
+}
+if (isMobile) {
+  return <LeadsMobile />
 }
