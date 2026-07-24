@@ -18,26 +18,29 @@ export default function StatPill({ label, value }: StatPillProps) {
 
 const pillStyle: CSSProperties = {
   minWidth: 0,
-  borderRadius: 16,
-  border: '1px solid rgba(88,230,255,0.12)',
-  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
-  boxShadow:
-    'inset 0 0 0 1px rgba(88,230,255,0.025), 0 0 10px rgba(88,230,255,0.03)',
-  padding: '10px 12px',
+  borderRadius: 14,
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'linear-gradient(180deg, rgba(16,14,10,0.92), rgba(6,6,6,0.98))',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.4)',
+  padding: '8px 12px',
   display: 'grid',
-  gap: 4,
+  gap: 2,
 }
 
 const labelStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 9.5,
+  fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'var(--text-faint)',
+  color: 'rgba(255,255,255,0.42)',
 }
 
 const valueStyle: CSSProperties = {
-  fontSize: 18,
+  fontSize: 16,
   fontWeight: 800,
-  color: '#f7fcff',
-  textShadow: '0 0 8px rgba(88,230,255,0.03)',
+  color: '#ffffff',
+  letterSpacing: '-0.02em',
+  lineHeight: 1.2,
 }
