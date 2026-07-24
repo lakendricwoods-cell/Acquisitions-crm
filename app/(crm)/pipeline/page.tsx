@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { supabase } from '@/lib/supabase'
 import PageShell from '@/components/ui/page-shell'
 import StatPill from '@/components/ui/stat-pill'
+import ActionButton from '@/components/ui/action-button'
 import PipelineBoard from '@/components/pipeline/pipeline-board'
 import type { PipelineLead } from '@/components/pipeline/pipeline-card'
 import type { CrmStage } from '@/lib/crm-stage'
@@ -113,18 +114,63 @@ export default function PipelinePage() {
     <PageShell
       title="Pipeline"
       actions={
-        <>
+        <div style={actionsContainerStyle}>
           <StatPill label="Leads" value={leads.length} />
           <StatPill label="Contracts" value={contractCount} />
           <StatPill label="Visible Value" value={money(totalValue)} />
-        </>
+          <ActionButton tone="ghost" compact onClick={loadLeads} disabled={loading}>
+            {loading ? 'Refreshing...' : '↻ Sync'}
+          </ActionButton>
+        </div>
       }
     >
-      {loading ? (
-        <div className="crm-muted">Loading pipeline...</div>
-      ) : (
-        <PipelineBoard leads={leads} onMoveLead={moveLeadToStage} />
-      )}
+      <div style={boardContainerStyle}>
+        {loading ? (
+          <div style={loadingStateStyle}>
+            <div style={spinnerStyle} />
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 500 }}>
+              Loading pipeline data...
+            </span>
+          </div>
+        ) : (
+          <PipelineBoard leads={leads} onMoveLead={moveLeadToStage} />
+        )}
+      </div>
     </PageShell>
   )
+}
+
+const actionsContainerStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  flexWrap: 'wrap',
+}
+
+const boardContainerStyle: CSSProperties = {
+  width: '100%',
+  marginTop: 8,
+}
+
+const loadingStateStyle: CSSProperties = {
+  minHeight: 400,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+  borderRadius: 22,
+  border: '1px solid rgba(255,255,255,0.06)',
+  background: 'linear-gradient(180deg, rgba(12,10,6,0.85), rgba(0,0,0,0.95))',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+}
+
+const spinnerStyle: CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: '50%',
+  border: '2px solid rgba(214, 166, 75, 0.2)',
+  borderTopColor: '#d6a64b',
+  animation: 'spin 0.8s linear infinite',
 }
