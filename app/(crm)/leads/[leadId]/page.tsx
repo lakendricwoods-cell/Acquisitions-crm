@@ -216,7 +216,12 @@ export default function LeadWorkspacePage() {
     return (
       <PageShell title="Lead Workspace" subtitle="Loading lead workspace...">
         <SectionCard title="Loading" subtitle="Pulling uploaded lead intelligence.">
-          <div className="crm-muted">Loading...</div>
+          <div style={loadingBoxStyle}>
+            <div style={spinnerStyle} />
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+              Retrieving property intelligence...
+            </span>
+          </div>
         </SectionCard>
       </PageShell>
     )
@@ -227,7 +232,7 @@ export default function LeadWorkspacePage() {
       <PageShell title="Lead Workspace" subtitle="Lead could not be found.">
         <SectionCard title="Lead not found" subtitle="This record could not be loaded.">
           <Link href="/leads">
-            <ActionButton>Back to Leads</ActionButton>
+            <ActionButton tone="gold">Back to Leads</ActionButton>
           </Link>
         </SectionCard>
       </PageShell>
@@ -263,7 +268,7 @@ export default function LeadWorkspacePage() {
           <SectionCard
             title={normalizedLead.property_address_1 || 'Unknown property'}
             subtitle={addressLine}
-            actions={<span className="crm-badge soft">{normalizedLead.lead_type || 'standard'}</span>}
+            actions={<span style={typeBadgeStyle}>{normalizedLead.lead_type || 'standard'}</span>}
           >
             <div style={heroSignalGridStyle}>
               <HeroSignal label="House Value" value={money(topValue)} tone="gold" />
@@ -403,10 +408,10 @@ function HeroSignal({
 }) {
   const palette =
     tone === 'gold'
-      ? { border: 'rgba(214,166,75,0.22)', bg: 'rgba(214,166,75,0.09)', text: '#f3d899' }
+      ? { border: 'rgba(214,166,75,0.25)', bg: 'linear-gradient(180deg, rgba(30,24,14,0.8), rgba(12,10,6,0.9))', text: '#d6a64b' }
       : tone === 'ice'
-        ? { border: 'rgba(147,197,253,0.22)', bg: 'rgba(147,197,253,0.09)', text: '#dcecff' }
-        : { border: 'rgba(74,222,128,0.22)', bg: 'rgba(74,222,128,0.09)', text: '#d8ffe6' }
+        ? { border: 'rgba(147,197,253,0.22)', bg: 'linear-gradient(180deg, rgba(16,22,30,0.8), rgba(6,10,14,0.9))', text: '#93c5fd' }
+        : { border: 'rgba(74,222,128,0.22)', bg: 'linear-gradient(180deg, rgba(14,28,18,0.8), rgba(6,12,8,0.9))', text: '#4ade80' }
 
   return (
     <div style={{ ...heroSignalStyle, borderColor: palette.border, background: palette.bg }}>
@@ -427,10 +432,10 @@ function InfoTile({
 }) {
   const palette =
     tone === 'gold'
-      ? { border: 'rgba(214,166,75,0.18)', bg: 'rgba(214,166,75,0.06)', text: '#f6dd9f' }
+      ? { border: 'rgba(214,166,75,0.18)', bg: 'rgba(214,166,75,0.05)', text: '#f0ca7e' }
       : tone === 'ice'
-        ? { border: 'rgba(147,197,253,0.18)', bg: 'rgba(147,197,253,0.06)', text: '#dcebff' }
-        : { border: 'rgba(74,222,128,0.18)', bg: 'rgba(74,222,128,0.06)', text: '#dbffe6' }
+        ? { border: 'rgba(147,197,253,0.18)', bg: 'rgba(147,197,253,0.05)', text: '#dcecff' }
+        : { border: 'rgba(74,222,128,0.18)', bg: 'rgba(74,222,128,0.05)', text: '#bbf7d0' }
 
   return (
     <div style={{ ...infoTileStyle, borderColor: palette.border, background: palette.bg }}>
@@ -451,10 +456,10 @@ function ScoreCard({
 }) {
   const palette =
     tone === 'gold'
-      ? { border: 'rgba(214,166,75,0.18)', bg: 'rgba(214,166,75,0.06)', text: '#f3d899' }
+      ? { border: 'rgba(214,166,75,0.25)', bg: 'linear-gradient(180deg, rgba(28,22,12,0.85), rgba(8,6,3,0.95))', text: '#d6a64b' }
       : tone === 'ice'
-        ? { border: 'rgba(147,197,253,0.18)', bg: 'rgba(147,197,253,0.06)', text: '#dcecff' }
-        : { border: 'rgba(74,222,128,0.18)', bg: 'rgba(74,222,128,0.06)', text: '#d8ffe6' }
+        ? { border: 'rgba(147,197,253,0.22)', bg: 'linear-gradient(180deg, rgba(14,20,28,0.85), rgba(4,8,12,0.95))', text: '#93c5fd' }
+        : { border: 'rgba(74,222,128,0.22)', bg: 'linear-gradient(180deg, rgba(12,26,16,0.85), rgba(4,10,6,0.95))', text: '#4ade80' }
 
   return (
     <div style={{ ...scoreCardStyle, borderColor: palette.border, background: palette.bg }}>
@@ -484,91 +489,131 @@ const rightRailStyle: CSSProperties = {
 
 const heroSignalGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 12,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gap: 10,
 }
 
 const propertyGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 12,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+  gap: 10,
 }
 
 const scoreGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 12,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 10,
 }
 
 const heroSignalStyle: CSSProperties = {
-  borderRadius: 18,
-  border: '1px solid var(--border)',
-  padding: 14,
+  borderRadius: 14,
+  border: '1px solid transparent',
+  padding: '12px 14px',
   display: 'grid',
-  gap: 6,
+  gap: 4,
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
 }
 
 const infoTileStyle: CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid var(--border)',
-  padding: 12,
+  borderRadius: 12,
+  border: '1px solid transparent',
+  padding: '10px 12px',
   display: 'grid',
-  gap: 6,
+  gap: 4,
 }
 
 const scoreCardStyle: CSSProperties = {
-  borderRadius: 16,
-  border: '1px solid var(--border)',
-  padding: 14,
+  borderRadius: 14,
+  border: '1px solid transparent',
+  padding: '14px',
   display: 'grid',
-  gap: 8,
+  gap: 6,
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+}
+
+const typeBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '4px 10px',
+  borderRadius: 8,
+  border: '1px solid rgba(214, 166, 75, 0.3)',
+  background: 'rgba(214, 166, 75, 0.1)',
+  color: '#d6a64b',
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
 }
 
 const infoLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 9.5,
+  fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'var(--text-faint)',
+  color: 'rgba(255,255,255,0.42)',
 }
 
 const heroValueStyle: CSSProperties = {
-  fontSize: 20,
-  fontWeight: 700,
+  fontSize: 18,
+  fontWeight: 800,
   lineHeight: 1.15,
+  letterSpacing: '-0.01em',
 }
 
 const infoValueStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 650,
-  lineHeight: 1.4,
+  lineHeight: 1.35,
 }
 
 const scoreValueStyle: CSSProperties = {
-  fontSize: 28,
+  fontSize: 26,
   fontWeight: 800,
   lineHeight: 1,
+  letterSpacing: '-0.02em',
 }
 
 const scoreReasonStyle: CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.45,
-  color: 'var(--text-soft)',
+  fontSize: 11.5,
+  lineHeight: 1.4,
+  color: 'rgba(255,255,255,0.55)',
 }
 
 const rawWrapStyle: CSSProperties = {
-  maxHeight: 420,
+  maxHeight: 360,
   overflow: 'auto',
-  borderRadius: 16,
-  border: '1px solid var(--line)',
-  background: 'rgba(255,255,255,0.02)',
+  borderRadius: 14,
+  border: '1px solid rgba(255,255,255,0.06)',
+  background: 'rgba(0,0,0,0.4)',
 }
 
 const rawPreStyle: CSSProperties = {
   margin: 0,
   padding: 14,
-  fontSize: 12,
+  fontSize: 11.5,
+  fontFamily: 'monospace',
   lineHeight: 1.5,
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
-  color: 'var(--text-soft)',
+  color: 'rgba(255,255,255,0.6)',
+}
+
+const loadingBoxStyle: CSSProperties = {
+  minHeight: 180,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+}
+
+const spinnerStyle: CSSProperties = {
+  width: 22,
+  height: 22,
+  borderRadius: '50%',
+  border: '2px solid rgba(214, 166, 75, 0.2)',
+  borderTopColor: '#d6a64b',
+  animation: 'spin 0.8s linear infinite',
 }
