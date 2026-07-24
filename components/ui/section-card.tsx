@@ -12,14 +12,17 @@ type Props = {
 
 const cardStyle: CSSProperties = {
   width: '100%',
-  background: '#050505',
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.06)',
-  padding: 16,
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'linear-gradient(180deg, rgba(16,14,10,0.85), rgba(6,6,6,0.95))',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+  padding: '18px 20px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 14,
-  boxShadow: '0 0 0px transparent',
+  gap: 16,
+  boxSizing: 'border-box',
 }
 
 const headerStyle: CSSProperties = {
@@ -32,20 +35,21 @@ const headerStyle: CSSProperties = {
 const headingWrapStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  gap: 3,
   minWidth: 0,
 }
 
 const titleStyle: CSSProperties = {
-  fontSize: 13,
-  color: 'rgba(255,255,255,0.78)',
-  fontWeight: 600,
-  lineHeight: 1.2,
+  fontSize: 14,
+  color: '#ffffff',
+  fontWeight: 750,
+  lineHeight: 1.25,
+  letterSpacing: '-0.01em',
 }
 
 const subtitleStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.50)',
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.48)',
   lineHeight: 1.4,
 }
 
