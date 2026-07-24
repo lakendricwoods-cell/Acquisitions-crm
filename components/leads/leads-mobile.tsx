@@ -430,6 +430,3 @@ const openTextStyle: CSSProperties = {
   fontWeight: 700,
   color: '#e0b84f',
 }
-if (isMobile) {
-  return <LeadsMobile />
-}
