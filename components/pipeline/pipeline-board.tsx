@@ -102,31 +102,31 @@ export default function PipelineBoard({
     })
   }
 
-function handleDragOver(stage: CrmStage) {
-  setDragOverStage(stage)
-}
+  function handleDragOver(stage: CrmStage) {
+    setDragOverStage(stage)
+  }
 
-function handleDragLeave(_stage: CrmStage) {
-  setDragOverStage(null)
-}
+  function handleDragLeave(_stage: CrmStage) {
+    setDragOverStage(null)
+  }
 
-async function handleDropLead(stage: CrmStage, leadId: string) {
-  const lead = leads.find((item) => item.id === leadId)
-  setDragOverStage(null)
+  async function handleDropLead(stage: CrmStage, leadId: string) {
+    const lead = leads.find((item) => item.id === leadId)
+    setDragOverStage(null)
 
-  if (!lead) return
+    if (!lead) return
 
-  const currentStage = resolveCrmStage(lead)
-  if (currentStage === stage) return
+    const currentStage = resolveCrmStage(lead)
+    if (currentStage === stage) return
 
-  const confirmed = window.confirm(
-    `Move ${lead.property_address_1 || 'this lead'} to ${CRM_STAGE_META[stage].label}?`
-  )
+    const confirmed = window.confirm(
+      `Move ${lead.property_address_1 || 'this lead'} to ${CRM_STAGE_META[stage].label}?`
+    )
 
-  if (!confirmed) return
+    if (!confirmed) return
 
-  await onMoveLead(lead, stage)
-}
+    await onMoveLead(lead, stage)
+  }
 
   async function handleMoveToStage(lead: PipelineLead, nextStage: CrmStage) {
     const confirmed = window.confirm(
@@ -141,34 +141,39 @@ async function handleDropLead(stage: CrmStage, leadId: string) {
   return (
     <div style={wrapStyle}>
       <div style={jumpBarStyle} data-no-pan="true">
-        <div style={jumpBarScrollStyle}>
-          {CRM_STAGES.map((stage) => (
-            <button
-              key={stage}
-              type="button"
-              onClick={() => scrollToStage(stage)}
-              style={{
-                ...jumpChipStyle,
-                borderColor: `${CRM_STAGE_META[stage].color}33`,
-                color: CRM_STAGE_META[stage].color,
-                boxShadow: `0 0 10px ${CRM_STAGE_META[stage].color}12`,
-              }}
-            >
-              {CRM_STAGE_META[stage].label}
-            </button>
-          ))}
+        <div style={jumpBarScrollStyle} className="crm-scroll-hide">
+          {CRM_STAGES.map((stage) => {
+            const color = CRM_STAGE_META[stage].color || '#d6a64b'
+            return (
+              <button
+                key={stage}
+                type="button"
+                onClick={() => scrollToStage(stage)}
+                style={{
+                  ...jumpChipStyle,
+                  borderColor: `${color}30`,
+                  color: color,
+                  boxShadow: `0 0 12px ${color}10`,
+                }}
+              >
+                {CRM_STAGE_META[stage].label}
+              </button>
+            )
+          })}
         </div>
 
         <div style={boardActionStyle}>
           <ActionButton
             compact
-            onClick={() => boardRef.current?.scrollBy({ left: -420, behavior: 'smooth' })}
+            tone="ghost"
+            onClick={() => boardRef.current?.scrollBy({ left: -340, behavior: 'smooth' })}
           >
             ←
           </ActionButton>
           <ActionButton
             compact
-            onClick={() => boardRef.current?.scrollBy({ left: 420, behavior: 'smooth' })}
+            tone="ghost"
+            onClick={() => boardRef.current?.scrollBy({ left: 340, behavior: 'smooth' })}
           >
             →
           </ActionButton>
@@ -196,7 +201,7 @@ async function handleDropLead(stage: CrmStage, leadId: string) {
               style={columnWrapStyle}
             >
               <PipelineColumn
-               stage={stage}
+                stage={stage}
                 leads={stageLeads}
                 isDragOver={dragOverStage === stage}
                 onDragOver={(nextStage) => handleDragOver(nextStage)}
@@ -214,7 +219,8 @@ async function handleDropLead(stage: CrmStage, leadId: string) {
 
 const wrapStyle: CSSProperties = {
   display: 'grid',
-  gap: 14,
+  gap: 16,
+  userSelect: 'none',
 }
 
 const jumpBarStyle: CSSProperties = {
@@ -222,6 +228,13 @@ const jumpBarStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 12,
+  padding: '6px 12px',
+  borderRadius: 16,
+  border: '1px solid rgba(255,255,255,0.06)',
+  background: 'linear-gradient(180deg, rgba(10,8,5,0.85), rgba(0,0,0,0.92))',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
 }
 
 const jumpBarScrollStyle: CSSProperties = {
@@ -229,32 +242,34 @@ const jumpBarScrollStyle: CSSProperties = {
   gap: 8,
   overflowX: 'auto',
   overflowY: 'hidden',
-  paddingBottom: 2,
+  padding: '2px 0',
   flex: 1,
 }
 
 const jumpChipStyle: CSSProperties = {
   borderRadius: 999,
   border: '1px solid rgba(255,255,255,0.08)',
-  background: 'linear-gradient(180deg, rgba(3,4,8,0.98), rgba(0,0,0,1))',
-  padding: '8px 12px',
+  background: 'linear-gradient(180deg, rgba(16,14,10,0.95), rgba(0,0,0,0.98))',
+  padding: '6px 14px',
   fontSize: 12,
   fontWeight: 700,
   whiteSpace: 'nowrap',
   cursor: 'pointer',
+  transition: 'all 160ms ease',
 }
 
 const boardActionStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
+  gap: 6,
+  flexShrink: 0,
 }
 
 const boardOuterStyle: CSSProperties = {
   overflowX: 'auto',
   overflowY: 'hidden',
   width: '100%',
-  paddingBottom: 2,
+  paddingBottom: 12,
   scrollBehavior: 'smooth',
 }
 
