@@ -40,7 +40,7 @@ export default function PipelineCard({
   onMoveToStage: (lead: PipelineLead, nextStage: CrmStage) => void
 }) {
   const nextStage = getNextCrmStage(stage)
-  const accent = CRM_STAGE_META[stage].color
+  const accent = CRM_STAGE_META[stage].color || '#d6a64b'
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     event.dataTransfer.setData('text/plain', lead.id)
@@ -53,17 +53,17 @@ export default function PipelineCard({
       onDragStart={handleDragStart}
       style={{
         ...cardStyle,
-        borderColor: `${accent}55`,
-        boxShadow: `inset 0 0 18px ${accent}14, 0 0 12px ${accent}10`,
+        borderColor: `${accent}40`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 0 16px ${accent}0d, 0 8px 24px rgba(0,0,0,0.5)`,
       }}
     >
       <div style={topRowStyle}>
         <div style={titleStyle}>{lead.property_address_1 || 'Unknown property'}</div>
         <span
-          className="crm-badge soft"
           style={{
-            background: `${accent}16`,
-            borderColor: `${accent}44`,
+            ...typeBadgeStyle,
+            background: `${accent}15`,
+            borderColor: `${accent}35`,
             color: accent,
           }}
         >
@@ -86,9 +86,11 @@ export default function PipelineCard({
       </div>
 
       <div style={actionRowStyle}>
-        <span style={{ ...dragHintStyle, color: accent }}>Drag to move</span>
+        <span style={{ ...dragHintStyle, color: 'rgba(255,255,255,0.35)' }}>
+          <span style={{ color: accent }}>⋮⋮</span> Drag to move
+        </span>
         {nextStage ? (
-          <ActionButton compact onClick={() => onMoveToStage(lead, nextStage)}>
+          <ActionButton compact tone="gold" onClick={() => onMoveToStage(lead, nextStage)}>
             Next Stage
           </ActionButton>
         ) : null}
@@ -107,14 +109,17 @@ function Meta({ label, value }: { label: string; value: string }) {
 }
 
 const cardStyle: CSSProperties = {
-  borderRadius: 18,
+  borderRadius: 16,
   border: '1px solid rgba(255,255,255,0.08)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
+  background: 'linear-gradient(180deg, rgba(16,14,10,0.92), rgba(6,6,6,0.98))',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
   padding: 13,
   display: 'grid',
   gap: 10,
   cursor: 'grab',
   userSelect: 'none',
+  transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
 }
 
 const topRowStyle: CSSProperties = {
@@ -125,43 +130,58 @@ const topRowStyle: CSSProperties = {
 }
 
 const titleStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 13.5,
   fontWeight: 700,
   color: '#ffffff',
   lineHeight: 1.25,
+  letterSpacing: '-0.01em',
+}
+
+const typeBadgeStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  padding: '3px 8px',
+  borderRadius: 6,
+  border: '1px solid transparent',
+  lineHeight: 1,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 }
 
 const subStyle: CSSProperties = {
-  fontSize: 12,
-  color: 'rgba(255,255,255,0.58)',
+  fontSize: 11.5,
+  color: 'rgba(255,255,255,0.50)',
 }
 
 const metaGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gap: 6,
 }
 
 const metaStyle: CSSProperties = {
-  borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(8,8,8,0.94), rgba(2,2,2,0.98))',
-  padding: '8px 9px',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.05)',
+  background: 'linear-gradient(180deg, rgba(22,20,16,0.7), rgba(10,10,10,0.9))',
+  padding: '7px 8px',
 }
 
 const metaLabelStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 9.5,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'rgba(255,255,255,0.40)',
-  marginBottom: 4,
+  color: 'rgba(255,255,255,0.38)',
+  marginBottom: 3,
+  fontWeight: 600,
 }
 
 const metaValueStyle: CSSProperties = {
   fontSize: 12,
-  fontWeight: 650,
+  fontWeight: 700,
   color: '#ffffff',
-  lineHeight: 1.3,
+  lineHeight: 1.2,
 }
 
 const actionRowStyle: CSSProperties = {
@@ -169,8 +189,13 @@ const actionRowStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 10,
+  paddingTop: 2,
 }
 
 const dragHintStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 10.5,
+  fontWeight: 600,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
 }
