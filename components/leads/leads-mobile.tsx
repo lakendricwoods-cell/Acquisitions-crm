@@ -1,6 +1,5 @@
 'use client'
 
-// ✅ FIX: Give the import a distinct name
 import LeadsMobileView from '@/components/leads/leads-mobile'
 import { useIsMobile } from '@/components/shared/use-is-mobile'
 import Link from 'next/link'
