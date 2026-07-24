@@ -699,7 +699,7 @@ const mobileDrawerStyle: CSSProperties = {
 const mobileDrawerTopStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justify-content: 'space-between',
+  justifyContent: 'space-between',
   gap: 12,
 }
 
