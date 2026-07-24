@@ -32,12 +32,13 @@ export default function PageShell({
       style={{
         ...outerStyle,
         padding: isMobile ? '14px 14px 22px' : '22px 24px 28px',
-        gap: isMobile ? 14 : 18,
+        gap: isMobile ? 16 : 22,
       }}
     >
-      <div
+      <header
         style={{
-          ...headerStyle,
+          ...headerContainerStyle,
+          padding: isMobile ? '14px 16px' : '18px 22px',
           gap: isMobile ? 12 : 16,
         }}
       >
@@ -45,7 +46,7 @@ export default function PageShell({
           <h1
             style={{
               ...titleStyle,
-              fontSize: isMobile ? 24 : 28,
+              fontSize: isMobile ? 22 : 26,
             }}
           >
             {title}
@@ -64,9 +65,9 @@ export default function PageShell({
             {actions}
           </div>
         ) : null}
-      </div>
+      </header>
 
-      <div style={contentStyle}>{children}</div>
+      <main style={contentStyle}>{children}</main>
     </div>
   )
 }
@@ -81,31 +82,38 @@ const outerStyle: CSSProperties = {
   background: 'transparent',
 }
 
-const headerStyle: CSSProperties = {
+const headerContainerStyle: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
+  alignItems: 'center',
   justifyContent: 'space-between',
   flexWrap: 'wrap',
+  borderRadius: 20,
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'linear-gradient(180deg, rgba(16,14,10,0.85), rgba(6,6,6,0.95))',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
 }
 
 const titleWrapStyle: CSSProperties = {
   display: 'grid',
-  gap: 6,
+  gap: 4,
   minWidth: 0,
 }
 
 const titleStyle: CSSProperties = {
   margin: 0,
   fontWeight: 800,
-  lineHeight: 1.08,
+  lineHeight: 1.1,
   color: '#ffffff',
+  letterSpacing: '-0.02em',
 }
 
 const subtitleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 13,
-  lineHeight: 1.5,
-  color: 'rgba(255,255,255,0.58)',
+  fontSize: 12.5,
+  lineHeight: 1.45,
+  color: 'rgba(255,255,255,0.50)',
   maxWidth: 720,
 }
 
