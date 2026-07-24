@@ -220,8 +220,14 @@ export default function CrmShell({ children }: CrmShellProps) {
         gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '272px minmax(0, 1fr)',
       }}
     >
+      {/* Dynamic Background Glowing Light Leaks */}
+      <div style={glowBgContainerStyle}>
+        <div style={goldGlowTopStyle} className="animate-pulse-glow" />
+        <div style={goldGlowBottomStyle} className="animate-pulse-glow" />
+      </div>
+
       {!isMobile ? (
-        <aside style={sidebarStyle}>
+        <aside style={sidebarStyle} className="crm-sidebar">
           <div style={brandWrapStyle}>
             <div style={brandMarkStyle}>F</div>
             <div style={brandTextWrapStyle}>
@@ -234,8 +240,8 @@ export default function CrmShell({ children }: CrmShellProps) {
 
           <div style={sidebarFooterStyle}>
             <div style={footerCardStyle}>
-              <div style={footerCardTitleStyle}>System</div>
-              <div style={footerCardTextStyle}>Responsive CRM shell active</div>
+              <div style={footerCardTitleStyle}>System Active</div>
+              <div style={footerCardTextStyle}>Dark Glass Engine v2.4</div>
             </div>
 
             <ActionButton tone="ghost" onClick={handleLogout}>
@@ -245,13 +251,14 @@ export default function CrmShell({ children }: CrmShellProps) {
         </aside>
       ) : null}
 
-      <main style={mainStyle}>
+      <main style={mainStyle} className="crm-main">
         <header
           style={{
             ...topbarStyle,
             padding: isMobile ? '0 14px' : '0 22px',
-            height: isMobile ? 68 : 74,
+            height: isMobile ? 64 : 70,
           }}
+          className="crm-topbar"
         >
           <div style={topbarLeftStyle}>
             {isMobile ? (
@@ -284,8 +291,9 @@ export default function CrmShell({ children }: CrmShellProps) {
             ...contentAreaStyle,
             paddingBottom: isMobile ? 92 : 0,
           }}
+          className="crm-main-content"
         >
-          {children}
+          <div className="crm-content-wrap">{children}</div>
         </div>
 
         {isMobile ? (
@@ -358,20 +366,54 @@ const shellStyle: CSSProperties = {
   minHeight: '100dvh',
   width: '100%',
   display: 'grid',
-  background: '#000000',
+  position: 'relative',
+  backgroundColor: 'var(--bg-0, #000000)',
+}
+
+const glowBgContainerStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  pointerEvents: 'none',
+  zIndex: 0,
+  overflow: 'hidden',
+}
+
+const goldGlowTopStyle: CSSProperties = {
+  position: 'absolute',
+  top: '-10%',
+  right: '15%',
+  width: '600px',
+  height: '600px',
+  borderRadius: '50%',
+  background: 'radial-gradient(circle, rgba(214,166,75,0.12) 0%, rgba(0,0,0,0) 70%)',
+  filter: 'blur(60px)',
+}
+
+const goldGlowBottomStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: '-15%',
+  left: '5%',
+  width: '700px',
+  height: '700px',
+  borderRadius: '50%',
+  background: 'radial-gradient(circle, rgba(214,166,75,0.08) 0%, rgba(0,0,0,0) 70%)',
+  filter: 'blur(80px)',
 }
 
 const sidebarStyle: CSSProperties = {
   position: 'sticky',
   top: 0,
   height: '100dvh',
+  zIndex: 60,
   display: 'grid',
   gridTemplateRows: 'auto 1fr auto',
   gap: 18,
   padding: 18,
   borderRight: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
-  boxShadow: 'inset -1px 0 0 rgba(214,166,75,0.06)',
+  background: 'linear-gradient(180deg, rgba(6,5,3,0.92), rgba(0,0,0,0.98))',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: 'inset -1px 0 0 rgba(214,166,75,0.12), 10px 0 30px rgba(0,0,0,0.5)',
 }
 
 const brandWrapStyle: CSSProperties = {
@@ -389,10 +431,10 @@ const brandMarkStyle: CSSProperties = {
   placeItems: 'center',
   fontWeight: 800,
   fontSize: 18,
-  color: '#e0b84f',
-  border: '1px solid rgba(214,166,75,0.28)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
-  boxShadow: '0 0 16px rgba(214,166,75,0.10)',
+  color: '#ebc477',
+  border: '1px solid rgba(214,166,75,0.35)',
+  background: 'linear-gradient(180deg, rgba(20,16,8,0.95), rgba(0,0,0,1))',
+  boxShadow: '0 0 20px rgba(214,166,75,0.18)',
   flexShrink: 0,
 }
 
@@ -407,6 +449,7 @@ const brandTitleStyle: CSSProperties = {
   fontWeight: 700,
   color: '#ffffff',
   lineHeight: 1.2,
+  letterSpacing: '-0.01em',
 }
 
 const brandSubtitleStyle: CSSProperties = {
@@ -427,11 +470,12 @@ const navItemStyle: CSSProperties = {
   alignItems: 'center',
   gap: 10,
   padding: '0 12px',
-  borderRadius: 13,
+  borderRadius: 14,
   border: '1px solid transparent',
   color: 'rgba(255,255,255,0.72)',
   background: 'transparent',
   textDecoration: 'none',
+  transition: 'all 160ms ease',
 }
 
 const mobileDrawerNavStyle: CSSProperties = {
@@ -455,9 +499,9 @@ const mobileDrawerItemStyle: CSSProperties = {
 
 const navItemActiveStyle: CSSProperties = {
   color: '#ffffff',
-  border: '1px solid rgba(214,166,75,0.24)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
-  boxShadow: '0 0 14px rgba(214,166,75,0.10)',
+  border: '1px solid rgba(214,166,75,0.32)',
+  background: 'linear-gradient(180deg, rgba(22,18,10,0.85), rgba(0,0,0,0.95))',
+  boxShadow: '0 0 16px rgba(214,166,75,0.12), inset 0 1px 0 rgba(255,255,255,0.05)',
 }
 
 const navIconStyle: CSSProperties = {
@@ -480,17 +524,18 @@ const sidebarFooterStyle: CSSProperties = {
 
 const footerCardStyle: CSSProperties = {
   borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
+  border: '1px solid rgba(214,166,75,0.18)',
+  background: 'linear-gradient(180deg, rgba(12,10,6,0.85), rgba(0,0,0,0.92))',
   padding: 12,
   display: 'grid',
   gap: 4,
+  boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
 }
 
 const footerCardTitleStyle: CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
-  color: '#ffffff',
+  color: '#ebc477',
 }
 
 const footerCardTextStyle: CSSProperties = {
@@ -503,20 +548,23 @@ const mainStyle: CSSProperties = {
   width: '100%',
   display: 'grid',
   gridTemplateRows: 'auto minmax(0, 1fr)',
-  background: '#000000',
+  position: 'relative',
+  zIndex: 1,
 }
 
 const topbarStyle: CSSProperties = {
   position: 'sticky',
   top: 0,
-  zIndex: 30,
+  zIndex: 50,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 16,
   borderBottom: '1px solid rgba(255,255,255,0.05)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.96), rgba(0,0,0,0.98))',
-  boxShadow: 'inset 0 -1px 0 rgba(214,166,75,0.05)',
+  background: 'linear-gradient(180deg, rgba(6,5,3,0.88), rgba(0,0,0,0.92))',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
 }
 
 const topbarLeftStyle: CSSProperties = {
@@ -536,14 +584,15 @@ const pageKickerStyle: CSSProperties = {
   fontSize: 10,
   textTransform: 'uppercase',
   letterSpacing: '0.14em',
-  color: 'rgba(255,255,255,0.38)',
+  color: 'rgba(214,166,75,0.65)',
 }
 
 const pageTitleStyle: CSSProperties = {
   fontSize: 18,
-  fontWeight: 700,
+  fontWeight: 750,
   color: '#ffffff',
   lineHeight: 1.1,
+  letterSpacing: '-0.02em',
 }
 
 const topbarRightStyle: CSSProperties = {
@@ -558,8 +607,8 @@ const menuButtonStyle: CSSProperties = {
   width: 42,
   height: 42,
   borderRadius: 12,
-  border: '1px solid rgba(214,166,75,0.2)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
+  border: '1px solid rgba(214,166,75,0.25)',
+  background: 'linear-gradient(180deg, rgba(14,12,7,0.95), rgba(0,0,0,1))',
   color: '#ffffff',
   display: 'grid',
   placeItems: 'center',
@@ -570,7 +619,6 @@ const menuButtonStyle: CSSProperties = {
 const contentAreaStyle: CSSProperties = {
   minWidth: 0,
   width: '100%',
-  background: '#000000',
 }
 
 const mobileBottomNavStyle: CSSProperties = {
@@ -583,9 +631,11 @@ const mobileBottomNavStyle: CSSProperties = {
   gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
   gap: 8,
   padding: '10px 10px calc(10px + env(safe-area-inset-bottom))',
-  borderTop: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
-  boxShadow: '0 -8px 24px rgba(0,0,0,0.35)',
+  borderTop: '1px solid rgba(214,166,75,0.18)',
+  background: 'linear-gradient(180deg, rgba(8,6,3,0.96), rgba(0,0,0,0.98))',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 -8px 30px rgba(0,0,0,0.6)',
 }
 
 const mobileNavItemStyle: CSSProperties = {
@@ -603,9 +653,9 @@ const mobileNavItemStyle: CSSProperties = {
 
 const mobileNavItemActiveStyle: CSSProperties = {
   color: '#ffffff',
-  border: '1px solid rgba(214,166,75,0.24)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.98), rgba(0,0,0,1))',
-  boxShadow: '0 0 12px rgba(214,166,75,0.08)',
+  border: '1px solid rgba(214,166,75,0.3)',
+  background: 'linear-gradient(180deg, rgba(20,16,8,0.9), rgba(0,0,0,1))',
+  boxShadow: '0 0 14px rgba(214,166,75,0.12)',
 }
 
 const mobileNavIconStyle: CSSProperties = {
@@ -624,10 +674,10 @@ const mobileNavLabelStyle: CSSProperties = {
 const mobileOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 49,
-  background: 'rgba(0,0,0,0.62)',
-  backdropFilter: 'blur(6px)',
-  WebkitBackdropFilter: 'blur(6px)',
+  zIndex: 79,
+  background: 'rgba(0,0,0,0.75)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
 }
 
 const mobileDrawerStyle: CSSProperties = {
@@ -635,11 +685,11 @@ const mobileDrawerStyle: CSSProperties = {
   top: 0,
   left: 0,
   bottom: 0,
-  zIndex: 50,
+  zIndex: 80,
   width: 'min(84vw, 320px)',
-  background: 'linear-gradient(180deg, rgba(4,4,4,0.985), rgba(0,0,0,1))',
-  borderRight: '1px solid rgba(255,255,255,0.06)',
-  boxShadow: '20px 0 50px rgba(0,0,0,0.45)',
+  background: 'linear-gradient(180deg, rgba(8,6,3,0.98), rgba(0,0,0,1))',
+  borderRight: '1px solid rgba(214,166,75,0.22)',
+  boxShadow: '20px 0 60px rgba(0,0,0,0.7)',
   padding: 16,
   display: 'grid',
   gridTemplateRows: 'auto 1fr auto',
@@ -649,7 +699,7 @@ const mobileDrawerStyle: CSSProperties = {
 const mobileDrawerTopStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
+  justify-content: 'space-between',
   gap: 12,
 }
 
