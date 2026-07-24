@@ -293,7 +293,7 @@ export default function WorkspaceCanvas({
   if (loading) {
     return (
       <SectionShell title="Workspace Canvas" subtitle="Loading workspace...">
-        <div className="crm-muted">Loading canvas...</div>
+        <div style={{ padding: 20, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Loading canvas...</div>
       </SectionShell>
     )
   }
@@ -305,14 +305,14 @@ export default function WorkspaceCanvas({
         subtitle="Mental deal board for imported signals, underwriting, and notes."
         actions={
           <div style={toolbarStyle}>
-            <ActionButton tone="gold" onClick={() => createBlock('note')}>
-              Add Note
+            <ActionButton tone="gold" compact onClick={() => createBlock('note')}>
+              + Note
             </ActionButton>
-            <ActionButton onClick={() => createBlock('signals')}>
-              Add Signals
+            <ActionButton compact onClick={() => createBlock('signals')}>
+              + Signals
             </ActionButton>
-            <ActionButton onClick={() => createBlock('deal-analysis')}>
-              Add Analysis
+            <ActionButton compact onClick={() => createBlock('deal-analysis')}>
+              + Analysis
             </ActionButton>
           </div>
         }
@@ -360,15 +360,15 @@ function SectionShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="crm-section-card">
-      <div className="crm-section-card-header">
-        <div className="crm-section-card-heading">
-          <h3 className="crm-section-card-title">{title}</h3>
-          <p className="crm-section-card-subtitle">{subtitle}</p>
+    <div style={sectionShellStyle}>
+      <div style={sectionShellHeaderStyle}>
+        <div style={{ display: 'grid', gap: 2 }}>
+          <h3 style={sectionShellTitleStyle}>{title}</h3>
+          <p style={sectionShellSubtitleStyle}>{subtitle}</p>
         </div>
-        {actions ? <div className="crm-section-card-actions">{actions}</div> : null}
+        {actions ? <div>{actions}</div> : null}
       </div>
-      <div className="crm-section-card-body">{children}</div>
+      <div>{children}</div>
     </div>
   )
 }
@@ -426,7 +426,7 @@ function CanvasBlockCard({
     >
       <div style={blockHeaderStyle}>
         <input
-          className="crm-input"
+          style={titleInputStyle}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Block title"
@@ -435,7 +435,7 @@ function CanvasBlockCard({
 
       {block.type === 'note' ? (
         <textarea
-          className="crm-textarea"
+          style={textareaStyle}
           value={content.text || ''}
           onChange={(e) => setContent({ ...content, text: e.target.value })}
           placeholder="Write deal thoughts, call notes, seller pressure, objections, or next moves..."
@@ -486,7 +486,7 @@ function CanvasBlockCard({
 
           <div style={{ gridColumn: '1 / -1' }}>
             <textarea
-              className="crm-textarea"
+              style={textareaStyle}
               value={content.notes || ''}
               onChange={(e) => setContent({ ...content, notes: e.target.value })}
               placeholder="Deal math notes, buyer angle, rehab risk, seller posture..."
@@ -496,8 +496,10 @@ function CanvasBlockCard({
       ) : null}
 
       <div style={blockFooterStyle}>
-        <ActionButton onClick={() => onDelete(block.id)}>Delete</ActionButton>
-        <ActionButton tone="gold" onClick={handleSave}>
+        <ActionButton tone="danger" compact onClick={() => onDelete(block.id)}>
+          Delete
+        </ActionButton>
+        <ActionButton tone="gold" compact onClick={handleSave}>
           {saving ? 'Saving...' : 'Save Block'}
         </ActionButton>
       </div>
@@ -518,7 +520,7 @@ function Field({
     <div style={fieldWrapStyle}>
       <div style={miniLabelStyle}>{label}</div>
       <input
-        className="crm-input"
+        style={fieldInputStyle}
         value={String(value)}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -546,6 +548,40 @@ const canvasStackStyle: CSSProperties = {
   gap: 16,
 }
 
+const sectionShellStyle: CSSProperties = {
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'linear-gradient(180deg, rgba(16,14,10,0.85), rgba(6,6,6,0.95))',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  padding: '18px 20px',
+  display: 'grid',
+  gap: 16,
+  boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+}
+
+const sectionShellHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 12,
+  flexWrap: 'wrap',
+}
+
+const sectionShellTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 14,
+  fontWeight: 750,
+  color: '#ffffff',
+  letterSpacing: '-0.01em',
+}
+
+const sectionShellSubtitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.48)',
+}
+
 const toolbarStyle: CSSProperties = {
   display: 'flex',
   gap: 8,
@@ -554,68 +590,79 @@ const toolbarStyle: CSSProperties = {
 
 const leadStripStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
   gap: 10,
 }
 
 const leadStripItemStyle: CSSProperties = {
-  padding: 12,
-  borderRadius: 14,
-  background: 'rgba(255,255,255,0.04)',
+  padding: '10px 12px',
+  borderRadius: 12,
+  background: 'rgba(255,255,255,0.03)',
   border: '1px solid rgba(255,255,255,0.06)',
 }
 
 const leadStripValueStyle: CSSProperties = {
-  fontSize: 13,
+  fontSize: 12.5,
   fontWeight: 700,
-  color: 'var(--white-hi)',
-  lineHeight: 1.45,
+  color: '#ffffff',
+  lineHeight: 1.35,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 }
 
 const miniLabelStyle: CSSProperties = {
-  fontSize: 10,
-  letterSpacing: '0.14em',
+  fontSize: 9.5,
+  letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  color: 'var(--white-faint)',
-  marginBottom: 8,
+  color: 'rgba(255,255,255,0.42)',
+  marginBottom: 4,
+  fontWeight: 600,
 }
 
 const canvasGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
   gap: 14,
 }
 
 const emptyCanvasStyle: CSSProperties = {
   padding: 24,
-  borderRadius: 18,
+  borderRadius: 16,
   border: '1px dashed rgba(255,255,255,0.12)',
-  color: 'var(--white-faint)',
+  color: 'rgba(255,255,255,0.42)',
+  fontSize: 12.5,
   textAlign: 'center',
-  background: 'rgba(255,255,255,0.03)',
+  background: 'rgba(255,255,255,0.02)',
 }
 
 const blockCardStyle: CSSProperties = {
-  padding: 14,
-  borderRadius: 18,
+  padding: 16,
+  borderRadius: 16,
   border: '1px solid rgba(255,255,255,0.08)',
   display: 'grid',
   gap: 12,
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  boxShadow: '0 6px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
 }
 
 const goldBlockStyle: CSSProperties = {
   background:
-    'radial-gradient(circle at top left, rgba(214,166,75,0.12), transparent 45%), linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008)), rgba(0,0,0,0.18)',
+    'radial-gradient(circle at top left, rgba(214,166,75,0.12), transparent 50%), linear-gradient(180deg, rgba(24,20,12,0.9), rgba(10,8,4,0.95))',
+  borderColor: 'rgba(214,166,75,0.25)',
 }
 
 const iceBlockStyle: CSSProperties = {
   background:
-    'radial-gradient(circle at top left, rgba(147,197,253,0.12), transparent 45%), linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008)), rgba(0,0,0,0.18)',
+    'radial-gradient(circle at top left, rgba(147,197,253,0.12), transparent 50%), linear-gradient(180deg, rgba(14,20,28,0.9), rgba(4,8,12,0.95))',
+  borderColor: 'rgba(147,197,253,0.22)',
 }
 
 const greenBlockStyle: CSSProperties = {
   background:
-    'radial-gradient(circle at top left, rgba(74,222,128,0.12), transparent 45%), linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008)), rgba(0,0,0,0.18)',
+    'radial-gradient(circle at top left, rgba(74,222,128,0.12), transparent 50%), linear-gradient(180deg, rgba(12,26,16,0.9), rgba(4,10,6,0.95))',
+  borderColor: 'rgba(74,222,128,0.22)',
 }
 
 const blockHeaderStyle: CSSProperties = {
@@ -623,54 +670,96 @@ const blockHeaderStyle: CSSProperties = {
   gap: 8,
 }
 
+const titleInputStyle: CSSProperties = {
+  width: '100%',
+  background: 'rgba(0,0,0,0.3)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 10,
+  padding: '8px 12px',
+  color: '#ffffff',
+  fontSize: 13,
+  fontWeight: 700,
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+
+const textareaStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 110,
+  background: 'rgba(0,0,0,0.35)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 10,
+  padding: 10,
+  color: 'rgba(255,255,255,0.85)',
+  fontSize: 12,
+  lineHeight: 1.5,
+  outline: 'none',
+  resize: 'vertical',
+  boxSizing: 'border-box',
+}
+
 const blockFooterStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
+  alignItems: 'center',
   gap: 10,
   flexWrap: 'wrap',
+  paddingTop: 4,
 }
 
 const signalsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
+  gap: 8,
 }
 
 const signalCardStyle: CSSProperties = {
-  padding: 10,
-  borderRadius: 12,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.05)',
+  padding: '8px 10px',
+  borderRadius: 10,
+  background: 'rgba(0,0,0,0.3)',
+  border: '1px solid rgba(255,255,255,0.06)',
 }
 
 const signalValueStyle: CSSProperties = {
-  fontSize: 13,
+  fontSize: 12.5,
   fontWeight: 700,
-  color: 'var(--white-hi)',
-  lineHeight: 1.45,
+  color: '#ffffff',
+  lineHeight: 1.35,
 }
 
 const analysisGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
+  gap: 8,
 }
 
 const fieldWrapStyle: CSSProperties = {
   display: 'grid',
-  gap: 6,
+  gap: 4,
+}
+
+const fieldInputStyle: CSSProperties = {
+  width: '100%',
+  background: 'rgba(0,0,0,0.35)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 9,
+  padding: '6px 10px',
+  color: '#ffffff',
+  fontSize: 12,
+  fontWeight: 650,
+  outline: 'none',
+  boxSizing: 'border-box',
 }
 
 const readOnlyFieldStyle: CSSProperties = {
-  minHeight: 36,
-  borderRadius: 13,
-  border: '1px solid rgba(255,255,255,0.065)',
-  background:
-    'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.006)), rgba(0,0,0,0.18)',
+  minHeight: 32,
+  borderRadius: 9,
+  border: '1px solid rgba(255,255,255,0.06)',
+  background: 'rgba(0,0,0,0.4)',
   display: 'flex',
   alignItems: 'center',
-  padding: '0 11px',
+  padding: '0 10px',
   fontSize: 12,
-  color: 'var(--white-hi)',
-  fontWeight: 700,
+  color: '#ffffff',
+  fontWeight: 750,
 }
