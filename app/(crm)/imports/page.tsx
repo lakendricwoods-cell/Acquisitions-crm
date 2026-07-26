@@ -105,7 +105,7 @@ export default function ImportsPage() {
         setMessage('No rows were found in this file.')
       } else {
         setMessage(
-          `Parsed ${mapped.length} row${mapped.length === 1 ? '' : 's'}. Upload will create new leads or update existing matches.`
+          `Parsed ${mapped.length} row${mapped.length === 1 ? '' : 's'}. Ready for upsert sync.`
         )
       }
     } catch (error) {
@@ -240,50 +240,58 @@ export default function ImportsPage() {
   return (
     <PageShell
       title="Imports"
-      subtitle="Upload files that create new leads or update existing leads when a match is found."
+      subtitle="Upload wide-row property files to create new leads or update existing database records."
       actions={
         <>
           <StatPill label="Rows" value={stats.total} />
           <StatPill label="Workable" value={stats.workable} />
-          <StatPill label="Value" value={stats.withHouseValue} />
-          <StatPill label="Equity" value={stats.withEquity} />
+          <StatPill label="Value Signal" value={stats.withHouseValue} />
+          <StatPill label="Equity Signal" value={stats.withEquity} />
         </>
       }
     >
       <div style={pageGridStyle}>
+        {/* Left Control Column */}
         <div style={leftRailStyle}>
           <SectionCard
             title="Import Console"
-            subtitle="This importer reads wide rows and only depends on leads, not extra audit tables."
+            subtitle="Configure source attribution and process wide lead files."
           >
             <div style={heroPanelStyle}>
-              <div style={heroEyebrowStyle}>Matching Logic</div>
-              <div style={heroTitleStyle}>Create if unmatched. Update if matched.</div>
+              <div style={heroEyebrowStyle}>INSPECTION & UPSERT ENGINE</div>
+              <div style={heroTitleStyle}>Smart Matching & Deduplication</div>
               <div style={heroCopyStyle}>
-                Matching order is source record, APN, address + zip, then address only.
-                Sparse rows continue unless they have no usable identity at all.
+                Pre-matches records against your database by source ID, APN, or property address before creating or updating rows.
               </div>
             </div>
 
             <div style={controlStackStyle}>
               <div style={fieldStackStyle}>
-                <div style={labelStyle}>Source Label</div>
+                <label style={labelStyle}>Source Label</label>
                 <input
-                  className="crm-input"
+                  style={customInputStyle}
                   value={sourceLabel}
                   onChange={(e) => setSourceLabel(e.target.value)}
-                  placeholder="Propwire March Batch"
+                  placeholder="e.g. Propwire March Batch"
                 />
               </div>
 
               <div style={fieldStackStyle}>
-                <div style={labelStyle}>CSV File</div>
-                <input
-                  className="crm-input"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileChange}
-                />
+                <label style={labelStyle}>Select CSV Data File</label>
+                <div style={dropzoneStyle}>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    style={fileInputOverlayStyle}
+                  />
+                  <div style={fileLabelContentStyle}>
+                    <span style={{ fontSize: 20 }}>📁</span>
+                    <span style={fileNameTextStyle}>
+                      {file ? file.name : 'Choose or drop CSV file'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div style={actionsStyle}>
@@ -301,7 +309,7 @@ export default function ImportsPage() {
                   onClick={handleImport}
                   disabled={!rows.length || loading}
                 >
-                  {loading ? 'Uploading...' : 'Create / Update Leads'}
+                  {loading ? 'Processing Sync...' : 'Create / Update Leads'}
                 </ActionButton>
               </div>
 
@@ -310,8 +318,8 @@ export default function ImportsPage() {
           </SectionCard>
 
           <SectionCard
-            title="File Quality"
-            subtitle="Quick read on whether the upload has enough usable signal."
+            title="File Health & Quality"
+            subtitle="Data completeness checks across critical valuation vectors."
           >
             <div style={metricsGridStyle}>
               <MetricCard title="Address" value={stats.withAddress} tone="gold" />
@@ -321,14 +329,14 @@ export default function ImportsPage() {
             </div>
 
             <div style={metricsGridStyle}>
-              <MetricCard title="Lead Type" value={stats.withLeadType} tone="green" />
+              <MetricCard title="Distress / Lead Type" value={stats.withLeadType} tone="green" />
               <MetricCard title="Workable Rows" value={stats.workable} tone="ice" />
             </div>
           </SectionCard>
 
           <SectionCard
-            title="Last Import Run"
-            subtitle="This shows whether rows were created, updated, skipped, or failed."
+            title="Last Import Batch"
+            subtitle="Execution summary for the most recent import run."
           >
             {runSummary ? (
               <div style={runSummaryWrapStyle}>
@@ -341,13 +349,13 @@ export default function ImportsPage() {
                 </div>
 
                 <div style={runSourceStyle}>
-                  <span style={runSourceLabelStyle}>Source</span>
-                  <span className="crm-badge soft">{runSummary.source}</span>
+                  <span style={runSourceLabelStyle}>Attributed Source</span>
+                  <span style={sourceTagStyle}>{runSummary.source}</span>
                 </div>
 
                 {runSummary.errors.length ? (
                   <div style={errorPanelStyle}>
-                    <div style={errorTitleStyle}>Actual Failure Messages</div>
+                    <div style={errorTitleStyle}>Failed Record Log</div>
                     <div style={errorListStyle}>
                       {runSummary.errors.map((error, index) => (
                         <div key={`${error}-${index}`} style={errorItemStyle}>
@@ -359,49 +367,54 @@ export default function ImportsPage() {
                 ) : null}
               </div>
             ) : (
-              <div className="crm-muted" style={{ fontSize: 12 }}>
-                No import has completed in this session yet.
-              </div>
+              <div style={emptyMutedStyle}>No execution summary available for this session.</div>
             )}
           </SectionCard>
         </div>
 
+        {/* Right Preview Column */}
         <div style={rightRailStyle}>
           <SectionCard
-            title="Imported Preview"
-            subtitle="Preview the rows that will either create or update leads."
+            title="Import Preview Grid"
+            subtitle="Inspect incoming properties before committing records into Supabase."
           >
             {!rows.length ? (
-              <div className="crm-muted" style={emptyStateStyle}>
-                No parsed rows yet.
+              <div style={emptyStateStyle}>
+                No parsed rows loaded. Select a CSV file to inspect property data.
               </div>
             ) : (
-              <div className="crm-table-wrap">
-                <table className="crm-table">
+              <div style={tableWrapStyle}>
+                <table style={customTableStyle}>
                   <thead>
-                    <tr>
-                      <th>Lead</th>
-                      <th>House Value</th>
-                      <th>Equity</th>
-                      <th>Lead Type</th>
-                      <th>Mortgage</th>
-                      <th>Last Money In</th>
+                    <tr style={thRowStyle}>
+                      <th style={{ ...thStyle, width: '30%' }}>PROPERTY / OWNER</th>
+                      <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>HOUSE VALUE</th>
+                      <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>EQUITY</th>
+                      <th style={{ ...thStyle, width: '14%' }}>LEAD TYPE</th>
+                      <th style={{ ...thStyle, width: '13%', textAlign: 'right' }}>MORTGAGE</th>
+                      <th style={{ ...thStyle, width: '13%', textAlign: 'right' }}>LAST SALE</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.slice(0, 12).map((row, index) => (
-                      <tr key={`${row.property_address_1 || row.apn || 'row'}-${index}`}>
-                        <td>
-                          <div style={cellTitleStyle}>{safeText(row.property_address_1)}</div>
-                          <div style={cellSubStyle}>{safeText(row.owner_name)}</div>
+                    {rows.slice(0, 16).map((row, index) => (
+                      <tr key={`${row.property_address_1 || row.apn || 'row'}-${index}`} style={trStyle}>
+                        <td style={tdStyle}>
+                          <div style={cellTitleStyle} title={safeText(row.property_address_1)}>
+                            {safeText(row.property_address_1)}
+                          </div>
+                          <div style={cellSubStyle} title={safeText(row.owner_name)}>
+                            {safeText(row.owner_name)}
+                          </div>
                         </td>
-                        <td>{money(row.house_value)}</td>
-                        <td>{money(row.equity_amount)}</td>
-                        <td>
-                          <span className="crm-badge soft">{safeText(row.lead_type)}</span>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={goldValueStyle}>{money(row.house_value)}</span>
                         </td>
-                        <td>{money(row.mortgage_balance)}</td>
-                        <td>{money(row.last_sale_amount)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.equity_amount)}</td>
+                        <td style={tdStyle}>
+                          <span style={badgeStyle}>{safeText(row.lead_type)}</span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.mortgage_balance)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.last_sale_amount)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -426,26 +439,20 @@ function MetricCard({
 }) {
   const palette =
     tone === 'gold'
-      ? { border: 'rgba(214,166,75,0.24)', bg: 'rgba(214,166,75,0.08)', text: '#f3d899' }
+      ? { border: 'rgba(214,166,75,0.25)', bg: 'rgba(214,166,75,0.06)', text: '#d6a64b' }
       : tone === 'ice'
-        ? { border: 'rgba(147,197,253,0.22)', bg: 'rgba(147,197,253,0.08)', text: '#dcecff' }
-        : { border: 'rgba(70,223,139,0.22)', bg: 'rgba(70,223,139,0.08)', text: '#cbf8de' }
+        ? { border: 'rgba(147,197,253,0.22)', bg: 'rgba(147,197,253,0.06)', text: '#93c5fd' }
+        : { border: 'rgba(74,222,128,0.22)', bg: 'rgba(74,222,128,0.06)', text: '#4ade80' }
 
   return (
     <div style={{ ...metricCardStyle, borderColor: palette.border, background: palette.bg }}>
       <div style={metricLabelStyle}>{title}</div>
-      <div style={{ color: palette.text, fontSize: 26, fontWeight: 800 }}>{value}</div>
+      <div style={{ color: palette.text, fontSize: 24, fontWeight: 800 }}>{value}</div>
     </div>
   )
 }
 
-function RunSummaryBox({
-  label,
-  value,
-}: {
-  label: string
-  value: number
-}) {
+function RunSummaryBox({ label, value }: { label: string; value: number }) {
   return (
     <div style={runSummaryBoxStyle}>
       <div style={metricLabelStyle}>{label}</div>
@@ -454,10 +461,13 @@ function RunSummaryBox({
   )
 }
 
+// ---------------- STYLES ----------------
+
 const pageGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '440px minmax(0, 1fr)',
-  gap: 16,
+  gridTemplateColumns: '420px minmax(0, 1fr)',
+  gap: 20,
+  alignItems: 'start',
 }
 
 const leftRailStyle: CSSProperties = {
@@ -471,39 +481,40 @@ const rightRailStyle: CSSProperties = {
 }
 
 const heroPanelStyle: CSSProperties = {
-  padding: 16,
-  borderRadius: 18,
-  border: '1px solid rgba(214,166,75,0.18)',
+  padding: 18,
+  borderRadius: 16,
+  border: '1px solid rgba(214,166,75,0.2)',
   background:
-    'radial-gradient(circle at top left, rgba(214,166,75,0.12), transparent 42%), linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.006)), rgba(0,0,0,0.20)',
+    'radial-gradient(circle at top left, rgba(214,166,75,0.12), transparent 60%), linear-gradient(180deg, rgba(20,18,14,0.8), rgba(8,8,8,0.9))',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
 }
 
 const heroEyebrowStyle: CSSProperties = {
-  fontSize: 10,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  color: 'var(--white-faint)',
+  fontSize: 9.5,
+  fontWeight: 800,
+  letterSpacing: '0.12em',
+  color: 'rgba(214,166,75,0.8)',
 }
 
 const heroTitleStyle: CSSProperties = {
-  marginTop: 8,
-  fontSize: 21,
-  lineHeight: 1.08,
-  fontWeight: 780,
-  letterSpacing: '-0.03em',
-  color: 'var(--white-hi)',
+  marginTop: 6,
+  fontSize: 17,
+  fontWeight: 800,
+  letterSpacing: '-0.02em',
+  color: '#ffffff',
 }
 
 const heroCopyStyle: CSSProperties = {
-  marginTop: 10,
+  marginTop: 8,
   fontSize: 12,
-  lineHeight: 1.6,
-  color: 'var(--white-soft)',
+  lineHeight: 1.5,
+  color: 'rgba(255,255,255,0.5)',
 }
 
 const controlStackStyle: CSSProperties = {
   display: 'grid',
-  gap: 12,
+  gap: 14,
+  marginTop: 6,
 }
 
 const fieldStackStyle: CSSProperties = {
@@ -511,29 +522,76 @@ const fieldStackStyle: CSSProperties = {
   gap: 6,
 }
 
+const labelStyle: CSSProperties = {
+  fontSize: 10,
+  color: 'rgba(255,255,255,0.4)',
+  fontWeight: 750,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+}
+
+const customInputStyle: CSSProperties = {
+  width: '100%',
+  background: 'rgba(0,0,0,0.4)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 12,
+  padding: '10px 14px',
+  color: '#ffffff',
+  fontSize: 12.5,
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+
+const dropzoneStyle: CSSProperties = {
+  position: 'relative',
+  border: '1px dashed rgba(214,166,75,0.3)',
+  borderRadius: 12,
+  background: 'rgba(0,0,0,0.3)',
+  padding: '12px 14px',
+  cursor: 'pointer',
+}
+
+const fileInputOverlayStyle: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  opacity: 0,
+  cursor: 'pointer',
+}
+
+const fileLabelContentStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  pointerEvents: 'none',
+}
+
+const fileNameTextStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 650,
+  color: '#ffffff',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+}
+
 const actionsStyle: CSSProperties = {
   display: 'flex',
   gap: 10,
   flexWrap: 'wrap',
-}
-
-const labelStyle: CSSProperties = {
-  fontSize: 10,
-  color: 'var(--white-faint)',
-  fontWeight: 700,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
+  marginTop: 4,
 }
 
 const messageStyle: CSSProperties = {
-  padding: '12px 14px',
-  borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background:
-    'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.006)), rgba(0,0,0,0.16)',
-  color: 'var(--white-soft)',
+  padding: '10px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(214,166,75,0.25)',
+  background: 'rgba(214,166,75,0.08)',
+  color: '#d6a64b',
   fontSize: 12,
-  lineHeight: 1.55,
+  lineHeight: 1.4,
 }
 
 const metricsGridStyle: CSSProperties = {
@@ -545,16 +603,17 @@ const metricsGridStyle: CSSProperties = {
 
 const metricCardStyle: CSSProperties = {
   padding: 12,
-  borderRadius: 16,
+  borderRadius: 12,
   border: '1px solid rgba(255,255,255,0.06)',
 }
 
 const metricLabelStyle: CSSProperties = {
-  fontSize: 10,
-  letterSpacing: '0.14em',
+  fontSize: 9.5,
+  letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  color: 'var(--white-faint)',
-  marginBottom: 8,
+  color: 'rgba(255,255,255,0.4)',
+  marginBottom: 6,
+  fontWeight: 700,
 }
 
 const runSummaryWrapStyle: CSSProperties = {
@@ -565,83 +624,166 @@ const runSummaryWrapStyle: CSSProperties = {
 const runSummaryTopStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-  gap: 10,
+  gap: 8,
 }
 
 const runSummaryBoxStyle: CSSProperties = {
-  padding: 12,
-  borderRadius: 16,
-  background: 'rgba(255,255,255,0.04)',
+  padding: '10px 8px',
+  borderRadius: 10,
+  background: 'rgba(255,255,255,0.03)',
   border: '1px solid rgba(255,255,255,0.06)',
+  textAlign: 'center',
 }
 
 const runSummaryValueStyle: CSSProperties = {
-  fontSize: 22,
+  fontSize: 18,
   fontWeight: 800,
-  color: 'var(--white-hi)',
+  color: '#ffffff',
 }
 
 const runSourceStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 10,
-  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  paddingTop: 4,
 }
 
 const runSourceLabelStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--white-faint)',
+  fontSize: 10.5,
+  color: 'rgba(255,255,255,0.4)',
   textTransform: 'uppercase',
-  letterSpacing: '0.14em',
+  letterSpacing: '0.08em',
+  fontWeight: 700,
+}
+
+const sourceTagStyle: CSSProperties = {
+  fontSize: 11,
+  padding: '3px 8px',
+  borderRadius: 6,
+  background: 'rgba(214,166,75,0.12)',
+  border: '1px solid rgba(214,166,75,0.25)',
+  color: '#d6a64b',
+  fontWeight: 650,
 }
 
 const errorPanelStyle: CSSProperties = {
   display: 'grid',
-  gap: 10,
+  gap: 8,
   padding: 12,
-  borderRadius: 16,
-  background: 'rgba(240,123,123,0.08)',
-  border: '1px solid rgba(240,123,123,0.18)',
+  borderRadius: 12,
+  background: 'rgba(239,68,68,0.08)',
+  border: '1px solid rgba(239,68,68,0.2)',
 }
 
 const errorTitleStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: '#ffd5d5',
+  fontSize: 10.5,
+  fontWeight: 750,
+  color: '#fca5a5',
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
 }
 
 const errorListStyle: CSSProperties = {
   display: 'grid',
-  gap: 8,
-  maxHeight: 220,
+  gap: 6,
+  maxHeight: 180,
   overflow: 'auto',
 }
 
 const errorItemStyle: CSSProperties = {
-  padding: 10,
-  borderRadius: 12,
-  background: 'rgba(0,0,0,0.22)',
-  color: 'rgba(255,255,255,0.82)',
+  padding: 8,
+  borderRadius: 8,
+  background: 'rgba(0,0,0,0.3)',
+  color: 'rgba(255,255,255,0.85)',
+  fontSize: 11.5,
+  lineHeight: 1.4,
+}
+
+const emptyMutedStyle: CSSProperties = {
   fontSize: 12,
-  lineHeight: 1.45,
-  border: '1px solid rgba(255,255,255,0.06)',
+  color: 'rgba(255,255,255,0.4)',
 }
 
 const emptyStateStyle: CSSProperties = {
+  fontSize: 12.5,
+  color: 'rgba(255,255,255,0.4)',
+  padding: '40px 0',
+  textAlign: 'center',
+}
+
+const tableWrapStyle: CSSProperties = {
+  width: '100%',
+  overflowX: 'auto',
+  borderRadius: 12,
+  border: '1px solid rgba(255,255,255,0.06)',
+  background: 'rgba(0,0,0,0.25)',
+}
+
+const customTableStyle: CSSProperties = {
+  width: '100%',
+  borderCollapse: 'collapse',
   fontSize: 12,
-  padding: '4px 0',
+  textAlign: 'left',
+  minWidth: 680,
+}
+
+const thRowStyle: CSSProperties = {
+  background: 'rgba(255,255,255,0.02)',
+  borderBottom: '1px solid rgba(255,255,255,0.08)',
+}
+
+const thStyle: CSSProperties = {
+  padding: '12px 14px',
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 9.5,
+  fontWeight: 750,
+  letterSpacing: '0.08em',
+  whiteSpace: 'nowrap',
+}
+
+const trStyle: CSSProperties = {
+  borderBottom: '1px solid rgba(255,255,255,0.04)',
+}
+
+const tdStyle: CSSProperties = {
+  padding: '12px 14px',
+  verticalAlign: 'middle',
+  color: 'rgba(255,255,255,0.85)',
 }
 
 const cellTitleStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 12.5,
   fontWeight: 700,
-  color: 'var(--white-hi)',
+  color: '#ffffff',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: 220,
 }
 
 const cellSubStyle: CSSProperties = {
-  marginTop: 4,
+  marginTop: 2,
   fontSize: 11,
-  color: 'var(--white-faint)',
+  color: 'rgba(255,255,255,0.4)',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: 220,
+}
+
+const goldValueStyle: CSSProperties = {
+  fontWeight: 750,
+  color: '#ffffff',
+}
+
+const badgeStyle: CSSProperties = {
+  display: 'inline-block',
+  padding: '2px 6px',
+  borderRadius: 6,
+  fontSize: 10,
+  fontWeight: 700,
+  color: 'rgba(255,255,255,0.6)',
+  background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  whiteSpace: 'nowrap',
 }
