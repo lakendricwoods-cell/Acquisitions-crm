@@ -3,23 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --bg-0: #000000;
-  --bg-1: #010101;
-  --bg-2: #040404;
-  --bg-3: #080808;
-  --bg-4: #0c0c0c;
+  --bg-0: #030304;
+  --bg-1: #050507;
+  --bg-2: #08080a;
+  --bg-3: #0c0c0f;
+  --bg-4: #101014;
 
-  --panel-base: rgba(0, 0, 0, 0.985);
-  --panel-base-strong: rgba(0, 0, 0, 1);
-  --panel-base-soft: rgba(10, 10, 10, 0.94);
+  /* Smoked Glass Transparency Settings */
+  --panel-base: rgba(10, 10, 14, 0.72);
+  --panel-base-strong: rgba(6, 6, 9, 0.88);
+  --panel-base-soft: rgba(14, 14, 18, 0.65);
 
-  --panel-glass-top: rgba(255, 255, 255, 0.02);
-  --panel-glass-bottom: rgba(255, 255, 255, 0.004);
+  --panel-glass-top: rgba(255, 255, 255, 0.05);
+  --panel-glass-bottom: rgba(255, 255, 255, 0.008);
 
-  --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-border-strong: rgba(214, 166, 75, 0.28);
-  --glass-line: rgba(255, 255, 255, 0.05);
-  --glass-line-soft: rgba(255, 255, 255, 0.025);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-strong: rgba(214, 166, 75, 0.45);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --glass-line-soft: rgba(255, 255, 255, 0.035);
 
   --white-hi: rgba(255, 255, 255, 0.985);
   --white-soft: rgba(255, 255, 255, 0.72);
@@ -28,10 +29,10 @@
   --gold: #d6a64b;
   --gold-2: #ebc477;
   --gold-soft: rgba(214, 166, 75, 0.12);
-  --gold-border: rgba(214, 166, 75, 0.24);
-  --gold-border-strong: rgba(214, 166, 75, 0.34);
-  --gold-glow-soft: rgba(214, 166, 75, 0.12);
-  --gold-glow: rgba(214, 166, 75, 0.2);
+  --gold-border: rgba(214, 166, 75, 0.3);
+  --gold-border-strong: rgba(214, 166, 75, 0.5);
+  --gold-glow-soft: rgba(214, 166, 75, 0.15);
+  --gold-glow: rgba(214, 166, 75, 0.28);
 
   --neon-blue: #d6a64b;
   --neon-cyan: #ebc477;
@@ -40,15 +41,15 @@
   --neon-orange: #f59e0b;
   --neon-pink: #fb7185;
 
-  --shadow-soft: 0 16px 42px rgba(0, 0, 0, 0.34);
-  --shadow-strong: 0 28px 80px rgba(0, 0, 0, 0.58);
+  --shadow-soft: 0 16px 42px rgba(0, 0, 0, 0.5);
+  --shadow-strong: 0 28px 80px rgba(0, 0, 0, 0.85);
   --glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.02),
-    0 24px 80px rgba(0, 0, 0, 0.82);
+    inset 0 1px 1px rgba(255, 220, 120, 0.25),
+    0 24px 80px rgba(0, 0, 0, 0.88);
 
-  --glass-blur: blur(24px);
-  --glass-blur-soft: blur(18px);
-  --glass-sat: saturate(135%);
+  --glass-blur: blur(20px);
+  --glass-blur-soft: blur(14px);
+  --glass-sat: saturate(140%);
 
   --radius-2xl: 28px;
   --radius-xl: 22px;
@@ -58,7 +59,7 @@
 
   --rail-width: 88px;
   --content-max: 1720px;
-  --border: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
   --text-main: var(--white-hi);
   --text-soft: var(--white-soft);
   --text-faint: var(--white-faint);
@@ -72,8 +73,8 @@ html[data-theme="midnight-gold"],
 body.theme-midnight-gold {
   --gold: #d6a64b;
   --gold-2: #f0ca7e;
-  --gold-border: rgba(214, 166, 75, 0.35);
-  --gold-glow: rgba(214, 166, 75, 0.25);
+  --gold-border: rgba(214, 166, 75, 0.45);
+  --gold-glow: rgba(214, 166, 75, 0.35);
   --bg-0: #030200;
 }
 
@@ -81,8 +82,8 @@ html[data-theme="dark-glass"],
 body.theme-dark-glass {
   --gold: #38bdf8;
   --gold-2: #7dd3fc;
-  --gold-border: rgba(56, 189, 248, 0.3);
-  --gold-glow: rgba(56, 189, 248, 0.2);
+  --gold-border: rgba(56, 189, 248, 0.4);
+  --gold-glow: rgba(56, 189, 248, 0.28);
   --bg-0: #020617;
 }
 
@@ -90,8 +91,8 @@ html[data-theme="obsidian"],
 body.theme-obsidian {
   --gold: #e2e8f0;
   --gold-2: #ffffff;
-  --gold-border: rgba(255, 255, 255, 0.2);
-  --gold-glow: rgba(255, 255, 255, 0.1);
+  --gold-border: rgba(255, 255, 255, 0.3);
+  --gold-glow: rgba(255, 255, 255, 0.18);
   --bg-0: #000000;
 }
 
@@ -121,7 +122,7 @@ body.theme-obsidian {
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
-  scrollbar-color: rgba(214, 166, 75, 0.22) transparent;
+  scrollbar-color: rgba(214, 166, 75, 0.35) transparent;
 }
 
 html {
@@ -143,7 +144,7 @@ body,
 }
 
 ::selection {
-  background: rgba(214, 166, 75, 0.28);
+  background: rgba(214, 166, 75, 0.38);
   color: #ffffff;
 }
 
@@ -153,7 +154,7 @@ body,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(214, 166, 75, 0.3);
+  background: rgba(214, 166, 75, 0.4);
   border-radius: 999px;
 }
 
@@ -162,19 +163,38 @@ body,
 }
 
 /* -------------------------------------------------------------------------- */
-/* GLASS SYSTEM & UTILITIES                                                  */
+/* GLASS SYSTEM & UTILITIES (Translucent 1:1 Obsidian Realization)           */
 /* -------------------------------------------------------------------------- */
 
 .gold-glass-card {
   position: relative;
   border-radius: 20px;
-  border: 1px solid rgba(214, 166, 75, 0.22);
-  background: linear-gradient(180deg, rgba(12, 10, 6, 0.85), rgba(0, 0, 0, 0.92));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--gold-border);
+  background: linear-gradient(
+    180deg,
+    rgba(22, 18, 10, 0.75) 0%,
+    rgba(6, 6, 8, 0.88) 100%
+  ) !important;
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
   box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 12px 36px rgba(0, 0, 0, 0.65);
+    inset 0 1px 1px rgba(255, 220, 100, 0.3),
+    0 16px 48px rgba(0, 0, 0, 0.78);
+}
+
+.glass-panel-dark {
+  background: linear-gradient(
+    180deg,
+    rgba(14, 14, 18, 0.72) 0%,
+    rgba(6, 6, 9, 0.88) 100%
+  ) !important;
+  border: 1px solid rgba(212, 175, 55, 0.22) !important;
+  box-shadow: 
+    0 20px 50px rgba(0, 0, 0, 0.85),
+    inset 0 1px 1px rgba(255, 215, 0, 0.2) !important;
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+  border-radius: 14px;
 }
 
 .crm-app-shell {
@@ -184,6 +204,7 @@ body,
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  background: transparent;
 }
 
 .crm-sidebar {
@@ -191,8 +212,12 @@ body,
   top: 0;
   height: 100vh;
   z-index: 60;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.85), rgba(4, 4, 4, 0.95));
+  border-right: 1px solid rgba(214, 166, 75, 0.18);
+  background: linear-gradient(
+    180deg,
+    rgba(8, 8, 12, 0.75) 0%,
+    rgba(3, 3, 5, 0.88) 100%
+  ) !important;
   backdrop-filter: var(--glass-blur) var(--glass-sat);
   -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
   padding: 14px 10px;
@@ -219,9 +244,15 @@ body,
 .crm-nav-link:hover,
 .crm-nav-link.active {
   color: #ffffff;
-  background: linear-gradient(180deg, rgba(20, 16, 8, 0.8), rgba(0, 0, 0, 0.95));
-  border-color: rgba(214, 166, 75, 0.35);
-  box-shadow: 0 0 18px rgba(214, 166, 75, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(35, 28, 14, 0.8) 0%,
+    rgba(8, 8, 12, 0.92) 100%
+  );
+  border-color: rgba(214, 166, 75, 0.5);
+  box-shadow: 
+    0 0 22px rgba(214, 166, 75, 0.25),
+    inset 0 1px 1px rgba(255, 220, 100, 0.35);
 }
 
 .crm-main {
@@ -236,10 +267,14 @@ body,
   top: 0;
   z-index: 50;
   height: 70px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.82), rgba(4, 4, 4, 0.92));
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid rgba(214, 166, 75, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(8, 8, 12, 0.75) 0%,
+    rgba(3, 3, 5, 0.88) 100%
+  ) !important;
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -249,6 +284,7 @@ body,
 .crm-main-content {
   min-width: 0;
   padding: 16px 20px 24px;
+  background: transparent;
 }
 
 .crm-content-wrap {
