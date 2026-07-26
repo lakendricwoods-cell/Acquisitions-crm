@@ -322,15 +322,15 @@ export default function ImportsPage() {
             subtitle="Data completeness checks across critical valuation vectors."
           >
             <div style={metricsGridStyle}>
-              <MetricCard title="Address" value={stats.withAddress} tone="gold" />
-              <MetricCard title="House Value" value={stats.withHouseValue} tone="ice" />
-              <MetricCard title="Equity" value={stats.withEquity} tone="green" />
-              <MetricCard title="Mortgage" value={stats.withMortgage} tone="gold" />
+              <MetricCard title="Address" value={stats.withAddress} neon="cyan" />
+              <MetricCard title="House Value" value={stats.withHouseValue} neon="magenta" />
+              <MetricCard title="Equity" value={stats.withEquity} neon="lime" />
+              <MetricCard title="Mortgage" value={stats.withMortgage} neon="yellow" />
             </div>
 
             <div style={metricsGridStyle}>
-              <MetricCard title="Distress / Lead Type" value={stats.withLeadType} tone="green" />
-              <MetricCard title="Workable Rows" value={stats.workable} tone="ice" />
+              <MetricCard title="Distress / Lead Type" value={stats.withLeadType} neon="orange" />
+              <MetricCard title="Workable Rows" value={stats.workable} neon="purple" />
             </div>
           </SectionCard>
 
@@ -341,11 +341,11 @@ export default function ImportsPage() {
             {runSummary ? (
               <div style={runSummaryWrapStyle}>
                 <div style={runSummaryTopStyle}>
-                  <RunSummaryBox label="Parsed" value={runSummary.parsed} />
-                  <RunSummaryBox label="Created" value={runSummary.created} />
-                  <RunSummaryBox label="Updated" value={runSummary.updated} />
-                  <RunSummaryBox label="Skipped" value={runSummary.skipped} />
-                  <RunSummaryBox label="Failed" value={runSummary.failed} />
+                  <RunSummaryBox label="Parsed" value={runSummary.parsed} neon="cyan" />
+                  <RunSummaryBox label="Created" value={runSummary.created} neon="lime" />
+                  <RunSummaryBox label="Updated" value={runSummary.updated} neon="magenta" />
+                  <RunSummaryBox label="Skipped" value={runSummary.skipped} neon="yellow" />
+                  <RunSummaryBox label="Failed" value={runSummary.failed} neon="orange" />
                 </div>
 
                 <div style={runSourceStyle}>
@@ -387,12 +387,12 @@ export default function ImportsPage() {
                 <table style={customTableStyle}>
                   <thead>
                     <tr style={thRowStyle}>
-                      <th style={{ ...thStyle, width: '30%' }}>PROPERTY / OWNER</th>
-                      <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>HOUSE VALUE</th>
-                      <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>EQUITY</th>
-                      <th style={{ ...thStyle, width: '14%' }}>LEAD TYPE</th>
-                      <th style={{ ...thStyle, width: '13%', textAlign: 'right' }}>MORTGAGE</th>
-                      <th style={{ ...thStyle, width: '13%', textAlign: 'right' }}>LAST SALE</th>
+                      <th style={{ ...thStyle, width: '30%', color: '#00f0ff' }}>PROPERTY / OWNER</th>
+                      <th style={{ ...thStyle, width: '15%', textAlign: 'right', color: '#ff007f' }}>HOUSE VALUE</th>
+                      <th style={{ ...thStyle, width: '15%', textAlign: 'right', color: '#39ff14' }}>EQUITY</th>
+                      <th style={{ ...thStyle, width: '14%', color: '#ffbd03' }}>LEAD TYPE</th>
+                      <th style={{ ...thStyle, width: '13%', textAlign: 'right', color: '#bf00ff' }}>MORTGAGE</th>
+                      <th style={{ ...thStyle, width: '13%', textAlign: 'right', color: '#ff6600' }}>LAST SALE</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -407,14 +407,20 @@ export default function ImportsPage() {
                           </div>
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>
-                          <span style={goldValueStyle}>{money(row.house_value)}</span>
+                          <span style={magentaValueStyle}>{money(row.house_value)}</span>
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.equity_amount)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={limeValueStyle}>{money(row.equity_amount)}</span>
+                        </td>
                         <td style={tdStyle}>
                           <span style={badgeStyle}>{safeText(row.lead_type)}</span>
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.mortgage_balance)}</td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(row.last_sale_amount)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={purpleValueStyle}>{money(row.mortgage_balance)}</span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={orangeValueStyle}>{money(row.last_sale_amount)}</span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -428,35 +434,72 @@ export default function ImportsPage() {
   )
 }
 
-function MetricCard({
-  title,
-  value,
-  tone,
-}: {
-  title: string
-  value: number
-  tone: 'gold' | 'ice' | 'green'
-}) {
-  const palette =
-    tone === 'gold'
-      ? { border: 'rgba(214,166,75,0.25)', bg: 'rgba(214,166,75,0.06)', text: '#d6a64b' }
-      : tone === 'ice'
-        ? { border: 'rgba(147,197,253,0.22)', bg: 'rgba(147,197,253,0.06)', text: '#93c5fd' }
-        : { border: 'rgba(74,222,128,0.22)', bg: 'rgba(74,222,128,0.06)', text: '#4ade80' }
+type NeonColor = 'cyan' | 'magenta' | 'lime' | 'yellow' | 'orange' | 'purple'
 
+const NEON_MAP: Record<NeonColor, { border: string; bg: string; text: string; shadow: string }> = {
+  cyan: {
+    border: 'rgba(0,240,255,0.4)',
+    bg: 'rgba(0,240,255,0.06)',
+    text: '#00f0ff',
+    shadow: '0 0 12px rgba(0,240,255,0.15)',
+  },
+  magenta: {
+    border: 'rgba(255,0,127,0.4)',
+    bg: 'rgba(255,0,127,0.06)',
+    text: '#ff007f',
+    shadow: '0 0 12px rgba(255,0,127,0.15)',
+  },
+  lime: {
+    border: 'rgba(57,255,20,0.4)',
+    bg: 'rgba(57,255,20,0.06)',
+    text: '#39ff14',
+    shadow: '0 0 12px rgba(57,255,20,0.15)',
+  },
+  yellow: {
+    border: 'rgba(255,189,3,0.4)',
+    bg: 'rgba(255,189,3,0.06)',
+    text: '#ffbd03',
+    shadow: '0 0 12px rgba(255,189,3,0.15)',
+  },
+  orange: {
+    border: 'rgba(255,102,0,0.4)',
+    bg: 'rgba(255,102,0,0.06)',
+    text: '#ff6600',
+    shadow: '0 0 12px rgba(255,102,0,0.15)',
+  },
+  purple: {
+    border: 'rgba(191,0,255,0.4)',
+    bg: 'rgba(191,0,255,0.06)',
+    text: '#bf00ff',
+    shadow: '0 0 12px rgba(191,0,255,0.15)',
+  },
+}
+
+function MetricCard({ title, value, neon }: { title: string; value: number; neon: NeonColor }) {
+  const theme = NEON_MAP[neon]
   return (
-    <div style={{ ...metricCardStyle, borderColor: palette.border, background: palette.bg }}>
-      <div style={metricLabelStyle}>{title}</div>
-      <div style={{ color: palette.text, fontSize: 24, fontWeight: 800 }}>{value}</div>
+    <div
+      style={{
+        ...metricCardStyle,
+        borderColor: theme.border,
+        background: theme.bg,
+        boxShadow: theme.shadow,
+      }}
+    >
+      <div style={{ ...metricLabelStyle, color: theme.text }}>{title}</div>
+      <div style={{ color: theme.text, fontSize: 26, fontWeight: 900, textShadow: `0 0 10px ${theme.border}` }}>
+        {value}
+      </div>
     </div>
   )
 }
 
-function RunSummaryBox({ label, value }: { label: string; value: number }) {
+function RunSummaryBox({ label, value, neon }: { label: string; value: number; neon: NeonColor }) {
+  const theme = NEON_MAP[neon]
   return (
-    <div style={runSummaryBoxStyle}>
-      <div style={metricLabelStyle}>{label}</div>
-      <div style={runSummaryValueStyle}>{value}</div>
+    <div style={{ ...runSummaryBoxStyle, borderColor: theme.border, background: theme.bg }}>
+      <div style={{ ...metricLabelStyle, color: theme.text }}>{label}</div>
+      <div style={{ ...runSummaryValueStyle, color: theme.text }}>{value}</div>
     </div>
   )
 }
@@ -483,17 +526,17 @@ const rightRailStyle: CSSProperties = {
 const heroPanelStyle: CSSProperties = {
   padding: 18,
   borderRadius: 16,
-  border: '1px solid rgba(214,166,75,0.2)',
+  border: '1px solid rgba(0,240,255,0.4)',
   background:
-    'radial-gradient(circle at top left, rgba(214,166,75,0.12), transparent 60%), linear-gradient(180deg, rgba(20,18,14,0.8), rgba(8,8,8,0.9))',
-  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+    'radial-gradient(circle at top left, rgba(255,0,127,0.15), transparent 60%), linear-gradient(180deg, rgba(20,18,28,0.9), rgba(8,8,12,0.95))',
+  boxShadow: '0 0 20px rgba(0,240,255,0.15)',
 }
 
 const heroEyebrowStyle: CSSProperties = {
   fontSize: 9.5,
-  fontWeight: 800,
-  letterSpacing: '0.12em',
-  color: 'rgba(214,166,75,0.8)',
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+  color: '#39ff14',
 }
 
 const heroTitleStyle: CSSProperties = {
@@ -508,7 +551,7 @@ const heroCopyStyle: CSSProperties = {
   marginTop: 8,
   fontSize: 12,
   lineHeight: 1.5,
-  color: 'rgba(255,255,255,0.5)',
+  color: 'rgba(255,255,255,0.6)',
 }
 
 const controlStackStyle: CSSProperties = {
@@ -524,29 +567,30 @@ const fieldStackStyle: CSSProperties = {
 
 const labelStyle: CSSProperties = {
   fontSize: 10,
-  color: 'rgba(255,255,255,0.4)',
-  fontWeight: 750,
-  letterSpacing: '0.08em',
+  color: '#ff007f',
+  fontWeight: 800,
+  letterSpacing: '0.1em',
   textTransform: 'uppercase',
 }
 
 const customInputStyle: CSSProperties = {
   width: '100%',
-  background: 'rgba(0,0,0,0.4)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(0,0,0,0.6)',
+  border: '1px solid rgba(0,240,255,0.3)',
   borderRadius: 12,
   padding: '10px 14px',
-  color: '#ffffff',
+  color: '#00f0ff',
   fontSize: 12.5,
+  fontWeight: 600,
   outline: 'none',
   boxSizing: 'border-box',
 }
 
 const dropzoneStyle: CSSProperties = {
   position: 'relative',
-  border: '1px dashed rgba(214,166,75,0.3)',
+  border: '1px dashed rgba(255,0,127,0.5)',
   borderRadius: 12,
-  background: 'rgba(0,0,0,0.3)',
+  background: 'rgba(255,0,127,0.04)',
   padding: '12px 14px',
   cursor: 'pointer',
 }
@@ -570,8 +614,8 @@ const fileLabelContentStyle: CSSProperties = {
 
 const fileNameTextStyle: CSSProperties = {
   fontSize: 12,
-  fontWeight: 650,
-  color: '#ffffff',
+  fontWeight: 700,
+  color: '#ffbd03',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -587,10 +631,11 @@ const actionsStyle: CSSProperties = {
 const messageStyle: CSSProperties = {
   padding: '10px 14px',
   borderRadius: 10,
-  border: '1px solid rgba(214,166,75,0.25)',
-  background: 'rgba(214,166,75,0.08)',
-  color: '#d6a64b',
+  border: '1px solid rgba(57,255,20,0.4)',
+  background: 'rgba(57,255,20,0.08)',
+  color: '#39ff14',
   fontSize: 12,
+  fontWeight: 600,
   lineHeight: 1.4,
 }
 
@@ -604,16 +649,15 @@ const metricsGridStyle: CSSProperties = {
 const metricCardStyle: CSSProperties = {
   padding: 12,
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.06)',
+  border: '1px solid',
 }
 
 const metricLabelStyle: CSSProperties = {
   fontSize: 9.5,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.4)',
   marginBottom: 6,
-  fontWeight: 700,
+  fontWeight: 800,
 }
 
 const runSummaryWrapStyle: CSSProperties = {
@@ -630,15 +674,13 @@ const runSummaryTopStyle: CSSProperties = {
 const runSummaryBoxStyle: CSSProperties = {
   padding: '10px 8px',
   borderRadius: 10,
-  background: 'rgba(255,255,255,0.03)',
-  border: '1px solid rgba(255,255,255,0.06)',
+  border: '1px solid',
   textAlign: 'center',
 }
 
 const runSummaryValueStyle: CSSProperties = {
   fontSize: 18,
   fontWeight: 800,
-  color: '#ffffff',
 }
 
 const runSourceStyle: CSSProperties = {
@@ -650,20 +692,20 @@ const runSourceStyle: CSSProperties = {
 
 const runSourceLabelStyle: CSSProperties = {
   fontSize: 10.5,
-  color: 'rgba(255,255,255,0.4)',
+  color: '#00f0ff',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  fontWeight: 700,
+  fontWeight: 800,
 }
 
 const sourceTagStyle: CSSProperties = {
   fontSize: 11,
   padding: '3px 8px',
   borderRadius: 6,
-  background: 'rgba(214,166,75,0.12)',
-  border: '1px solid rgba(214,166,75,0.25)',
-  color: '#d6a64b',
-  fontWeight: 650,
+  background: 'rgba(255,0,127,0.15)',
+  border: '1px solid rgba(255,0,127,0.4)',
+  color: '#ff007f',
+  fontWeight: 800,
 }
 
 const errorPanelStyle: CSSProperties = {
@@ -671,14 +713,14 @@ const errorPanelStyle: CSSProperties = {
   gap: 8,
   padding: 12,
   borderRadius: 12,
-  background: 'rgba(239,68,68,0.08)',
-  border: '1px solid rgba(239,68,68,0.2)',
+  background: 'rgba(255,102,0,0.08)',
+  border: '1px solid rgba(255,102,0,0.4)',
 }
 
 const errorTitleStyle: CSSProperties = {
   fontSize: 10.5,
-  fontWeight: 750,
-  color: '#fca5a5',
+  fontWeight: 800,
+  color: '#ff6600',
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
 }
@@ -693,8 +735,8 @@ const errorListStyle: CSSProperties = {
 const errorItemStyle: CSSProperties = {
   padding: 8,
   borderRadius: 8,
-  background: 'rgba(0,0,0,0.3)',
-  color: 'rgba(255,255,255,0.85)',
+  background: 'rgba(0,0,0,0.4)',
+  color: '#ffbd03',
   fontSize: 11.5,
   lineHeight: 1.4,
 }
@@ -706,7 +748,7 @@ const emptyMutedStyle: CSSProperties = {
 
 const emptyStateStyle: CSSProperties = {
   fontSize: 12.5,
-  color: 'rgba(255,255,255,0.4)',
+  color: '#00f0ff',
   padding: '40px 0',
   textAlign: 'center',
 }
@@ -715,8 +757,8 @@ const tableWrapStyle: CSSProperties = {
   width: '100%',
   overflowX: 'auto',
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'rgba(0,0,0,0.25)',
+  border: '1px solid rgba(0,240,255,0.2)',
+  background: 'rgba(0,0,0,0.4)',
 }
 
 const customTableStyle: CSSProperties = {
@@ -728,33 +770,32 @@ const customTableStyle: CSSProperties = {
 }
 
 const thRowStyle: CSSProperties = {
-  background: 'rgba(255,255,255,0.02)',
-  borderBottom: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(255,255,255,0.03)',
+  borderBottom: '1px solid rgba(255,255,255,0.1)',
 }
 
 const thStyle: CSSProperties = {
   padding: '12px 14px',
-  color: 'rgba(255,255,255,0.4)',
   fontSize: 9.5,
-  fontWeight: 750,
-  letterSpacing: '0.08em',
+  fontWeight: 900,
+  letterSpacing: '0.1em',
   whiteSpace: 'nowrap',
 }
 
 const trStyle: CSSProperties = {
-  borderBottom: '1px solid rgba(255,255,255,0.04)',
+  borderBottom: '1px solid rgba(255,255,255,0.05)',
 }
 
 const tdStyle: CSSProperties = {
   padding: '12px 14px',
   verticalAlign: 'middle',
-  color: 'rgba(255,255,255,0.85)',
+  color: '#ffffff',
 }
 
 const cellTitleStyle: CSSProperties = {
   fontSize: 12.5,
-  fontWeight: 700,
-  color: '#ffffff',
+  fontWeight: 800,
+  color: '#00f0ff',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -764,26 +805,42 @@ const cellTitleStyle: CSSProperties = {
 const cellSubStyle: CSSProperties = {
   marginTop: 2,
   fontSize: 11,
-  color: 'rgba(255,255,255,0.4)',
+  color: '#ff007f',
+  fontWeight: 600,
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   maxWidth: 220,
 }
 
-const goldValueStyle: CSSProperties = {
-  fontWeight: 750,
-  color: '#ffffff',
+const magentaValueStyle: CSSProperties = {
+  fontWeight: 800,
+  color: '#ff007f',
+}
+
+const limeValueStyle: CSSProperties = {
+  fontWeight: 800,
+  color: '#39ff14',
+}
+
+const purpleValueStyle: CSSProperties = {
+  fontWeight: 800,
+  color: '#bf00ff',
+}
+
+const orangeValueStyle: CSSProperties = {
+  fontWeight: 800,
+  color: '#ff6600',
 }
 
 const badgeStyle: CSSProperties = {
   display: 'inline-block',
-  padding: '2px 6px',
+  padding: '3px 8px',
   borderRadius: 6,
   fontSize: 10,
-  fontWeight: 700,
-  color: 'rgba(255,255,255,0.6)',
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  fontWeight: 800,
+  color: '#ffbd03',
+  background: 'rgba(255,189,3,0.12)',
+  border: '1px solid rgba(255,189,3,0.3)',
   whiteSpace: 'nowrap',
 }
