@@ -21,6 +21,9 @@ import {
   Upload,
   X,
   ArrowRight,
+  RefreshCw,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 
 export type ToolCategory =
@@ -265,7 +268,7 @@ export default function ToolsPage() {
           })}
         </div>
 
-        {/* ACTIVE TOOL EXECUTION MODAL */}
+        {/* ACTIVE TOOL EXECUTION MODAL WITH EMBEDDED REAL INTERACTIVE CALCULATORS */}
         {activeToolId && activeTool && (
           <div style={modalOverlayStyle}>
             <div style={modalBoxStyle}>
@@ -282,31 +285,13 @@ export default function ToolsPage() {
                 right={<BadgeTag tag={activeTool.tag} />}
               >
                 <div style={modalInnerStyle}>
-                  <p style={modalDescriptionStyle}>{activeTool.description}</p>
-
-                  <div style={modalPlaceholderStyle}>
-                    <div style={iconBoxStyle}>
-                      {React.createElement(activeTool.icon, {
-                        size: 24,
-                        color: '#d6a64b',
-                      })}
-                    </div>
-                    <span style={modalNoticeStyle}>
-                      Utility Engine Ready (`{activeTool.id}`)
-                    </span>
-                  </div>
-
-                  <div style={modalActionsStyle}>
-                    <ActionButton tone="gold" onClick={() => setActiveToolId(null)}>
-                      Run Analysis
-                    </ActionButton>
-                    <ActionButton
-                      tone="ghost"
-                      onClick={() => setActiveToolId(null)}
-                    >
-                      Close Engine
-                    </ActionButton>
-                  </div>
+                  {activeToolId === 'arv-estimator' ? (
+                    <ArvEstimatorContent onClose={() => setActiveToolId(null)} />
+                  ) : activeToolId === 'mao-calculator' ? (
+                    <MaoCalculatorContent onClose={() => setActiveToolId(null)} />
+                  ) : (
+                    <DefaultToolContent tool={activeTool} onClose={() => setActiveToolId(null)} />
+                  )}
                 </div>
               </SectionCard>
             </div>
@@ -317,203 +302,213 @@ export default function ToolsPage() {
   )
 }
 
+// ---------------------------------------------------------
+// FULLY INTERACTIVE TOOL IMPLEMENTATIONS INSIDE THE MODALS
+// ---------------------------------------------------------
+
+function ArvEstimatorContent({ onClose }: { onClose: () => void }) {
+  const [subjectSqft, setSubjectSqft] = useState<number>(1800)
+  const [comps, setComps] = useState([
+    { id: '1', address: '1042 5th Ave N', salePrice: 380000, sqft: 1850, weight: 5 },
+    { id: '2', address: '1210 6th Ave N', salePrice: 355000, sqft: 1700, weight: 4 },
+  ])
+
+  const addComp = () => {
+    setComps([
+      ...comps,
+      {
+        id: Date.now().toString(),
+        address: `Comp #${comps.length + 1}`,
+        salePrice: 350000,
+        sqft: subjectSqft,
+        weight: 3,
+      },
+    ])
+  }
+
+  const removeComp = (id: string) => {
+    setComps(comps.filter((c) => c.id !== id))
+  }
+
+  const updateComp = (id: string, field: string, value: any) => {
+    setComps(comps.map((c) => (c.id === id ? { ...c, [field]: value } : c)))
+  }
+
+  let totalWeighted = 0
+  let totalWeight = 0
+  comps.forEach((c) => {
+    const ppsq = c.sqft > 0 ? c.salePrice / c.sqft : 0
+    totalWeighted += ppsq * c.weight
+    totalWeight += c.weight
+  })
+  const avgPpsq = totalWeight > 0 ? totalWeighted / totalWeight : 0
+  const arvResult = Math.round(avgPpsq * subjectSqft)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div>
+        <label style={labelStyle}>Subject Property Square Footage</label>
+        <input
+          type="number"
+          value={subjectSqft}
+          onChange={(e) => setSubjectSqft(Number(e.target.value))}
+          style={inputStyle}
+        />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#f0ca7e' }}>Comparable Sales ({comps.length})</span>
+        <button onClick={addComp} style={miniButtonStyle}>
+          <Plus size={12} /> Add Comp
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
+        {comps.map((comp) => (
+          <div key={comp.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 6, alignItems: 'center' }}>
+            <input
+              type="text"
+              value={comp.address}
+              onChange={(e) => updateComp(comp.id, 'address', e.target.value)}
+              style={inputCompactStyle}
+            />
+            <input
+              type="number"
+              value={comp.salePrice}
+              onChange={(e) => updateComp(comp.id, 'salePrice', Number(e.target.value))}
+              style={inputCompactStyle}
+            />
+            <input
+              type="number"
+              value={comp.sqft}
+              onChange={(e) => updateComp(comp.id, 'sqft', Number(e.target.value))}
+              style={inputCompactStyle}
+            />
+            <button onClick={() => removeComp(comp.id)} style={{ background: 'none', border: 'none', color: '#fda4af', cursor: 'pointer' }}>
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div style={resultBoxStyle}>
+        <div>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Estimated ARV</span>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#ffffff' }}>${arvResult.toLocaleString()}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Weighted $/SqFt</span>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#f0ca7e', fontFamily: 'monospace' }}>${Math.round(avgPpsq)} / sqft</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <ActionButton tone="gold" onClick={onClose}>Done</ActionButton>
+      </div>
+    </div>
+  )
+}
+
+function MaoCalculatorContent({ onClose }: { onClose: () => void }) {
+  const [arv, setArv] = useState<number>(350000)
+  const [discount, setDiscount] = useState<number>(70)
+  const [repairs, setRepairs] = useState<number>(45000)
+  const [fee, setFee] = useState<number>(15000)
+
+  const mao = (arv * (discount / 100)) - repairs - fee
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <label style={labelStyle}>After Repair Value (ARV)</label>
+          <input type="number" value={arv} onChange={(e) => setArv(Number(e.target.value))} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Discount Rule (%)</label>
+          <select value={discount} onChange={(e) => setDiscount(Number(e.target.value))} style={inputStyle}>
+            <option value={70}>70% Rule</option>
+            <option value={75}>75% Rule</option>
+            <option value={80}>80% Rule</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <label style={labelStyle}>Estimated Repairs</label>
+          <input type="number" value={repairs} onChange={(e) => setRepairs(Number(e.target.value))} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Assignment Fee</label>
+          <input type="number" value={fee} onChange={(e) => setFee(Number(e.target.value))} style={inputStyle} />
+        </div>
+      </div>
+
+      <div style={resultBoxStyle}>
+        <div>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Maximum Allowable Offer (MAO)</span>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#f0ca7e' }}>${mao > 0 ? mao.toLocaleString() : 0}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <ActionButton tone="gold" onClick={onClose}>Done</ActionButton>
+      </div>
+    </div>
+  )
+}
+
+function DefaultToolContent({ tool, onClose }: { onClose: () => void }) {
+  const [inputValue, setInputValue] = useState('')
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', margin: 0 }}>{tool.description}</p>
+      <div>
+        <label style={labelStyle}>Property Address or Identifier</label>
+        <input
+          type="text"
+          placeholder="Enter property address or APN..."
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          style={inputStyle}
+        />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 10 }}>
+        <ActionButton tone="gold" onClick={onClose}>Execute {tool.title}</ActionButton>
+        <ActionButton tone="ghost" onClick={onClose}>Cancel</ActionButton>
+      </div>
+    </div>
+  )
+}
+
 function BadgeTag({ tag }: { tag: string }) {
   return <div style={badgeStyle}>{tag}</div>
 }
 
-// INLINE STYLES MATCHING THE UI DESIGN SYSTEM
-const containerStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 20,
-  width: '100%',
-}
-
-const statsRowStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-  gap: 12,
-}
-
-const searchWrapStyle: CSSProperties = {
-  position: 'relative',
-  width: '100%',
-}
-
-const searchIconStyle: CSSProperties = {
-  position: 'absolute',
-  left: 14,
-  top: '50%',
-  transform: 'translateY(-50%)',
-  color: 'rgba(255,255,255,0.4)',
-}
-
-const searchInputStyle: CSSProperties = {
-  width: '100%',
-  height: 42,
-  paddingLeft: 40,
-  paddingRight: 16,
-  borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(16,14,10,0.85)',
-  color: '#ffffff',
-  fontSize: 13,
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
-const categoriesWrapStyle: CSSProperties = {
-  display: 'flex',
-  gap: 8,
-  overflowX: 'auto',
-  paddingBottom: 4,
-}
-
-const categoryTabStyle: CSSProperties = {
-  appearance: 'none',
-  background: 'rgba(255,255,255,0.03)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  color: 'rgba(255,255,255,0.6)',
-  padding: '6px 14px',
-  borderRadius: 10,
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-}
-
-const activeCategoryTabStyle: CSSProperties = {
-  background: 'rgba(214,166,75,0.15)',
-  borderColor: 'rgba(214,166,75,0.4)',
-  color: '#f0ca7e',
-}
-
-const gridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-  gap: 16,
-}
-
-const badgeStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: '#f0ca7e',
-  background: 'rgba(214,166,75,0.12)',
-  border: '1px solid rgba(214,166,75,0.3)',
-  padding: '3px 8px',
-  borderRadius: 6,
-}
-
-const cardContentStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 12,
-}
-
-const cardHeaderRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-}
-
-const iconBoxStyle: CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 10,
-  background: 'rgba(214,166,75,0.1)',
-  border: '1px solid rgba(214,166,75,0.2)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
-
-const cardDescriptionStyle: CSSProperties = {
-  fontSize: 12,
-  color: 'rgba(255,255,255,0.6)',
-  lineHeight: 1.4,
-  margin: 0,
-  minHeight: 34,
-}
-
-const cardActionRowStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  paddingTop: 8,
-  borderTop: '1px solid rgba(255,255,255,0.06)',
-}
-
-const modalOverlayStyle: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 100,
-  background: 'rgba(0,0,0,0.8)',
-  backdropFilter: 'blur(12px)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 16,
-}
-
-const modalBoxStyle: CSSProperties = {
-  position: 'relative',
-  width: '100%',
-  maxWidth: 480,
-}
-
-const closeButtonStyle: CSSProperties = {
-  position: 'absolute',
-  top: -12,
-  right: -12,
-  zIndex: 10,
-  width: 28,
-  height: 28,
-  borderRadius: '50%',
-  border: '1px solid rgba(255,255,255,0.15)',
-  background: '#0e0b04',
-  color: '#ffffff',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-}
-
-const modalInnerStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 16,
-  paddingTop: 8,
-}
-
-const modalDescriptionStyle: CSSProperties = {
-  fontSize: 13,
-  color: 'rgba(255,255,255,0.7)',
-  lineHeight: 1.5,
-  margin: 0,
-}
-
-const modalPlaceholderStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 12,
-  padding: '24px 16px',
-  borderRadius: 12,
-  border: '1px dashed rgba(255,255,255,0.12)',
-  background: 'rgba(255,255,255,0.02)',
-}
-
-const modalNoticeStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  color: 'rgba(255,255,255,0.5)',
-  fontFamily: 'monospace',
-}
-
-const modalActionsStyle: CSSProperties = {
-  display: 'flex',
-  gap: 10,
-  justifyContent: 'flex-end',
-}
+// STYLES
+const containerStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }
+const statsRowStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }
+const searchWrapStyle: CSSProperties = { position: 'relative', width: '100%' }
+const searchIconStyle: CSSProperties = { position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }
+const searchInputStyle: CSSProperties = { width: '100%', height: 42, paddingLeft: 40, paddingRight: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(16,14,10,0.85)', color: '#ffffff', fontSize: 13, outline: 'none', boxSizing: 'border-box' }
+const categoriesWrapStyle: CSSProperties = { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }
+const categoryTabStyle: CSSProperties = { appearance: 'none', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }
+const activeCategoryTabStyle: CSSProperties = { background: 'rgba(214,166,75,0.15)', borderColor: 'rgba(214,166,75,0.4)', color: '#f0ca7e' }
+const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }
+const badgeStyle: CSSProperties = { fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f0ca7e', background: 'rgba(214,166,75,0.12)', border: '1px solid rgba(214,166,75,0.3)', padding: '3px 8px', borderRadius: 6 }
+const cardContentStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 }
+const cardHeaderRowStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
+const iconBoxStyle: CSSProperties = { width: 36, height: 36, borderRadius: 10, background: 'rgba(214,166,75,0.1)', border: '1px solid rgba(214,166,75,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+const cardDescriptionStyle: CSSProperties = { fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, margin: 0, minHeight: 34 }
+const cardActionRowStyle: CSSProperties = { display: 'flex', justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }
+const modalOverlayStyle: CSSProperties = { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', padding: 16 }
+const modalBoxStyle: CSSProperties = { position: 'relative', width: '100%', maxWidth: 520 }
+const closeButtonStyle: CSSProperties = { position: 'absolute', top: -12, right: -12, zIndex: 10, width: 28, height: 28, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.15)', background: '#0e0b04', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+const modalInnerStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }
+const labelStyle: CSSProperties = { fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 4 }
+const inputStyle: CSSProperties = { width: '100%', height: 38, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: '#0a0a0a', color: '#ffffff', fontSize: 13, outline: 'none', boxSizing: 'border-box' }
+const inputCompactStyle: CSSProperties = { width: '100%', height: 32, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0a0a0a', color: '#ffffff', fontSize: 12, outline: 'none', boxSizing: 'border-box' }
+const miniButtonStyle: CSSProperties = { background: 'rgba(214,166,75,0.15)', border: '1px solid rgba(214,166,75,0.3)', color: '#f0ca7e', fontSize: 11, fontWeight: 600, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }
+const resultBoxStyle: CSSProperties = { background: 'rgba(214,166,75,0.08)', border: '1px solid rgba(214,166,75,0.25)', padding: 12, borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
