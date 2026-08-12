@@ -355,7 +355,7 @@ export default function ToolsPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div style={{ fontSize: 14, fontWeight: 750, color: '#fff' }}>{tool.title}</div>
                   {tool.badge && (
-                    <StatPill label={tool.badge} tone="gold" />
+                    <StatPill label={tool.badge} value="" />
                   )}
                 </div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
