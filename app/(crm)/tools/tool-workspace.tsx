@@ -298,7 +298,7 @@ export default function ToolWorkspace({
       actions={
         <>
           <Link href="/tools">
-            <ActionButton compact tone="ice">
+            <ActionButton compact tone="ghost">
               Tools
             </ActionButton>
           </Link>
