@@ -27,7 +27,9 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    // Force router refresh and push to bypass frozen states and sync cookies
+    router.refresh()
+    router.push('/')
   }
 
   return (
