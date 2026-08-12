@@ -350,23 +350,25 @@ export default function ToolsPage() {
         {/* Tools Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
           {filteredTools.map((tool) => (
-            <SectionCard key={tool.id} style={{ display: 'grid', gap: 12, padding: 18, position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ fontSize: 14, fontWeight: 750, color: '#fff' }}>{tool.title}</div>
-                {tool.badge && (
-                  <StatPill label={tool.badge} tone="gold" />
-                )}
-              </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
-                {tool.description}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(214,166,75,0.6)' }}>
-                  {tool.category}
-                </span>
-                <ActionButton compact tone="gold" onClick={() => setActiveToolId(tool.id)}>
-                  Launch Utility
-                </ActionButton>
+            <SectionCard key={tool.id}>
+              <div style={{ display: 'grid', gap: 12, padding: 4, position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 750, color: '#fff' }}>{tool.title}</div>
+                  {tool.badge && (
+                    <StatPill label={tool.badge} tone="gold" />
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
+                  {tool.description}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                  <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(214,166,75,0.6)' }}>
+                    {tool.category}
+                  </span>
+                  <ActionButton compact tone="gold" onClick={() => setActiveToolId(tool.id)}>
+                    Launch Utility
+                  </ActionButton>
+                </div>
               </div>
             </SectionCard>
           ))}
