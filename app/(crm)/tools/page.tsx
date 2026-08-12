@@ -1,92 +1,146 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import type { CSSProperties } from 'react'
 import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
 import ActionButton from '@/components/ui/action-button'
 
-export default function ToolsDashboard() {
-  const router = useRouter()
+interface ToolCardData {
+  title: string
+  tag: string
+  description: string
+  href: string
+}
 
-  const tools = [
-    {
-      id: 'comps',
-      title: 'Comparable Sales Analyzer',
-      description: 'Underwrite After Repair Value (ARV) and calculate price per sqft using live property data streams.',
-      route: '/tools/comps-analyzer',
-      badge: 'Interactive Workspace',
-    },
-    {
-      id: 'wholesale',
-      title: 'Wholesale Calculator',
-      description: 'Calculate Maximum Allowable Offer (MAO), repair estimates, wholesale fees, and net profit margins.',
-      route: '/tools/wholesale-calc',
-      badge: 'Financial Calculator',
-    },
-    {
-      id: 'contracts',
-      title: 'Contract Generator',
-      description: 'Generate legally binding purchase agreements, assignment contracts, and seller addendums instantly.',
-      route: '/tools/contracts',
-      badge: 'Document Suite',
-    },
-    {
-      id: 'scripts',
-      title: 'Script Generator',
-      description: 'Create and customize cold calling, SMS, and direct-to-seller acquisition scripts tailored to motivated leads.',
-      route: '/tools/script-generator',
-      badge: 'Utility Suite',
-    },
-    {
-      id: 'marketing-roi',
-      title: 'Marketing ROI Calculator',
-      description: 'Forecast campaign profitability, direct mail response rates, cost-per-lead, and projected deal pipelines.',
-      route: '/tools/marketing-roi',
-      badge: 'Analytics Engine',
-    },
-    {
-      id: 'dispositions',
-      title: 'Dispositions Blast',
-      description: 'Format buyer list blasts, property flyers, and assignment details for cash buyer broadcasting.',
-      route: '/tools/dispositions',
-      badge: 'Buyer Network',
-    },
-  ]
+const TOOLS: ToolCardData[] = [
+  {
+    title: 'Comparable Sales Analyzer',
+    tag: 'Interactive Workspace',
+    description: 'Underwrite After Repair Value (ARV) and calculate price per sqft using live property data streams.',
+    href: '/tools/comps-analyzer',
+  },
+  {
+    title: 'Wholesale Calculator',
+    tag: 'Financial Calculator',
+    description: 'Calculate Maximum Allowable Offer (MAO), repair estimates, wholesale fees, and net profit margins.',
+    href: '/tools/wholesale-calculator',
+  },
+  {
+    title: 'Contract Generator',
+    tag: 'Document Suite',
+    description: 'Generate legally binding purchase agreements, assignment contracts, and seller addendums instantly.',
+    href: '/tools/contract-generator',
+  },
+  {
+    title: 'Script Generator',
+    tag: 'Utility Suite',
+    description: 'Create and customize cold calling, SMS, and direct-to-seller acquisition scripts tailored to motivated leads.',
+    href: '/tools/script-generator',
+  },
+  {
+    title: 'Marketing ROI Calculator',
+    tag: 'Analytics Engine',
+    description: 'Forecast campaign profitability, direct mail response rates, cost-per-lead, and projected deal pipelines.',
+    href: '/tools/marketing-roi',
+  },
+  {
+    title: 'Dispositions Blast',
+    tag: 'Buyer Network',
+    description: 'Format buyer list blasts, property flyers, and assignment details for cash buyer broadcasting.',
+    href: '/tools/dispositions-blast',
+  },
+]
 
+export default function ToolsHubPage() {
   return (
-    <PageShell 
-      title="Acquisitions Tool Suite" 
+    <PageShell
+      title="Acquisitions & Dispo Utilities"
       subtitle="Complete centralized terminal for real estate underwriting, analytics, and documentation."
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-        {tools.map((tool) => (
-          <SectionCard key={tool.id}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%', justifyContent: 'space-between' }}>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ color: '#ebc477', fontSize: 18, fontWeight: 700, margin: 0 }}>
-                    {tool.title}
-                  </h3>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(214,166,75,0.15)', color: '#ebc477', fontWeight: 600 }}>
-                    {tool.badge}
-                  </span>
-                </div>
-                <p style={{ fontSize: 13, color: '#aaa', margin: 0, lineHeight: 1.5 }}>
-                  {tool.description}
-                </p>
+      <SectionCard
+        title="Acquisitions Tool Suite"
+        subtitle="Select a workspace terminal to launch automated underwriting and deal modeling tools."
+      >
+        <div style={toolsGridStyle}>
+          {TOOLS.map((tool, idx) => (
+            <div key={idx} style={toolCardStyle}>
+              <div style={toolCardHeaderStyle}>
+                <h3 style={toolTitleStyle}>{tool.title}</h3>
+                <span style={toolTagStyle}>{tool.tag}</span>
               </div>
 
-              <div style={{ paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <ActionButton tone="gold" onClick={() => router.push(tool.route)}>
-                  Launch Tool Terminal ↗
-                </ActionButton>
-              </div>
+              <p style={toolDescriptionStyle}>{tool.description}</p>
 
+              <div style={toolActionWrapStyle}>
+                <Link href={tool.href} style={{ textDecoration: 'none', width: '100%' }}>
+                  <ActionButton tone="gold" style={{ width: '100%', justifyContent: 'center' }}>
+                    Launch Tool Terminal →
+                  </ActionButton>
+                </Link>
+              </div>
             </div>
-          </SectionCard>
-        ))}
-      </div>
+          ))}
+        </div>
+      </SectionCard>
     </PageShell>
   )
+}
+
+const toolsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+  gap: 16,
+}
+
+const toolCardStyle: CSSProperties = {
+  padding: 18,
+  borderRadius: 16,
+  background: 'linear-gradient(180deg, rgba(20,16,8,0.7), rgba(6,5,2,0.95))',
+  border: '1px solid rgba(214, 166, 75, 0.2)',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  gap: 14,
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+}
+
+const toolCardHeaderStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 10,
+}
+
+const toolTitleStyle: CSSProperties = {
+  fontSize: 15,
+  fontWeight: 750,
+  color: '#ffffff',
+  margin: 0,
+  lineHeight: 1.25,
+}
+
+const toolTagStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  padding: '3px 8px',
+  borderRadius: 6,
+  background: 'rgba(214, 166, 75, 0.1)',
+  border: '1px solid rgba(214, 166, 75, 0.25)',
+  color: '#d6a64b',
+  whiteSpace: 'nowrap',
+}
+
+const toolDescriptionStyle: CSSProperties = {
+  fontSize: 12.5,
+  color: 'rgba(255, 255, 255, 0.6)',
+  lineHeight: 1.45,
+  margin: 0,
+}
+
+const toolActionWrapStyle: CSSProperties = {
+  paddingTop: 4,
 }
