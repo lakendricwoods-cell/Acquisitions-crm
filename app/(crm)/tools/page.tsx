@@ -185,7 +185,7 @@ function ArvEstimatorContent({ onClose }: { onClose: () => void }) {
         <div style={{ display: 'grid', gap: 6 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: '#ebc477' }}>Estimated ARV</label>
           <div style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(214,166,75,0.5)', background: 'rgba(214,166,75,0.1)', color: '#ebc477', fontWeight: 700, display: 'flex', alignItems: 'center' }}>
-            ${calculatedArv.toLocaleString()} ({$ppsqft}/sqft)
+            ${calculatedArv.toLocaleString()} ({ppsqft}/sqft)
           </div>
         </div>
       </div>
