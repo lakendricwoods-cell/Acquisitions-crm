@@ -1,112 +1,259 @@
-"use client";
+export type ToolSlug =
+  | 'assignment-contract'
+  | 'buyer-blast'
+  | 'closing-cost'
+  | 'comps-analyzer'
+  | 'contract-generator'
+  | 'marketing-roi'
+  | 'repair-estimator'
+  | 'script-generator'
 
-import Link from "next/link";
-import type { ToolConfig } from "../tool-config";
+export type ToolCategory =
+  | 'deal'
+  | 'analysis'
+  | 'marketing'
+  | 'documents'
+  | 'operations'
 
-type Props = {
-  tool: ToolConfig;
-};
-
-export default function ToolTerminal({ tool }: Props) {
-  return (
-    <main className="min-h-screen bg-black px-5 py-8 text-white">
-      <div className="mx-auto max-w-5xl">
-
-        {/* Header */}
-        <div className="mb-6">
-          <Link
-            href="/tools"
-            className="text-sm text-zinc-500 transition hover:text-white"
-          >
-            ← Back to Tools
-          </Link>
-        </div>
-
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-
-          <div className="mb-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-500">
-              {tool.category}
-            </p>
-
-            <h1 className="mt-2 text-3xl font-bold">
-              {tool.name}
-            </h1>
-
-            <p className="mt-2 text-sm text-zinc-400">
-              {tool.description}
-            </p>
-          </div>
-
-          {/* Tool workspace */}
-          <ToolWorkspace tool={tool} />
-
-        </section>
-      </div>
-    </main>
-  );
+export type ToolConfig = {
+  slug: ToolSlug
+  name: string
+  shortName: string
+  description: string
+  longDescription: string
+  category: ToolCategory
+  icon: string
+  accent: 'gold' | 'green' | 'blue'
+  href: string
+  inputs: string[]
+  outputs: string[]
 }
 
-function ToolWorkspace({ tool }: Props) {
+export const TOOL_CONFIGS: ToolConfig[] = [
+  {
+    slug: 'assignment-contract',
+    name: 'Assignment Contract',
+    shortName: 'Assignment',
+    description: 'Build and manage real estate assignment agreements.',
+    longDescription:
+      'Create an assignment deal workspace with assignor, assignee, purchase contract, assignment fee, earnest money, and closing information.',
+    category: 'documents',
+    icon: '▣',
+    accent: 'gold',
+    href: '/tools/assignment-contract',
+    inputs: [
+      'Property',
+      'Assignor',
+      'Assignee',
+      'Original Purchase Price',
+      'Assignment Fee',
+      'Earnest Money',
+      'Closing Date',
+    ],
+    outputs: [
+      'Assignment Price',
+      'Total Consideration',
+      'Deal Summary',
+      'Contract Data',
+    ],
+  },
+  {
+    slug: 'buyer-blast',
+    name: 'Buyer Blast',
+    shortName: 'Buyer Blast',
+    description: 'Match deals to buyers and create buyer outreach.',
+    longDescription:
+      'Organize your buyer criteria, calculate buyer fit, and generate a deal-focused outreach message.',
+    category: 'marketing',
+    icon: '◈',
+    accent: 'green',
+    href: '/tools/buyer-blast',
+    inputs: [
+      'Buyer Name',
+      'Buyer Email',
+      'Buyer Phone',
+      'Property Type',
+      'Price Range',
+      'Strategy',
+      'Target Area',
+    ],
+    outputs: [
+      'Buyer Match Score',
+      'Outreach Message',
+      'Deal Summary',
+      'Buyer Status',
+    ],
+  },
+  {
+    slug: 'closing-cost',
+    name: 'Closing Cost Calculator',
+    shortName: 'Closing Costs',
+    description: 'Estimate acquisition, disposition, and transaction costs.',
+    longDescription:
+      'Calculate projected closing expenses including title, recording, taxes, prorations, commissions, and other transaction costs.',
+    category: 'deal',
+    icon: '$',
+    accent: 'blue',
+    href: '/tools/closing-cost',
+    inputs: [
+      'Purchase Price',
+      'Title',
+      'Recording',
+      'Transfer Tax',
+      'Property Tax',
+      'Insurance',
+      'Inspection',
+      'Other Costs',
+    ],
+    outputs: [
+      'Buyer Costs',
+      'Seller Costs',
+      'Total Costs',
+      'Cash Required',
+    ],
+  },
+  {
+    slug: 'comps-analyzer',
+    name: 'Comps Analyzer',
+    shortName: 'Comps',
+    description: 'Analyze comparable sales and calculate an estimated ARV.',
+    longDescription:
+      'Compare nearby sales, price per square foot, sale recency, size, and property characteristics to produce a weighted ARV estimate.',
+    category: 'analysis',
+    icon: '⌁',
+    accent: 'gold',
+    href: '/tools/comps-analyzer',
+    inputs: [
+      'Subject Value',
+      'Subject Sq Ft',
+      'Comp Sale Prices',
+      'Comp Sq Ft',
+      'Comp Distance',
+      'Comp Sale Date',
+    ],
+    outputs: [
+      'Average Sale Price',
+      'Average Price/SF',
+      'Weighted ARV',
+      'Confidence',
+    ],
+  },
+  {
+    slug: 'contract-generator',
+    name: 'Contract Generator',
+    shortName: 'Contracts',
+    description: 'Generate structured purchase contract data.',
+    longDescription:
+      'Prepare purchase agreement information including parties, price, financing, closing, contingencies, and assignment provisions.',
+    category: 'documents',
+    icon: '▤',
+    accent: 'gold',
+    href: '/tools/contract-generator',
+    inputs: [
+      'Buyer',
+      'Seller',
+      'Property',
+      'Purchase Price',
+      'Earnest Money',
+      'Closing Date',
+      'Financing',
+      'Contingencies',
+    ],
+    outputs: [
+      'Contract Summary',
+      'Deal Terms',
+      'Closing Terms',
+      'Contract Data',
+    ],
+  },
+  {
+    slug: 'marketing-roi',
+    name: 'Marketing ROI',
+    shortName: 'Marketing ROI',
+    description: 'Measure marketing performance from lead to closing.',
+    longDescription:
+      'Track spend, leads, appointments, offers, contracts, closings, revenue, acquisition cost, and return on marketing spend.',
+    category: 'marketing',
+    icon: '%',
+    accent: 'green',
+    href: '/tools/marketing-roi',
+    inputs: [
+      'Marketing Spend',
+      'Leads',
+      'Contacts',
+      'Appointments',
+      'Offers',
+      'Contracts',
+      'Closings',
+      'Revenue',
+    ],
+    outputs: [
+      'Cost Per Lead',
+      'Conversion Rate',
+      'Cost Per Deal',
+      'ROI',
+      'ROAS',
+    ],
+  },
+  {
+    slug: 'repair-estimator',
+    name: 'Repair Estimator',
+    shortName: 'Repairs',
+    description: 'Estimate renovation and property repair costs.',
+    longDescription:
+      'Build a repair budget by category with quantities, unit costs, labor, materials, contingency, and total project cost.',
+    category: 'analysis',
+    icon: '⌂',
+    accent: 'gold',
+    href: '/tools/repair-estimator',
+    inputs: [
+      'Roof',
+      'HVAC',
+      'Plumbing',
+      'Electrical',
+      'Kitchen',
+      'Bathrooms',
+      'Flooring',
+      'Paint',
+      'Landscaping',
+      'Other',
+    ],
+    outputs: [
+      'Base Repairs',
+      'Contingency',
+      'Total Repairs',
+      'Repair Level',
+    ],
+  },
+  {
+    slug: 'script-generator',
+    name: 'Script Generator',
+    shortName: 'Scripts',
+    description: 'Create seller and buyer conversation scripts.',
+    longDescription:
+      'Generate structured call flows based on lead type, motivation, property condition, objections, and desired outcome.',
+    category: 'operations',
+    icon: '✎',
+    accent: 'blue',
+    href: '/tools/script-generator',
+    inputs: [
+      'Lead Type',
+      'Motivation',
+      'Property Condition',
+      'Desired Outcome',
+      'Objection',
+      'Follow Up',
+    ],
+    outputs: [
+      'Opening',
+      'Discovery Questions',
+      'Objection Response',
+      'Offer Transition',
+      'Follow Up',
+    ],
+  },
+]
 
-  if (tool.slug === "marketing-roi") {
-    return (
-      <div className="rounded-xl border border-zinc-800 p-6">
-        <p className="text-sm text-zinc-400">
-          Your existing Marketing ROI calculator should remain here.
-        </p>
-      </div>
-    );
-  }
-
-  if (tool.slug === "wholesale-calculator") {
-    return (
-      <div className="grid gap-5 md:grid-cols-2">
-
-        <Input label="After Repair Value (ARV)" />
-        <Input label="Estimated Repairs" />
-        <Input label="Assignment Fee" />
-        <Input label="Investor Margin (%)" />
-
-        <div className="md:col-span-2">
-          <button className="h-12 w-full rounded-xl bg-gradient-to-r from-amber-300 to-yellow-500 font-semibold text-black">
-            Calculate MAO
-          </button>
-        </div>
-
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl border border-zinc-800 bg-black/40 p-8 text-center">
-      <h2 className="text-xl font-semibold">
-        {tool.name}
-      </h2>
-
-      <p className="mt-2 text-sm text-zinc-500">
-        Tool workspace ready.
-      </p>
-
-      <p className="mt-6 text-xs text-zinc-600">
-        Connect this workspace to the tool-specific calculator,
-        generator, or analyzer.
-      </p>
-    </div>
-  );
-}
-
-function Input({ label }: { label: string }) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm text-zinc-400">
-        {label}
-      </span>
-
-      <input
-        type="number"
-        className="h-12 w-full rounded-xl border border-zinc-800 bg-black px-4 text-white outline-none focus:border-amber-500"
-      />
-    </label>
-  );
+export function getToolConfig(slug: string) {
+  return TOOL_CONFIGS.find((tool) => tool.slug === slug)
 }
