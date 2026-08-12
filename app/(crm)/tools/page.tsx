@@ -188,10 +188,7 @@ export default function ToolsPage() {
   const activeTool = FULL_TOOL_CATALOG.find((t) => t.id === activeToolId)
 
   return (
-    <PageShell
-      title="Acquisitions & Dispo Utilities"
-      description="Automated real estate calculators, AI pitch copywriters, and deal execution engines."
-    >
+    <PageShell title="Acquisitions & Dispo Utilities">
       <div style={containerStyle}>
         {/* STATS ROW */}
         <div style={statsRowStyle}>
