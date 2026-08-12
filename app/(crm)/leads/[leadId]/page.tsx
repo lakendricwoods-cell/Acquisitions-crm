@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import ActionButton from '@/components/ui/action-button'
 import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
@@ -34,6 +34,10 @@ type LeadRecord = {
   year_built?: number | null
   apn?: string | null
   status?: string | null
+  stage?: string | null
+  lead_status?: string | null
+  deal_status?: string | null
+  pipeline_stage?: string | null
   lead_type?: string | null
   house_value?: number | null
   estimated_value?: number | null
@@ -53,6 +57,17 @@ type LeadRecord = {
   raw_import_data?: Record<string, unknown> | null
   source_columns?: Record<string, unknown> | null
 }
+
+const STAGE_OPTIONS = [
+  { value: 'new_lead', label: 'New Lead' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'appointment_set', label: 'Appointment Set' },
+  { value: 'offer_sent', label: 'Offer Sent' },
+  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'under_contract', label: 'Under Contract' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'dead_lead', label: 'Dead / Archive' },
+]
 
 function money(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—'
@@ -120,6 +135,7 @@ function debugBedroomSource(lead: LeadRecord) {
 
 export default function LeadWorkspacePage() {
   const params = useParams()
+  const router = useRouter()
   const leadId = String(params?.leadId || '')
   const [lead, setLead] = useState<LeadRecord | null>(null)
   const [loading, setLoading] = useState(true)
@@ -193,8 +209,12 @@ export default function LeadWorkspacePage() {
       last_sale_date: lastSaleDate,
     })
 
+    const currentStage =
+      lead.status || lead.stage || lead.lead_status || lead.deal_status || lead.pipeline_stage || 'new_lead'
+
     return {
       ...lead,
+      stage: currentStage,
       bedrooms: beds ?? null,
       bathrooms: baths ?? null,
       square_feet: sqft ?? null,
@@ -211,6 +231,41 @@ export default function LeadWorkspacePage() {
     if (!normalizedLead) return null
     return computeLeadScores(normalizedLead as any)
   }, [normalizedLead])
+
+  async function handleUpdateStage(nextStage: string) {
+    if (!leadId) return
+
+    const payload = {
+      status: nextStage,
+      stage: nextStage,
+      lead_status: nextStage,
+      deal_status: nextStage,
+      pipeline_stage: nextStage,
+    }
+
+    const { error } = await supabase.from('leads').update(payload).eq('id', leadId)
+
+    if (error) {
+      alert(`Failed to update stage: ${error.message}`)
+      return
+    }
+
+    setLead((curr) => (curr ? { ...curr, ...payload } : null))
+  }
+
+  async function handleDeleteLead() {
+    if (!leadId) return
+    if (!confirm('Are you sure you want to permanently delete this lead?')) return
+
+    const { error } = await supabase.from('leads').delete().eq('id', leadId)
+
+    if (error) {
+      alert(`Failed to delete lead: ${error.message}`)
+      return
+    }
+
+    router.push('/leads')
+  }
 
   if (loading) {
     return (
@@ -256,6 +311,23 @@ export default function LeadWorkspacePage() {
       subtitle="Imported property intelligence and deal thinking surface."
       actions={
         <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <select
+              value={normalizedLead.stage}
+              onChange={(e) => handleUpdateStage(e.target.value)}
+              style={workspaceSelectStyle}
+            >
+              {STAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value} style={optionStyle}>
+                  Stage: {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <ActionButton compact tone="danger" onClick={handleDeleteLead}>
+              Delete Lead
+            </ActionButton>
+          </div>
           <StatPill label="Strength" value={scores.overall.score} />
           <StatPill label="Motivation" value={scores.motivation.score} />
           <StatPill label="Contact" value={scores.contactability.score} />
@@ -468,6 +540,24 @@ function ScoreCard({
       <div style={scoreReasonStyle}>{detail.reason || 'No explanation provided.'}</div>
     </div>
   )
+}
+
+const workspaceSelectStyle: CSSProperties = {
+  minHeight: 32,
+  padding: '0 10px',
+  borderRadius: 8,
+  fontSize: 12,
+  fontWeight: 700,
+  outline: 'none',
+  cursor: 'pointer',
+  border: '1px solid rgba(214,166,75,0.4)',
+  background: 'rgba(214,166,75,0.12)',
+  color: '#e0b84f',
+}
+
+const optionStyle: CSSProperties = {
+  background: '#121212',
+  color: '#ffffff',
 }
 
 const pageGridStyle: CSSProperties = {
