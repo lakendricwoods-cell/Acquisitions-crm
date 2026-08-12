@@ -184,6 +184,7 @@ function ResultCard({
       }}
     >
       <div style={fieldLabelStyle}>{label}</div>
+
       <div style={{ ...resultValueStyle, color: palette.text }}>
         {value}
       </div>
@@ -202,12 +203,18 @@ function ToolHeader({
     <div style={toolHeaderStyle}>
       <div>
         <div style={eyebrowStyle}>Foundation Acquisitions LLC</div>
+
         <h1 style={toolTitleStyle}>{title}</h1>
+
         <p style={toolDescriptionStyle}>{description}</p>
       </div>
     </div>
   )
 }
+
+/* =========================================================
+   TOOL WORKSPACE CONTENT
+========================================================= */
 
 function ToolWorkspaceContent({
   slug,
@@ -258,7 +265,9 @@ function ToolWorkspaceContent({
       >
         <SectionCard title="Unknown Tool">
           <Link href="/tools">
-            <ActionButton tone="gold">Back to Tools</ActionButton>
+            <ActionButton tone="gold">
+              Back to Tools
+            </ActionButton>
           </Link>
         </SectionCard>
       </PageShell>
@@ -404,6 +413,35 @@ function ToolWorkspaceContent({
         )}
       </div>
     </PageShell>
+  )
+}
+
+/* =========================================================
+   SUSPENSE WRAPPER
+========================================================= */
+
+export default function ToolWorkspace({
+  slug,
+}: {
+  slug: ToolSlug
+}) {
+  return (
+    <Suspense
+      fallback={
+        <PageShell
+          title="Loading Tool"
+          subtitle="Preparing your acquisition workspace..."
+        >
+          <SectionCard title="Loading">
+            <div style={loadingStyle}>
+              Loading tool workspace...
+            </div>
+          </SectionCard>
+        </PageShell>
+      }
+    >
+      <ToolWorkspaceContent slug={slug} />
+    </Suspense>
   )
 }
 
@@ -593,11 +631,24 @@ function BuyerBlastTool({
 
     if (maxPrice >= propertyValue && maxPrice > 0) score += 20
     if (minPrice <= propertyValue) score += 10
-    if (area && lead?.city?.toLowerCase() === area.toLowerCase()) score += 10
+    if (
+      area &&
+      lead?.city?.toLowerCase() === area.toLowerCase()
+    ) {
+      score += 10
+    }
+
     if (strategy) score += 10
 
     return Math.min(score, 100)
-  }, [maxPrice, minPrice, area, propertyValue, strategy, lead])
+  }, [
+    maxPrice,
+    minPrice,
+    area,
+    propertyValue,
+    strategy,
+    lead,
+  ])
 
   function generateBlast() {
     const address =
@@ -912,14 +963,17 @@ function CompsAnalyzerTool({
 
   const averagePrice =
     calculated.length > 0
-      ? calculated.reduce((sum, comp) => sum + comp.salePrice, 0) /
-        calculated.length
+      ? calculated.reduce(
+          (sum, comp) => sum + comp.salePrice,
+          0
+        ) / calculated.length
       : 0
 
   const averagePricePerSqft =
     calculated.length > 0
       ? calculated.reduce(
-          (sum, comp) => sum + comp.salePrice / comp.sqft,
+          (sum, comp) =>
+            sum + comp.salePrice / comp.sqft,
           0
         ) / calculated.length
       : 0
@@ -1042,7 +1096,10 @@ function CompsAnalyzerTool({
 
                   <td style={tdStyle}>
                     {comp.salePrice && comp.sqft
-                      ? money(comp.salePrice / comp.sqft)
+                      ? money(
+                          comp.salePrice /
+                            comp.sqft
+                        )
                       : '—'}
                   </td>
                 </tr>
@@ -1103,7 +1160,11 @@ function CompsAnalyzerTool({
           <ResultCard
             label="Confidence"
             value={confidence}
-            tone={confidence === 'High' ? 'green' : 'gold'}
+            tone={
+              confidence === 'High'
+                ? 'green'
+                : 'gold'
+            }
           />
         </div>
       </SectionCard>
@@ -1121,16 +1182,22 @@ function ContractGeneratorTool({
   lead: Lead | null
 }) {
   const [buyer, setBuyer] = useState('')
-  const [seller, setSeller] = useState(lead?.owner_name ?? '')
+  const [seller, setSeller] = useState(
+    lead?.owner_name ?? ''
+  )
   const [purchasePrice, setPurchasePrice] = useState(
-    lead?.estimated_value ?? lead?.house_value ?? 0
+    lead?.estimated_value ??
+      lead?.house_value ??
+      0
   )
-  const [earnestMoney, setEarnestMoney] = useState(5000)
-  const [closingDate, setClosingDate] = useState('')
-  const [financing, setFinancing] = useState('Cash')
-  const [contingencies, setContingencies] = useState(
-    'Inspection and due diligence'
-  )
+  const [earnestMoney, setEarnestMoney] =
+    useState(5000)
+  const [closingDate, setClosingDate] =
+    useState('')
+  const [financing, setFinancing] =
+    useState('Cash')
+  const [contingencies, setContingencies] =
+    useState('Inspection and due diligence')
   const [generated, setGenerated] = useState('')
 
   function generate() {
@@ -1140,7 +1207,9 @@ function ContractGeneratorTool({
         '',
         `Buyer: ${buyer || '—'}`,
         `Seller: ${seller || '—'}`,
-        `Property: ${lead?.property_address_1 || '—'}`,
+        `Property: ${
+          lead?.property_address_1 || '—'
+        }`,
         `Purchase Price: ${money(purchasePrice)}`,
         `Earnest Money: ${money(earnestMoney)}`,
         `Closing Date: ${closingDate || '—'}`,
@@ -1208,12 +1277,16 @@ function ContractGeneratorTool({
 
         <div style={{ marginTop: 12 }}>
           <label style={fieldStyle}>
-            <span style={fieldLabelStyle}>Contingencies</span>
+            <span style={fieldLabelStyle}>
+              Contingencies
+            </span>
 
             <textarea
               value={contingencies}
               onChange={(event) =>
-                setContingencies(event.target.value)
+                setContingencies(
+                  event.target.value
+                )
               }
               style={textareaStyle}
             />
@@ -1221,7 +1294,10 @@ function ContractGeneratorTool({
         </div>
 
         <div style={actionRowStyle}>
-          <ActionButton tone="gold" onClick={generate}>
+          <ActionButton
+            tone="gold"
+            onClick={generate}
+          >
             Generate Term Summary
           </ActionButton>
         </div>
@@ -1233,7 +1309,9 @@ function ContractGeneratorTool({
       >
         <textarea
           value={generated}
-          onChange={(event) => setGenerated(event.target.value)}
+          onChange={(event) =>
+            setGenerated(event.target.value)
+          }
           placeholder="Your generated contract terms will appear here..."
           style={{
             ...textareaStyle,
@@ -1253,17 +1331,31 @@ function MarketingROITool() {
   const [spend, setSpend] = useState(0)
   const [leads, setLeads] = useState(0)
   const [contacts, setContacts] = useState(0)
-  const [appointments, setAppointments] = useState(0)
+  const [appointments, setAppointments] =
+    useState(0)
   const [offers, setOffers] = useState(0)
   const [contracts, setContracts] = useState(0)
   const [closings, setClosings] = useState(0)
   const [revenue, setRevenue] = useState(0)
 
-  const costPerLead = leads ? spend / leads : 0
-  const costPerContract = contracts ? spend / contracts : 0
-  const conversionRate = leads ? (closings / leads) * 100 : 0
-  const roi = spend ? ((revenue - spend) / spend) * 100 : 0
-  const roas = spend ? revenue / spend : 0
+  const costPerLead =
+    leads ? spend / leads : 0
+
+  const costPerContract =
+    contracts ? spend / contracts : 0
+
+  const conversionRate =
+    leads
+      ? (closings / leads) * 100
+      : 0
+
+  const roi =
+    spend
+      ? ((revenue - spend) / spend) * 100
+      : 0
+
+  const roas =
+    spend ? revenue / spend : 0
 
   return (
     <div style={toolGridStyle}>
@@ -1350,7 +1442,9 @@ function MarketingROITool() {
           <ResultCard
             label="ROI"
             value={`${roi.toFixed(2)}%`}
-            tone={roi >= 0 ? 'green' : 'gold'}
+            tone={
+              roi >= 0 ? 'green' : 'gold'
+            }
           />
 
           <ResultCard
@@ -1371,15 +1465,21 @@ function MarketingROITool() {
 function RepairEstimatorTool() {
   const [roof, setRoof] = useState(0)
   const [hvac, setHvac] = useState(0)
-  const [plumbing, setPlumbing] = useState(0)
-  const [electrical, setElectrical] = useState(0)
+  const [plumbing, setPlumbing] =
+    useState(0)
+  const [electrical, setElectrical] =
+    useState(0)
   const [kitchen, setKitchen] = useState(0)
-  const [bathrooms, setBathrooms] = useState(0)
-  const [flooring, setFlooring] = useState(0)
+  const [bathrooms, setBathrooms] =
+    useState(0)
+  const [flooring, setFlooring] =
+    useState(0)
   const [paint, setPaint] = useState(0)
-  const [landscaping, setLandscaping] = useState(0)
+  const [landscaping, setLandscaping] =
+    useState(0)
   const [other, setOther] = useState(0)
-  const [contingency, setContingency] = useState(10)
+  const [contingency, setContingency] =
+    useState(10)
 
   const base =
     roof +
@@ -1393,8 +1493,11 @@ function RepairEstimatorTool() {
     landscaping +
     other
 
-  const contingencyAmount = base * (contingency / 100)
-  const total = base + contingencyAmount
+  const contingencyAmount =
+    base * (contingency / 100)
+
+  const total =
+    base + contingencyAmount
 
   const repairLevel =
     total === 0
@@ -1506,7 +1609,9 @@ function RepairEstimatorTool() {
 
           <ResultCard
             label="Contingency"
-            value={money(contingencyAmount)}
+            value={money(
+              contingencyAmount
+            )}
             tone="blue"
           />
 
@@ -1536,27 +1641,32 @@ function ScriptGeneratorTool({
 }: {
   lead: Lead | null
 }) {
-  const [leadType, setLeadType] = useState(
-    lead?.lead_type || 'Distressed Seller'
-  )
+  const [leadType, setLeadType] =
+    useState(
+      lead?.lead_type ||
+        'Distressed Seller'
+    )
 
-  const [motivation, setMotivation] = useState(
-    'Needs a simple and convenient sale'
-  )
+  const [motivation, setMotivation] =
+    useState(
+      'Needs a simple and convenient sale'
+    )
 
-  const [condition, setCondition] = useState(
-    'Unknown'
-  )
+  const [condition, setCondition] =
+    useState('Unknown')
 
-  const [objective, setObjective] = useState(
-    'Qualify the seller and determine whether an offer makes sense'
-  )
+  const [objective, setObjective] =
+    useState(
+      'Qualify the seller and determine whether an offer makes sense'
+    )
 
-  const [objection, setObjection] = useState(
-    'I need to think about it'
-  )
+  const [objection, setObjection] =
+    useState(
+      'I need to think about it'
+    )
 
-  const [script, setScript] = useState('')
+  const [script, setScript] =
+    useState('')
 
   function generateScript() {
     setScript(
@@ -1659,7 +1769,10 @@ function ScriptGeneratorTool({
         </div>
 
         <div style={actionRowStyle}>
-          <ActionButton tone="gold" onClick={generateScript}>
+          <ActionButton
+            tone="gold"
+            onClick={generateScript}
+          >
             Generate Script
           </ActionButton>
         </div>
@@ -1671,7 +1784,9 @@ function ScriptGeneratorTool({
       >
         <textarea
           value={script}
-          onChange={(event) => setScript(event.target.value)}
+          onChange={(event) =>
+            setScript(event.target.value)
+          }
           placeholder="Your script will appear here..."
           style={{
             ...textareaStyle,
@@ -1694,14 +1809,16 @@ const pageStyle: CSSProperties = {
 
 const toolGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
+  gridTemplateColumns:
+    'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
   gap: 18,
   alignItems: 'start',
 }
 
 const toolHeaderStyle: CSSProperties = {
   borderRadius: 16,
-  border: '1px solid rgba(214,166,75,0.15)',
+  border:
+    '1px solid rgba(214,166,75,0.15)',
   background:
     'linear-gradient(180deg, rgba(24,20,12,0.72), rgba(7,7,6,0.92))',
   padding: 18,
@@ -1735,7 +1852,8 @@ const leadBadgeStyle: CSSProperties = {
   alignItems: 'center',
   padding: '5px 9px',
   borderRadius: 8,
-  border: '1px solid rgba(214,166,75,0.25)',
+  border:
+    '1px solid rgba(214,166,75,0.25)',
   background: 'rgba(214,166,75,0.08)',
   color: '#d6a64b',
   fontSize: 9,
@@ -1745,13 +1863,15 @@ const leadBadgeStyle: CSSProperties = {
 
 const leadGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(150px, 1fr))',
   gap: 10,
 }
 
 const formGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(180px, 1fr))',
   gap: 12,
 }
 
@@ -1774,7 +1894,8 @@ const inputWrapStyle: CSSProperties = {
   alignItems: 'center',
   minHeight: 40,
   borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.08)',
+  border:
+    '1px solid rgba(255,255,255,0.08)',
   background: 'rgba(255,255,255,0.025)',
   overflow: 'hidden',
 }
@@ -1790,7 +1911,8 @@ const inputStyle: CSSProperties = {
   minHeight: 40,
   boxSizing: 'border-box',
   borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.08)',
+  border:
+    '1px solid rgba(255,255,255,0.08)',
   background: 'rgba(255,255,255,0.025)',
   color: '#fff',
   padding: '0 11px',
@@ -1800,7 +1922,8 @@ const inputStyle: CSSProperties = {
 
 const resultGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(150px, 1fr))',
   gap: 10,
 }
 
@@ -1823,7 +1946,8 @@ const resultValueStyle: CSSProperties = {
 const outputBoxStyle: CSSProperties = {
   marginTop: 14,
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.07)',
+  border:
+    '1px solid rgba(255,255,255,0.07)',
   background: 'rgba(0,0,0,0.25)',
   padding: 14,
   color: 'rgba(255,255,255,0.62)',
@@ -1843,7 +1967,8 @@ const textareaStyle: CSSProperties = {
   boxSizing: 'border-box',
   resize: 'vertical',
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.08)',
+  border:
+    '1px solid rgba(255,255,255,0.08)',
   background: 'rgba(0,0,0,0.25)',
   color: '#fff',
   padding: 13,
@@ -1869,7 +1994,8 @@ const tableStyle: CSSProperties = {
 const thStyle: CSSProperties = {
   textAlign: 'left',
   padding: '9px 10px',
-  borderBottom: '1px solid rgba(255,255,255,0.08)',
+  borderBottom:
+    '1px solid rgba(255,255,255,0.08)',
   color: 'rgba(255,255,255,0.4)',
   fontSize: 9,
   textTransform: 'uppercase',
@@ -1878,7 +2004,8 @@ const thStyle: CSSProperties = {
 
 const tdStyle: CSSProperties = {
   padding: '9px 10px',
-  borderBottom: '1px solid rgba(255,255,255,0.05)',
+  borderBottom:
+    '1px solid rgba(255,255,255,0.05)',
   color: 'rgba(255,255,255,0.7)',
   fontSize: 11,
 }
@@ -1888,7 +2015,8 @@ const tableInputStyle: CSSProperties = {
   minHeight: 34,
   boxSizing: 'border-box',
   borderRadius: 7,
-  border: '1px solid rgba(255,255,255,0.08)',
+  border:
+    '1px solid rgba(255,255,255,0.08)',
   background: 'rgba(255,255,255,0.025)',
   color: '#fff',
   padding: '0 8px',
