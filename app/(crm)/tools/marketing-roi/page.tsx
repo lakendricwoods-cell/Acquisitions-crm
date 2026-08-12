@@ -1,5 +1,29 @@
+import { Suspense } from 'react'
+
 import ToolWorkspace from '../tool-workspace'
 
+function Loading() {
+  return (
+    <div
+      style={{
+        minHeight: 300,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        color: 'rgba(255,255,255,0.45)',
+        fontSize: 13,
+      }}
+    >
+      Loading marketing ROI...
+    </div>
+  )
+}
+
 export default function MarketingROIPage() {
-  return <ToolWorkspace slug="marketing-roi" />
+  return (
+    <Suspense fallback={<Loading />}>
+      <ToolWorkspace slug="marketing-roi" />
+    </Suspense>
+  )
 }
