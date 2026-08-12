@@ -254,6 +254,7 @@ export const TOOL_CONFIGS: ToolConfig[] = [
   },
 ]
 
-export function getToolConfig(slug: string) {
+
+export function getToolConfig(slug: string): ToolConfig | undefined {
   return TOOL_CONFIGS.find((tool) => tool.slug === slug)
 }
