@@ -1,64 +1,56 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
-  // Allow access to login page and static/public assets without checks
-  if (
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/_next') ||
-    request.nextUrl.pathname.includes('.')
-  ) {
-    return NextResponse.next()
-  }
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
 
-  // Initialize Supabase client
-  const supabase = createClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
   )
 
-  // Look for Supabase auth cookies in the request
-  const allCookies = request.cookies.getAll()
-  const authCookie = allCookies.find((c) => c.name.includes('-auth-token'))
+  // Refresh auth session if expired
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!authCookie) {
+  // If user is not signed in and trying to access protected routes, redirect to login
+  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/auth')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  try {
-    // Parse the token container to get the access token
-    const tokenData = JSON.parse(authCookie.value)
-    const accessToken = Array.isArray(tokenData) ? tokenData[0] : tokenData?.access_token
-
-    if (!accessToken) {
-      throw new Error('No access token found')
-    }
-
-    // Verify user session with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken)
-
-    if (error || !user) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      return NextResponse.redirect(url)
-    }
-  } catch {
+  // If user IS signed in and trying to access login, send them to dashboard
+  if (user && request.nextUrl.pathname.startsWith('/login')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
-  return NextResponse.next()
+  return supabaseResponse
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for static files, images, and favicon
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
