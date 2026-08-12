@@ -250,255 +250,178 @@ export default function ImportsPage() {
         </>
       }
     >
-      {/* 1:1 Silk Wave Flow Animations & Star Particle Canvas */}
-      <style>{`
-        @keyframes waveSilkFlow {
-          0% {
-            transform: translateY(0px) rotate(0deg) scale(1);
-            opacity: 0.85;
-          }
-          50% {
-            transform: translateY(-25px) rotate(1.5deg) scale(1.04);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(0px) rotate(0deg) scale(1);
-            opacity: 0.85;
-          }
-        }
-
-        @keyframes goldDustShimmer {
-          0%, 100% { opacity: 0.3; transform: scale(0.98); }
-          50% { opacity: 0.75; transform: scale(1.02); }
-        }
-      `}</style>
-
-      <div style={mockCanvasWrapperStyle}>
-        {/* Dynamic Wave 1 - Upper Glowing Golden Ribbons */}
-        <div style={silkWaveLayerOneStyle}>
-          <svg viewBox="0 0 1440 900" fill="none" style={{ width: '100%', height: '100%' }}>
-            <path
-              d="M-100,200 C300,100 600,450 1100,150 C1300,30 1500,120 1600,200 L1600,-100 L-100,-100 Z"
-              fill="url(#goldSilkGrad1)"
-              opacity="0.6"
-            />
-            <path
-              d="M-100,400 C200,200 700,550 1200,250 C1400,120 1550,300 1600,350 L1600,-100 L-100,-100 Z"
-              fill="url(#goldSilkGrad2)"
-              opacity="0.45"
-            />
-            <defs>
-              <linearGradient id="goldSilkGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#d4af37" stopOpacity="0.4" />
-                <stop offset="40%" stopColor="#f59e0b" stopOpacity="0.7" />
-                <stop offset="75%" stopColor="#9a7b20" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="goldSilkGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#fcd34d" stopOpacity="0.5" />
-                <stop offset="50%" stopColor="#b48220" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#050508" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-          </svg>
+      <div style={pageContainerStyle}>
+        {/* Top Stage Headers Matching System Theme */}
+        <div style={stageGridStyle}>
+          <StageCard title="Parsed Records" count={stats.total} accent="neutral" />
+          <StageCard title="Address Signal" count={stats.withAddress} accent="blue" />
+          <StageCard title="Valuation Signal" count={stats.withHouseValue} accent="purple" />
+          <StageCard title="Equity Signal" count={stats.withEquity} accent="amber" />
+          <StageCard title="Workable Leads" count={stats.workable} accent="emerald" />
         </div>
 
-        {/* Dynamic Wave 2 - Bottom Floor Silk & Particle Dust Overlay */}
-        <div style={silkWaveLayerTwoStyle}>
-          <svg viewBox="0 0 1440 900" fill="none" style={{ width: '100%', height: '100%' }}>
-            <path
-              d="M-100,600 C350,400 800,850 1500,500 L1600,1000 L-100,1000 Z"
-              fill="url(#goldFloorGrad)"
-              opacity="0.65"
-            />
-            <defs>
-              <linearGradient id="goldFloorGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#d4af37" stopOpacity="0.35" />
-                <stop offset="30%" stopColor="#78480f" stopOpacity="0.5" />
-                <stop offset="70%" stopColor="#1a140a" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#000000" stopOpacity="1" />
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
+        {/* Main Layout Grid */}
+        <div style={mainGridStyle}>
+          {/* Left Console */}
+          <div style={leftColumnStyle}>
+            <SectionCard
+              title="Import Console"
+              subtitle="Configure source attribution and process wide lead files."
+            >
+              <div style={heroPanelStyle}>
+                <div style={heroEyebrowStyle}>INSPECTION & UPSERT ENGINE</div>
+                <div style={heroTitleStyle}>Smart Matching & Deduplication</div>
+                <div style={heroCopyStyle}>
+                  Pre-matches records against your database by source ID, APN, or property address before creating or updating rows.
+                </div>
+              </div>
 
-        {/* Golden Dust Shimmer Pattern */}
-        <div style={goldDustOverlayStyle} />
+              <div style={controlStackStyle}>
+                <div style={fieldStackStyle}>
+                  <label style={labelStyle}>Source Label</label>
+                  <input
+                    style={customInputStyle}
+                    value={sourceLabel}
+                    onChange={(e) => setSourceLabel(e.target.value)}
+                    placeholder="e.g. Propwire March Batch"
+                  />
+                </div>
 
-        {/* Page Content Container */}
-        <div style={pageContainerStyle}>
-          {/* Top Stage Headers Matching Mockup */}
-          <div style={stageGridStyle}>
-            <StageCard title="Parsed Records" count={stats.total} accent="neutral" />
-            <StageCard title="Address Signal" count={stats.withAddress} accent="blue" />
-            <StageCard title="Valuation Signal" count={stats.withHouseValue} accent="purple" />
-            <StageCard title="Equity Signal" count={stats.withEquity} accent="amber" />
-            <StageCard title="Workable Leads" count={stats.workable} accent="emerald" />
+                <div style={fieldStackStyle}>
+                  <label style={labelStyle}>Select CSV Data File</label>
+                  <div style={dropzoneStyle}>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileChange}
+                      style={fileInputOverlayStyle}
+                    />
+                    <div style={fileLabelContentStyle}>
+                      <span style={{ fontSize: 18, color: '#d4af37' }}>📁</span>
+                      <span style={fileNameTextStyle}>
+                        {file ? file.name : 'Choose or drop CSV file'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={actionsStyle}>
+                  <ActionButton
+                    onClick={() => {
+                      if (file) void parseSelectedFile(file)
+                    }}
+                    disabled={!file || parsing}
+                  >
+                    {parsing ? 'Parsing...' : 'Re-Parse CSV'}
+                  </ActionButton>
+
+                  <ActionButton
+                    tone="gold"
+                    onClick={handleImport}
+                    disabled={!rows.length || loading}
+                  >
+                    {loading ? 'Processing Sync...' : 'Create / Update Leads'}
+                  </ActionButton>
+                </div>
+
+                {message ? <div style={messageStyle}>{message}</div> : null}
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Last Import Batch"
+              subtitle="Execution summary for the most recent import run."
+            >
+              {runSummary ? (
+                <div style={runSummaryWrapStyle}>
+                  <div style={runSummaryTopStyle}>
+                    <RunSummaryBox label="Parsed" value={runSummary.parsed} />
+                    <RunSummaryBox label="Created" value={runSummary.created} color="#10b981" />
+                    <RunSummaryBox label="Updated" value={runSummary.updated} color="#3b82f6" />
+                    <RunSummaryBox label="Skipped" value={runSummary.skipped} color="#f59e0b" />
+                    <RunSummaryBox label="Failed" value={runSummary.failed} color="#ef4444" />
+                  </div>
+
+                  <div style={runSourceStyle}>
+                    <span style={runSourceLabelStyle}>Attributed Source</span>
+                    <span style={sourceTagStyle}>{runSummary.source}</span>
+                  </div>
+
+                  {runSummary.errors.length ? (
+                    <div style={errorPanelStyle}>
+                      <div style={errorTitleStyle}>Failed Record Log</div>
+                      <div style={errorListStyle}>
+                        {runSummary.errors.map((error, index) => (
+                          <div key={`${error}-${index}`} style={errorItemStyle}>
+                            {error}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div style={emptyMutedStyle}>No execution summary available for this session.</div>
+              )}
+            </SectionCard>
           </div>
 
-          {/* Main Layout Grid */}
-          <div style={mainGridStyle}>
-            {/* Left Console */}
-            <div style={leftColumnStyle}>
-              <SectionCard
-                title="Import Console"
-                subtitle="Configure source attribution and process wide lead files."
-              >
-                <div style={heroPanelStyle}>
-                  <div style={heroEyebrowStyle}>INSPECTION & UPSERT ENGINE</div>
-                  <div style={heroTitleStyle}>Smart Matching & Deduplication</div>
-                  <div style={heroCopyStyle}>
-                    Pre-matches records against your database by source ID, APN, or property address before creating or updating rows.
-                  </div>
+          {/* Right Preview Grid */}
+          <div style={rightColumnStyle}>
+            <SectionCard
+              title="Import Preview Grid"
+              subtitle="Inspect incoming properties before committing records into Supabase."
+            >
+              {!rows.length ? (
+                <div style={emptyStateStyle}>
+                  No parsed rows loaded. Select a CSV file to inspect property data.
                 </div>
-
-                <div style={controlStackStyle}>
-                  <div style={fieldStackStyle}>
-                    <label style={labelStyle}>Source Label</label>
-                    <input
-                      style={customInputStyle}
-                      value={sourceLabel}
-                      onChange={(e) => setSourceLabel(e.target.value)}
-                      placeholder="e.g. Propwire March Batch"
-                    />
-                  </div>
-
-                  <div style={fieldStackStyle}>
-                    <label style={labelStyle}>Select CSV Data File</label>
-                    <div style={dropzoneStyle}>
-                      <input
-                        type="file"
-                        accept=".csv"
-                        onChange={handleFileChange}
-                        style={fileInputOverlayStyle}
-                      />
-                      <div style={fileLabelContentStyle}>
-                        <span style={{ fontSize: 18, color: '#d4af37' }}>📁</span>
-                        <span style={fileNameTextStyle}>
-                          {file ? file.name : 'Choose or drop CSV file'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={actionsStyle}>
-                    <ActionButton
-                      onClick={() => {
-                        if (file) void parseSelectedFile(file)
-                      }}
-                      disabled={!file || parsing}
-                    >
-                      {parsing ? 'Parsing...' : 'Re-Parse CSV'}
-                    </ActionButton>
-
-                    <ActionButton
-                      tone="gold"
-                      onClick={handleImport}
-                      disabled={!rows.length || loading}
-                    >
-                      {loading ? 'Processing Sync...' : 'Create / Update Leads'}
-                    </ActionButton>
-                  </div>
-
-                  {message ? <div style={messageStyle}>{message}</div> : null}
-                </div>
-              </SectionCard>
-
-              <SectionCard
-                title="Last Import Batch"
-                subtitle="Execution summary for the most recent import run."
-              >
-                {runSummary ? (
-                  <div style={runSummaryWrapStyle}>
-                    <div style={runSummaryTopStyle}>
-                      <RunSummaryBox label="Parsed" value={runSummary.parsed} />
-                      <RunSummaryBox label="Created" value={runSummary.created} color="#10b981" />
-                      <RunSummaryBox label="Updated" value={runSummary.updated} color="#3b82f6" />
-                      <RunSummaryBox label="Skipped" value={runSummary.skipped} color="#f59e0b" />
-                      <RunSummaryBox label="Failed" value={runSummary.failed} color="#ef4444" />
-                    </div>
-
-                    <div style={runSourceStyle}>
-                      <span style={runSourceLabelStyle}>Attributed Source</span>
-                      <span style={sourceTagStyle}>{runSummary.source}</span>
-                    </div>
-
-                    {runSummary.errors.length ? (
-                      <div style={errorPanelStyle}>
-                        <div style={errorTitleStyle}>Failed Record Log</div>
-                        <div style={errorListStyle}>
-                          {runSummary.errors.map((error, index) => (
-                            <div key={`${error}-${index}`} style={errorItemStyle}>
-                              {error}
+              ) : (
+                <div style={tableWrapStyle}>
+                  <table style={customTableStyle}>
+                    <thead>
+                      <tr style={thRowStyle}>
+                        <th style={{ ...thStyle, width: '32%' }}>PROPERTY / OWNER</th>
+                        <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>HOUSE VALUE</th>
+                        <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>EQUITY</th>
+                        <th style={{ ...thStyle, width: '14%' }}>LEAD TYPE</th>
+                        <th style={{ ...thStyle, width: '12%', textAlign: 'right' }}>MORTGAGE</th>
+                        <th style={{ ...thStyle, width: '12%', textAlign: 'right' }}>LAST SALE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.slice(0, 16).map((row, index) => (
+                        <tr key={`${row.property_address_1 || row.apn || 'row'}-${index}`} style={trStyle}>
+                          <td style={tdStyle}>
+                            <div style={cellTitleStyle} title={safeText(row.property_address_1)}>
+                              {safeText(row.property_address_1)}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div style={emptyMutedStyle}>No execution summary available for this session.</div>
-                )}
-              </SectionCard>
-            </div>
-
-            {/* Right Preview Grid */}
-            <div style={rightColumnStyle}>
-              <SectionCard
-                title="Import Preview Grid"
-                subtitle="Inspect incoming properties before committing records into Supabase."
-              >
-                {!rows.length ? (
-                  <div style={emptyStateStyle}>
-                    No parsed rows loaded. Select a CSV file to inspect property data.
-                  </div>
-                ) : (
-                  <div style={tableWrapStyle}>
-                    <table style={customTableStyle}>
-                      <thead>
-                        <tr style={thRowStyle}>
-                          <th style={{ ...thStyle, width: '32%' }}>PROPERTY / OWNER</th>
-                          <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>HOUSE VALUE</th>
-                          <th style={{ ...thStyle, width: '15%', textAlign: 'right' }}>EQUITY</th>
-                          <th style={{ ...thStyle, width: '14%' }}>LEAD TYPE</th>
-                          <th style={{ ...thStyle, width: '12%', textAlign: 'right' }}>MORTGAGE</th>
-                          <th style={{ ...thStyle, width: '12%', textAlign: 'right' }}>LAST SALE</th>
+                            <div style={cellSubStyle} title={safeText(row.owner_name)}>
+                              {safeText(row.owner_name)}
+                            </div>
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            <span style={textHighlightStyle}>{money(row.house_value)}</span>
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            <span style={{ color: '#10b981', fontWeight: 600 }}>{money(row.equity_amount)}</span>
+                          </td>
+                          <td style={tdStyle}>
+                            <span style={badgeStyle}>{safeText(row.lead_type)}</span>
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            <span style={mutedTextStyle}>{money(row.mortgage_balance)}</span>
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            <span style={mutedTextStyle}>{money(row.last_sale_amount)}</span>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {rows.slice(0, 16).map((row, index) => (
-                          <tr key={`${row.property_address_1 || row.apn || 'row'}-${index}`} style={trStyle}>
-                            <td style={tdStyle}>
-                              <div style={cellTitleStyle} title={safeText(row.property_address_1)}>
-                                {safeText(row.property_address_1)}
-                              </div>
-                              <div style={cellSubStyle} title={safeText(row.owner_name)}>
-                                {safeText(row.owner_name)}
-                              </div>
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'right' }}>
-                              <span style={textHighlightStyle}>{money(row.house_value)}</span>
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'right' }}>
-                              <span style={{ color: '#10b981', fontWeight: 600 }}>{money(row.equity_amount)}</span>
-                            </td>
-                            <td style={tdStyle}>
-                              <span style={badgeStyle}>{safeText(row.lead_type)}</span>
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'right' }}>
-                              <span style={mutedTextStyle}>{money(row.mortgage_balance)}</span>
-                            </td>
-                            <td style={{ ...tdStyle, textAlign: 'right' }}>
-                              <span style={mutedTextStyle}>{money(row.last_sale_amount)}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </SectionCard>
-            </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
           </div>
         </div>
       </div>
@@ -510,33 +433,33 @@ type AccentColor = 'neutral' | 'blue' | 'purple' | 'amber' | 'emerald'
 
 const ACCENT_MAP: Record<AccentColor, { headerBg: string; border: string; pillBg: string; text: string }> = {
   neutral: {
-    headerBg: 'linear-gradient(180deg, rgba(35, 35, 42, 0.75) 0%, rgba(14, 14, 18, 0.9) 100%)',
-    border: 'rgba(255, 255, 255, 0.12)',
+    headerBg: 'rgba(18, 18, 22, 0.65)',
+    border: 'rgba(255, 255, 255, 0.08)',
     pillBg: 'rgba(255, 255, 255, 0.08)',
     text: '#ffffff',
   },
   blue: {
-    headerBg: 'linear-gradient(180deg, rgba(28, 52, 115, 0.5) 0%, rgba(10, 15, 28, 0.9) 100%)',
-    border: 'rgba(59, 130, 246, 0.4)',
-    pillBg: 'rgba(59, 130, 246, 0.25)',
+    headerBg: 'rgba(18, 18, 22, 0.65)',
+    border: 'rgba(59, 130, 246, 0.25)',
+    pillBg: 'rgba(59, 130, 246, 0.15)',
     text: '#60a5fa',
   },
   purple: {
-    headerBg: 'linear-gradient(180deg, rgba(78, 25, 115, 0.5) 0%, rgba(18, 10, 28, 0.9) 100%)',
-    border: 'rgba(168, 85, 247, 0.4)',
-    pillBg: 'rgba(168, 85, 247, 0.25)',
+    headerBg: 'rgba(18, 18, 22, 0.65)',
+    border: 'rgba(168, 85, 247, 0.25)',
+    pillBg: 'rgba(168, 85, 247, 0.15)',
     text: '#c084fc',
   },
   amber: {
-    headerBg: 'linear-gradient(180deg, rgba(120, 75, 20, 0.55) 0%, rgba(25, 16, 8, 0.92) 100%)',
-    border: 'rgba(212, 175, 55, 0.6)',
-    pillBg: 'rgba(245, 158, 11, 0.25)',
+    headerBg: 'rgba(18, 18, 22, 0.65)',
+    border: 'rgba(212, 175, 55, 0.3)',
+    pillBg: 'rgba(245, 158, 11, 0.15)',
     text: '#fcd34d',
   },
   emerald: {
-    headerBg: 'linear-gradient(180deg, rgba(10, 78, 55, 0.5) 0%, rgba(8, 22, 16, 0.9) 100%)',
-    border: 'rgba(16, 185, 129, 0.4)',
-    pillBg: 'rgba(16, 185, 129, 0.25)',
+    headerBg: 'rgba(18, 18, 22, 0.65)',
+    border: 'rgba(16, 185, 129, 0.25)',
+    pillBg: 'rgba(16, 185, 129, 0.15)',
     text: '#34d399',
   },
 }
@@ -553,8 +476,7 @@ function StageCard({ title, count, accent }: { title: string; count: number; acc
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
-        backdropFilter: 'blur(16px)',
+        backdropFilter: 'blur(12px)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -588,53 +510,7 @@ function RunSummaryBox({ label, value, color = '#f3f4f6' }: { label: string; val
 
 // ---------------- STYLES ----------------
 
-const mockCanvasWrapperStyle: CSSProperties = {
-  position: 'relative',
-  minHeight: '100vh',
-  margin: '-24px',
-  padding: '24px',
-  backgroundColor: '#030304',
-  overflow: 'hidden',
-}
-
-const silkWaveLayerOneStyle: CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  height: '100%',
-  pointerEvents: 'none',
-  animation: 'waveSilkFlow 16s ease-in-out infinite',
-  zIndex: 0,
-}
-
-const silkWaveLayerTwoStyle: CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  height: '100%',
-  pointerEvents: 'none',
-  animation: 'waveSilkFlow 22s ease-in-out infinite reverse',
-  zIndex: 0,
-}
-
-const goldDustOverlayStyle: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  backgroundImage: `radial-gradient(1.5px 1.5px at 10% 20%, rgba(212,175,55,0.6) 100%, transparent),
-                    radial-gradient(1px 1px at 40% 70%, rgba(245,158,11,0.5) 100%, transparent),
-                    radial-gradient(1.5px 1.5px at 80% 30%, rgba(255,215,0,0.6) 100%, transparent),
-                    radial-gradient(1px 1px at 60% 85%, rgba(212,175,55,0.4) 100%, transparent)`,
-  backgroundSize: '350px 350px',
-  animation: 'goldDustShimmer 8s ease-in-out infinite',
-  pointerEvents: 'none',
-  zIndex: 0,
-}
-
 const pageContainerStyle: CSSProperties = {
-  position: 'relative',
-  zIndex: 1,
   display: 'flex',
   flexDirection: 'column',
   gap: 20,
@@ -666,10 +542,9 @@ const rightColumnStyle: CSSProperties = {
 const heroPanelStyle: CSSProperties = {
   padding: 16,
   borderRadius: 12,
-  border: '1px solid rgba(212, 175, 55, 0.4)',
-  background: 'linear-gradient(180deg, rgba(28, 22, 14, 0.85) 0%, rgba(12, 12, 15, 0.95) 100%)',
-  boxShadow: '0 4px 28px rgba(212, 175, 55, 0.15)',
-  backdropFilter: 'blur(16px)',
+  border: '1px solid rgba(212, 175, 55, 0.25)',
+  background: 'rgba(18, 18, 22, 0.65)',
+  backdropFilter: 'blur(12px)',
 }
 
 const heroEyebrowStyle: CSSProperties = {
@@ -714,7 +589,7 @@ const labelStyle: CSSProperties = {
 
 const customInputStyle: CSSProperties = {
   width: '100%',
-  background: 'rgba(10, 10, 14, 0.85)',
+  background: 'rgba(10, 10, 14, 0.6)',
   border: '1px solid rgba(255, 255, 255, 0.12)',
   borderRadius: 8,
   padding: '9px 12px',
@@ -726,9 +601,9 @@ const customInputStyle: CSSProperties = {
 
 const dropzoneStyle: CSSProperties = {
   position: 'relative',
-  border: '1px dashed rgba(212, 175, 55, 0.4)',
+  border: '1px dashed rgba(212, 175, 55, 0.3)',
   borderRadius: 8,
-  background: 'rgba(18, 15, 12, 0.6)',
+  background: 'rgba(18, 18, 22, 0.4)',
   padding: '12px 14px',
   cursor: 'pointer',
 }
@@ -798,7 +673,7 @@ const runSummaryTopStyle: CSSProperties = {
 const runSummaryBoxStyle: CSSProperties = {
   padding: '8px 6px',
   borderRadius: 8,
-  background: 'rgba(14, 14, 18, 0.8)',
+  background: 'rgba(14, 14, 18, 0.6)',
   border: '1px solid rgba(255,255,255,0.08)',
   textAlign: 'center',
 }
@@ -883,8 +758,8 @@ const tableWrapStyle: CSSProperties = {
   overflowX: 'auto',
   borderRadius: 10,
   border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(10, 10, 14, 0.85)',
-  backdropFilter: 'blur(16px)',
+  background: 'rgba(10, 10, 14, 0.6)',
+  backdropFilter: 'blur(12px)',
 }
 
 const customTableStyle: CSSProperties = {
