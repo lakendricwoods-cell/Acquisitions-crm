@@ -25,6 +25,9 @@ type LeadRow = {
   property_zip?: string | null
   status?: string | null
   stage?: string | null
+  lead_status?: string | null
+  deal_status?: string | null
+  pipeline_stage?: string | null
   asking_price?: number | null
   listing_price?: number | null
   market_value?: number | null
@@ -34,6 +37,17 @@ type LeadRow = {
 }
 
 type FilterKey = 'all' | 'high' | 'workable' | 'missing-contact' | 'missing-market'
+
+const STAGE_OPTIONS = [
+  { value: 'new_lead', label: 'New Lead' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'appointment_set', label: 'Appointment Set' },
+  { value: 'offer_sent', label: 'Offer Sent' },
+  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'under_contract', label: 'Under Contract' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'dead_lead', label: 'Dead / Archive' },
+]
 
 function firstNonEmpty(...values: Array<string | null | undefined>) {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0)
@@ -51,7 +65,7 @@ function titleCase(value: string) {
 }
 
 function getLeadStage(lead: LeadRow) {
-  return firstNonEmpty(lead.status, lead.stage, 'new_lead') || 'new_lead'
+  return firstNonEmpty(lead.status, lead.stage, lead.lead_status, lead.pipeline_stage, 'new_lead') || 'new_lead'
 }
 
 function getStageTone(stage: string) {
@@ -62,7 +76,7 @@ function getStageTone(stage: string) {
   if (normalized.includes('follow')) return '#8b5cf6'
   if (normalized.includes('appoint')) return '#38bdf8'
   if (normalized.includes('offer')) return '#fbbf24'
-  if (normalized.includes('dead')) return '#94a3b8'
+  if (normalized.includes('dead') || normalized.includes('archive')) return '#ef4444'
 
   return '#e0b84f'
 }
@@ -129,6 +143,8 @@ export default function LeadsPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
   const [isMobile, setIsMobile] = useState(false)
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([])
+  const [bulkStage, setBulkStage] = useState<string>('new_lead')
 
   useEffect(() => {
     const sync = () => setIsMobile(window.innerWidth <= 900)
@@ -137,25 +153,25 @@ export default function LeadsPage() {
     return () => window.removeEventListener('resize', sync)
   }, [])
 
-  useEffect(() => {
-    async function loadLeads() {
-      setLoading(true)
+  async function loadLeads() {
+    setLoading(true)
 
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false })
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('Failed to load leads:', error)
-        setLeads([])
-      } else {
-        setLeads((data as LeadRow[]) || [])
-      }
-
-      setLoading(false)
+    if (error) {
+      console.error('Failed to load leads:', error)
+      setLeads([])
+    } else {
+      setLeads((data as LeadRow[]) || [])
     }
 
+    setLoading(false)
+  }
+
+  useEffect(() => {
     void loadLeads()
   }, [])
 
@@ -226,13 +242,101 @@ export default function LeadsPage() {
     }
   }, [rows])
 
+  async function handleUpdateStage(leadId: string, nextStage: string) {
+    const payload = {
+      status: nextStage,
+      stage: nextStage,
+      lead_status: nextStage,
+      deal_status: nextStage,
+      pipeline_stage: nextStage,
+    }
+
+    const { error } = await supabase.from('leads').update(payload).eq('id', leadId)
+
+    if (error) {
+      alert(`Failed to update stage: ${error.message}`)
+      return
+    }
+
+    setLeads((curr) =>
+      curr.map((l) => (l.id === leadId ? { ...l, ...payload } : l))
+    )
+  }
+
+  async function handleDeleteLead(leadId: string) {
+    if (!confirm('Are you sure you want to delete this lead permanently?')) return
+
+    const { error } = await supabase.from('leads').delete().eq('id', leadId)
+
+    if (error) {
+      alert(`Failed to delete lead: ${error.message}`)
+      return
+    }
+
+    setLeads((curr) => curr.filter((l) => l.id !== leadId))
+    setSelectedLeadIds((curr) => curr.filter((id) => id !== leadId))
+  }
+
+  async function handleBulkStageChange() {
+    if (selectedLeadIds.length === 0) return
+
+    const payload = {
+      status: bulkStage,
+      stage: bulkStage,
+      lead_status: bulkStage,
+      deal_status: bulkStage,
+      pipeline_stage: bulkStage,
+    }
+
+    const { error } = await supabase.from('leads').update(payload).in('id', selectedLeadIds)
+
+    if (error) {
+      alert(`Failed to update bulk leads: ${error.message}`)
+      return
+    }
+
+    setLeads((curr) =>
+      curr.map((l) => (selectedLeadIds.includes(l.id) ? { ...l, ...payload } : l))
+    )
+    setSelectedLeadIds([])
+  }
+
+  async function handleBulkDelete() {
+    if (selectedLeadIds.length === 0) return
+    if (!confirm(`Are you sure you want to permanently delete ${selectedLeadIds.length} selected leads?`)) return
+
+    const { error } = await supabase.from('leads').delete().in('id', selectedLeadIds)
+
+    if (error) {
+      alert(`Failed to delete selected leads: ${error.message}`)
+      return
+    }
+
+    setLeads((curr) => curr.filter((l) => !selectedLeadIds.includes(l.id)))
+    setSelectedLeadIds([])
+  }
+
+  function toggleSelectAll() {
+    if (selectedLeadIds.length === filteredRows.length) {
+      setSelectedLeadIds([])
+    } else {
+      setSelectedLeadIds(filteredRows.map((r) => r.lead.id))
+    }
+  }
+
+  function toggleSelectLead(id: string) {
+    setSelectedLeadIds((curr) =>
+      curr.includes(id) ? curr.filter((item) => item !== id) : [...curr, id]
+    )
+  }
+
   return (
     <PageShell
       title="Leads"
       subtitle={
         isMobile
           ? 'Mobile-ready lead list for fast scanning and one-tap workspace access.'
-          : 'Control center for searching, filtering, and opening the right lead fast.'
+          : 'Control center for searching, filtering, moving stages, and managing leads.'
       }
       actions={
         <>
@@ -252,8 +356,8 @@ export default function LeadsPage() {
         title="Lead Control Center"
         subtitle={
           isMobile
-            ? 'Search and open leads without pinching or zooming.'
-            : 'Search and filter leads across the desktop table or mobile card list.'
+            ? 'Search, change stages, or clear leads without pinching or zooming.'
+            : 'Search, filter, update stages, or bulk eliminate leads across your workspace.'
         }
       >
         <div style={toolbarStyle}>
@@ -302,6 +406,36 @@ export default function LeadsPage() {
               Missing Market
             </button>
           </div>
+
+          {selectedLeadIds.length > 0 && (
+            <div style={bulkBarContainerStyle}>
+              <span style={bulkCountStyle}>
+                {selectedLeadIds.length} lead{selectedLeadIds.length > 1 ? 's' : ''} selected
+              </span>
+
+              <div style={bulkActionGroupStyle}>
+                <select
+                  value={bulkStage}
+                  onChange={(e) => setBulkStage(e.target.value)}
+                  style={selectStyle}
+                >
+                  {STAGE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value} style={optionStyle}>
+                      Move to: {opt.label}
+                    </option>
+                  ))}
+                </select>
+
+                <ActionButton compact tone="gold" onClick={handleBulkStageChange}>
+                  Apply Stage
+                </ActionButton>
+
+                <ActionButton compact tone="danger" onClick={handleBulkDelete}>
+                  Delete Selected
+                </ActionButton>
+              </div>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -311,53 +445,80 @@ export default function LeadsPage() {
         ) : isMobile ? (
           <div style={mobileListStyle}>
             {filteredRows.map((row) => (
-              <Link key={row.lead.id} href={`/leads/${row.lead.id}`} style={cardLinkStyle}>
-                <article style={mobileCardStyle}>
-                  <div style={mobileCardTopStyle}>
-                    <div style={mobileAddressWrapStyle}>
-                      <div style={mobileAddressStyle}>{row.address}</div>
-                      <div style={mobileSubStyle}>{row.location}</div>
+              <article key={row.lead.id} style={mobileCardStyle}>
+                <div style={mobileCardTopStyle}>
+                  <div style={mobileAddressWrapStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedLeadIds.includes(row.lead.id)}
+                        onChange={() => toggleSelectLead(row.lead.id)}
+                        style={checkboxStyle}
+                      />
+                      <Link href={`/leads/${row.lead.id}`} style={cardLinkStyle}>
+                        <div style={mobileAddressStyle}>{row.address}</div>
+                      </Link>
                     </div>
-
-                    <span
-                      style={{
-                        ...stageBadgeStyle,
-                        color: row.stageColor,
-                        borderColor: `${row.stageColor}55`,
-                        background: `${row.stageColor}14`,
-                      }}
-                    >
-                      {row.stageLabel}
-                    </span>
+                    <div style={mobileSubStyle}>{row.location}</div>
                   </div>
+                </div>
 
-                  <div style={infoBlockStyle}>
-                    <div style={miniKeyStyle}>Owner</div>
-                    <div style={mobileValueStyle}>{row.owner}</div>
-                  </div>
+                <div style={infoBlockStyle}>
+                  <div style={miniKeyStyle}>Stage Progression</div>
+                  <select
+                    value={row.stage}
+                    onChange={(e) => handleUpdateStage(row.lead.id, e.target.value)}
+                    style={{
+                      ...selectStyle,
+                      color: row.stageColor,
+                      borderColor: `${row.stageColor}55`,
+                      background: 'rgba(0,0,0,0.6)',
+                      width: '100%',
+                    }}
+                  >
+                    {STAGE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value} style={optionStyle}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div style={infoBlockStyle}>
-                    <div style={miniKeyStyle}>Contact</div>
-                    <div style={mobileValueStyle}>{row.phone}</div>
-                  </div>
+                <div style={infoBlockStyle}>
+                  <div style={miniKeyStyle}>Owner</div>
+                  <div style={mobileValueStyle}>{row.owner}</div>
+                </div>
 
-                  <div style={scoreGridStyle}>
-                    <ScorePill label="Strength" score={row.strength} tone="gold" />
-                    <ScorePill label="Motivation" score={row.motivation} tone="orange" />
-                    <ScorePill label="Contact" score={row.contact} tone="blue" />
-                    <ScorePill label="Market" score={row.market} tone="green" />
-                  </div>
+                <div style={infoBlockStyle}>
+                  <div style={miniKeyStyle}>Contact</div>
+                  <div style={mobileValueStyle}>{row.phone}</div>
+                </div>
 
-                  <div style={valueGridStyle}>
-                    <MiniValueCard label="Price" value={row.priceText} />
-                    <MiniValueCard label="ARV" value={row.arvText} />
-                  </div>
+                <div style={scoreGridStyle}>
+                  <ScorePill label="Strength" score={row.strength} tone="gold" />
+                  <ScorePill label="Motivation" score={row.motivation} tone="orange" />
+                  <ScorePill label="Contact" score={row.contact} tone="blue" />
+                  <ScorePill label="Market" score={row.market} tone="green" />
+                </div>
 
-                  <div style={mobileActionRowStyle}>
-                    <span style={openWorkspaceStyle}>Open Workspace</span>
-                  </div>
-                </article>
-              </Link>
+                <div style={valueGridStyle}>
+                  <MiniValueCard label="Price" value={row.priceText} />
+                  <MiniValueCard label="ARV" value={row.arvText} />
+                </div>
+
+                <div style={mobileActionRowStyle}>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteLead(row.lead.id)}
+                    style={deleteButtonStyle}
+                  >
+                    Delete Lead
+                  </button>
+                  <Link href={`/leads/${row.lead.id}`} style={cardLinkStyle}>
+                    <span style={openWorkspaceStyle}>Open Workspace →</span>
+                  </Link>
+                </div>
+              </article>
             ))}
           </div>
         ) : (
@@ -365,24 +526,42 @@ export default function LeadsPage() {
             <table className="crm-table">
               <thead>
                 <tr>
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedLeadIds.length > 0 &&
+                        selectedLeadIds.length === filteredRows.length
+                      }
+                      onChange={toggleSelectAll}
+                      style={checkboxStyle}
+                    />
+                  </th>
                   <th>Lead</th>
                   <th>Owner</th>
                   <th>Contact</th>
                   <th>Stage</th>
                   <th>Price</th>
                   <th>ARV</th>
-                  <th>Strength</th>
-                  <th>Motivation</th>
-                  <th>Contact</th>
-                  <th>Market</th>
-                  <th>Workspace</th>
+                  <th>Scores</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((row) => (
                   <tr key={row.lead.id}>
                     <td>
-                      <div style={desktopLeadTitleStyle}>{row.address}</div>
+                      <input
+                        type="checkbox"
+                        checked={selectedLeadIds.includes(row.lead.id)}
+                        onChange={() => toggleSelectLead(row.lead.id)}
+                        style={checkboxStyle}
+                      />
+                    </td>
+                    <td>
+                      <Link href={`/leads/${row.lead.id}`} style={cardLinkStyle}>
+                        <div style={desktopLeadTitleStyle}>{row.address}</div>
+                      </Link>
                       <div style={desktopSubStyle}>{row.location}</div>
                     </td>
                     <td>{row.owner}</td>
@@ -391,27 +570,45 @@ export default function LeadsPage() {
                       <div style={desktopSubStyle}>{row.email}</div>
                     </td>
                     <td>
-                      <span
-                        className="crm-badge soft"
+                      <select
+                        value={row.stage}
+                        onChange={(e) => handleUpdateStage(row.lead.id, e.target.value)}
                         style={{
+                          ...selectStyle,
                           color: row.stageColor,
                           borderColor: `${row.stageColor}55`,
                           background: `${row.stageColor}14`,
                         }}
                       >
-                        {row.stageLabel}
-                      </span>
+                        {STAGE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value} style={optionStyle}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td>{row.priceText}</td>
                     <td>{row.arvText}</td>
-                    <td><span className="crm-badge soft">Strength {row.strength}</span></td>
-                    <td><span className="crm-badge soft">Motivation {row.motivation}</span></td>
-                    <td><span className="crm-badge soft">Contact {row.contact}</span></td>
-                    <td><span className="crm-badge soft">Market {row.market}</span></td>
                     <td>
-                      <Link href={`/leads/${row.lead.id}`}>
-                        <ActionButton compact>Open Workspace</ActionButton>
-                      </Link>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        <span className="crm-badge soft">Str {row.strength}</span>
+                        <span className="crm-badge soft">Mot {row.motivation}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Link href={`/leads/${row.lead.id}`}>
+                          <ActionButton compact>Workspace</ActionButton>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLead(row.lead.id)}
+                          style={iconDeleteButtonStyle}
+                          title="Delete Lead"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -513,6 +710,7 @@ const chipStyle: CSSProperties = {
   whiteSpace: 'nowrap',
   fontSize: 12,
   fontWeight: 700,
+  cursor: 'pointer',
 }
 
 const activeChipStyle: CSSProperties = {
@@ -520,6 +718,55 @@ const activeChipStyle: CSSProperties = {
   border: '1px solid rgba(214,166,75,0.28)',
   background: 'rgba(214,166,75,0.12)',
   color: '#ffffff',
+}
+
+const bulkBarContainerStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '10px 14px',
+  borderRadius: 14,
+  border: '1px solid rgba(214,166,75,0.25)',
+  background: 'linear-gradient(180deg, rgba(28,22,12,0.9), rgba(12,10,6,0.95))',
+  flexWrap: 'wrap',
+}
+
+const bulkCountStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 700,
+  color: '#d6a64b',
+}
+
+const bulkActionGroupStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flexWrap: 'wrap',
+}
+
+const selectStyle: CSSProperties = {
+  minHeight: 32,
+  padding: '0 10px',
+  borderRadius: 8,
+  fontSize: 12,
+  fontWeight: 600,
+  outline: 'none',
+  cursor: 'pointer',
+  border: '1px solid rgba(255,255,255,0.12)',
+  background: 'rgba(18,18,18,0.9)',
+}
+
+const optionStyle: CSSProperties = {
+  background: '#121212',
+  color: '#ffffff',
+}
+
+const checkboxStyle: CSSProperties = {
+  accentColor: '#d6a64b',
+  width: 16,
+  height: 16,
+  cursor: 'pointer',
 }
 
 const mobileListStyle: CSSProperties = {
@@ -558,11 +805,11 @@ const mobileAddressWrapStyle: CSSProperties = {
 }
 
 const mobileAddressStyle: CSSProperties = {
-  fontSize: 22,
-  lineHeight: 1.04,
+  fontSize: 20,
+  lineHeight: 1.1,
   fontWeight: 800,
   color: '#ffffff',
-  letterSpacing: '-0.03em',
+  letterSpacing: '-0.02em',
   wordBreak: 'break-word',
 }
 
@@ -574,22 +821,9 @@ const mobileSubStyle: CSSProperties = {
   letterSpacing: '0.04em',
 }
 
-const stageBadgeStyle: CSSProperties = {
-  minHeight: 30,
-  padding: '0 10px',
-  borderRadius: 999,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 11,
-  fontWeight: 700,
-  flexShrink: 0,
-  border: '1px solid rgba(255,255,255,0.08)',
-}
-
 const infoBlockStyle: CSSProperties = {
   display: 'grid',
-  gap: 3,
+  gap: 4,
 }
 
 const miniKeyStyle: CSSProperties = {
@@ -600,7 +834,7 @@ const miniKeyStyle: CSSProperties = {
 }
 
 const mobileValueStyle: CSSProperties = {
-  fontSize: 16,
+  fontSize: 15,
   fontWeight: 650,
   color: '#ffffff',
   lineHeight: 1.25,
@@ -657,8 +891,35 @@ const miniValueStyle: CSSProperties = {
 
 const mobileActionRowStyle: CSSProperties = {
   display: 'flex',
-  justifyContent: 'flex-end',
-  paddingTop: 2,
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingTop: 4,
+  borderTop: '1px solid rgba(255,255,255,0.06)',
+}
+
+const deleteButtonStyle: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: '#ef4444',
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: 'pointer',
+  padding: 0,
+}
+
+const iconDeleteButtonStyle: CSSProperties = {
+  background: 'rgba(239, 68, 68, 0.12)',
+  border: '1px solid rgba(239, 68, 68, 0.25)',
+  color: '#ef4444',
+  width: 28,
+  height: 28,
+  borderRadius: 6,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  fontSize: 12,
+  fontWeight: 700,
 }
 
 const openWorkspaceStyle: CSSProperties = {
