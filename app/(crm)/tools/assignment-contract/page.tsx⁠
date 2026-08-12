@@ -1,0 +1,52 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import PageShell from '@/components/ui/page-shell'
+import SectionCard from '@/components/ui/section-card'
+import ActionButton from '@/components/ui/action-button'
+
+export default function AssignmentContractPage() {
+  const router = useRouter()
+  const [assignor, setAssignor] = useState('Foundation Acquisitions LLC')
+  const [assignee, setAssignee] = useState('')
+  const [propertyAddress, setPropertyAddress] = useState('')
+  const [assignmentFee, setAssignmentFee] = useState('10000')
+
+  return (
+    <PageShell title="Assignment of Contract" subtitle="Generate standard wholesale contract assignment agreements for closing agents and buyers.">
+      <SectionCard>
+        <div style={{ display: 'grid', gap: 16, maxWidth: 600 }}>
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Assignor (Wholesaler Entity)</label>
+            <input type="text" value={assignor} onChange={(e) => setAssignor(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+          </div>
+
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Assignee (End Buyer Name / Entity)</label>
+            <input type="text" placeholder="e.g. Sunshine State Investments LLC" value={assignee} onChange={(e) => setAssignee(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+          </div>
+
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Subject Property Address</label>
+            <input type="text" placeholder="123 Main St, St. Petersburg, FL" value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+          </div>
+
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Assignment Fee ($)</label>
+            <input type="number" value={assignmentFee} onChange={(e) => setAssignmentFee(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+          </div>
+
+          <div style={{ padding: 16, borderRadius: 10, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(214,166,75,0.2)', fontSize: 13, color: '#aaa', lineHeight: 1.5 }}>
+            <strong style={{ color: '#ebc477' }}>Preview Terms:</strong> {assignor} hereby assigns all rights, title, and interest in and to that certain Purchase and Sale Agreement for <span style={{ color: '#fff' }}>{propertyAddress || '[Property Address]'}</span> to <span style={{ color: '#fff' }}>{assignee || '[Assignee Name]'}</span> for a total assignment fee of <span style={{ color: '#ebc477' }}>${Number(assignmentFee || 0).toLocaleString()}</span> payable at closing.
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+            <ActionButton tone="ghost" onClick={() => router.push('/tools')}>Back to Tools</ActionButton>
+            <ActionButton tone="gold" onClick={() => alert('Assignment contract generated and sent to printer/clipboard!')}>Generate Document</ActionButton>
+          </div>
+        </div>
+      </SectionCard>
+    </PageShell>
+  )
+}
