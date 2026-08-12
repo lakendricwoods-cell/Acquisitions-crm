@@ -75,6 +75,14 @@ function IconBuyers() {
   )
 }
 
+function IconTools() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={iconSvgStyle}>
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.9a2.12 2.12 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  )
+}
+
 function IconImports() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={iconSvgStyle}>
@@ -139,6 +147,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/leads', label: 'Leads', bottomLabel: 'Leads', icon: <IconLeads /> },
   { href: '/deals', label: 'Deals', icon: <IconDeals /> },
   { href: '/buyers', label: 'Buyers', icon: <IconBuyers /> },
+  { href: '/tools', label: 'Calculators & Tools', bottomLabel: 'Tools', icon: <IconTools /> },
   { href: '/imports', label: 'Imports', icon: <IconImports /> },
   { href: '/reports', label: 'Reports', icon: <IconReports /> },
   { href: '/settings', label: 'Settings', icon: <IconSettings /> },
@@ -151,6 +160,7 @@ function getPageTitle(pathname: string) {
   if (pathname.startsWith('/leads')) return 'Leads'
   if (pathname.startsWith('/deals')) return 'Deals'
   if (pathname.startsWith('/buyers')) return 'Buyers'
+  if (pathname.startsWith('/tools')) return 'Acquisitions & Dispo Utilities'
   if (pathname.startsWith('/imports')) return 'Imports'
   if (pathname.startsWith('/reports')) return 'Reports'
   if (pathname.startsWith('/settings')) return 'Settings'
@@ -180,7 +190,7 @@ export default function CrmShell({ children }: CrmShellProps) {
   }, [pathname])
 
   const bottomNavItems = useMemo(
-    () => NAV_ITEMS.filter((item) => ['/dashboard', '/pipeline', '/tasks', '/leads'].includes(item.href)),
+    () => NAV_ITEMS.filter((item) => ['/dashboard', '/pipeline', '/tasks', '/tools'].includes(item.href)),
     []
   )
 
@@ -220,7 +230,6 @@ export default function CrmShell({ children }: CrmShellProps) {
         gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '272px minmax(0, 1fr)',
       }}
     >
-      {/* Dynamic Background Glowing Light Leaks */}
       <div style={glowBgContainerStyle}>
         <div style={goldGlowTopStyle} className="animate-pulse-glow" />
         <div style={goldGlowBottomStyle} className="animate-pulse-glow" />
@@ -356,353 +365,43 @@ export default function CrmShell({ children }: CrmShellProps) {
   )
 }
 
-const iconSvgStyle: CSSProperties = {
-  width: 18,
-  height: 18,
-  strokeWidth: 1.8,
-}
-
-const shellStyle: CSSProperties = {
-  minHeight: '100dvh',
-  width: '100%',
-  display: 'grid',
-  position: 'relative',
-  backgroundColor: 'var(--bg-0, #000000)',
-}
-
-const glowBgContainerStyle: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  pointerEvents: 'none',
-  zIndex: 0,
-  overflow: 'hidden',
-}
-
-const goldGlowTopStyle: CSSProperties = {
-  position: 'absolute',
-  top: '-10%',
-  right: '15%',
-  width: '600px',
-  height: '600px',
-  borderRadius: '50%',
-  background: 'radial-gradient(circle, rgba(214,166,75,0.12) 0%, rgba(0,0,0,0) 70%)',
-  filter: 'blur(60px)',
-}
-
-const goldGlowBottomStyle: CSSProperties = {
-  position: 'absolute',
-  bottom: '-15%',
-  left: '5%',
-  width: '700px',
-  height: '700px',
-  borderRadius: '50%',
-  background: 'radial-gradient(circle, rgba(214,166,75,0.08) 0%, rgba(0,0,0,0) 70%)',
-  filter: 'blur(80px)',
-}
-
-const sidebarStyle: CSSProperties = {
-  position: 'sticky',
-  top: 0,
-  height: '100dvh',
-  zIndex: 60,
-  display: 'grid',
-  gridTemplateRows: 'auto 1fr auto',
-  gap: 18,
-  padding: 18,
-  borderRight: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(6,5,3,0.92), rgba(0,0,0,0.98))',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  boxShadow: 'inset -1px 0 0 rgba(214,166,75,0.12), 10px 0 30px rgba(0,0,0,0.5)',
-}
-
-const brandWrapStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  minWidth: 0,
-}
-
-const brandMarkStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 14,
-  display: 'grid',
-  placeItems: 'center',
-  fontWeight: 800,
-  fontSize: 18,
-  color: '#ebc477',
-  border: '1px solid rgba(214,166,75,0.35)',
-  background: 'linear-gradient(180deg, rgba(20,16,8,0.95), rgba(0,0,0,1))',
-  boxShadow: '0 0 20px rgba(214,166,75,0.18)',
-  flexShrink: 0,
-}
-
-const brandTextWrapStyle: CSSProperties = {
-  display: 'grid',
-  gap: 2,
-  minWidth: 0,
-}
-
-const brandTitleStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 700,
-  color: '#ffffff',
-  lineHeight: 1.2,
-  letterSpacing: '-0.01em',
-}
-
-const brandSubtitleStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.54)',
-  lineHeight: 1.2,
-}
-
-const navStyle: CSSProperties = {
-  display: 'grid',
-  alignContent: 'start',
-  gap: 8,
-}
-
-const navItemStyle: CSSProperties = {
-  minHeight: 46,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '0 12px',
-  borderRadius: 14,
-  border: '1px solid transparent',
-  color: 'rgba(255,255,255,0.72)',
-  background: 'transparent',
-  textDecoration: 'none',
-  transition: 'all 160ms ease',
-}
-
-const mobileDrawerNavStyle: CSSProperties = {
-  display: 'grid',
-  gap: 8,
-  paddingTop: 8,
-}
-
-const mobileDrawerItemStyle: CSSProperties = {
-  minHeight: 48,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  padding: '0 12px',
-  borderRadius: 14,
-  border: '1px solid transparent',
-  color: 'rgba(255,255,255,0.72)',
-  background: 'transparent',
-  textDecoration: 'none',
-}
-
-const navItemActiveStyle: CSSProperties = {
-  color: '#ffffff',
-  border: '1px solid rgba(214,166,75,0.32)',
-  background: 'linear-gradient(180deg, rgba(22,18,10,0.85), rgba(0,0,0,0.95))',
-  boxShadow: '0 0 16px rgba(214,166,75,0.12), inset 0 1px 0 rgba(255,255,255,0.05)',
-}
-
-const navIconStyle: CSSProperties = {
-  width: 18,
-  height: 18,
-  display: 'grid',
-  placeItems: 'center',
-  flexShrink: 0,
-}
-
-const navLabelStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-}
-
-const sidebarFooterStyle: CSSProperties = {
-  display: 'grid',
-  gap: 12,
-}
-
-const footerCardStyle: CSSProperties = {
-  borderRadius: 14,
-  border: '1px solid rgba(214,166,75,0.18)',
-  background: 'linear-gradient(180deg, rgba(12,10,6,0.85), rgba(0,0,0,0.92))',
-  padding: 12,
-  display: 'grid',
-  gap: 4,
-  boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-}
-
-const footerCardTitleStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: '#ebc477',
-}
-
-const footerCardTextStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.52)',
-}
-
-const mainStyle: CSSProperties = {
-  minWidth: 0,
-  width: '100%',
-  display: 'grid',
-  gridTemplateRows: 'auto minmax(0, 1fr)',
-  position: 'relative',
-  zIndex: 1,
-}
-
-const topbarStyle: CSSProperties = {
-  position: 'sticky',
-  top: 0,
-  zIndex: 50,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 16,
-  borderBottom: '1px solid rgba(255,255,255,0.05)',
-  background: 'linear-gradient(180deg, rgba(6,5,3,0.88), rgba(0,0,0,0.92))',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
-}
-
-const topbarLeftStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  minWidth: 0,
-}
-
-const pageTitleWrapStyle: CSSProperties = {
-  display: 'grid',
-  gap: 2,
-  minWidth: 0,
-}
-
-const pageKickerStyle: CSSProperties = {
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.14em',
-  color: 'rgba(214,166,75,0.65)',
-}
-
-const pageTitleStyle: CSSProperties = {
-  fontSize: 18,
-  fontWeight: 750,
-  color: '#ffffff',
-  lineHeight: 1.1,
-  letterSpacing: '-0.02em',
-}
-
-const topbarRightStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  flexWrap: 'wrap',
-  justifyContent: 'flex-end',
-}
-
-const menuButtonStyle: CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: 12,
-  border: '1px solid rgba(214,166,75,0.25)',
-  background: 'linear-gradient(180deg, rgba(14,12,7,0.95), rgba(0,0,0,1))',
-  color: '#ffffff',
-  display: 'grid',
-  placeItems: 'center',
-  flexShrink: 0,
-  cursor: 'pointer',
-}
-
-const contentAreaStyle: CSSProperties = {
-  minWidth: 0,
-  width: '100%',
-}
-
-const mobileBottomNavStyle: CSSProperties = {
-  position: 'fixed',
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 40,
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-  gap: 8,
-  padding: '10px 10px calc(10px + env(safe-area-inset-bottom))',
-  borderTop: '1px solid rgba(214,166,75,0.18)',
-  background: 'linear-gradient(180deg, rgba(8,6,3,0.96), rgba(0,0,0,0.98))',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  boxShadow: '0 -8px 30px rgba(0,0,0,0.6)',
-}
-
-const mobileNavItemStyle: CSSProperties = {
-  minHeight: 58,
-  borderRadius: 14,
-  display: 'grid',
-  justifyItems: 'center',
-  alignContent: 'center',
-  gap: 4,
-  color: 'rgba(255,255,255,0.68)',
-  border: '1px solid transparent',
-  textDecoration: 'none',
-  background: 'transparent',
-}
-
-const mobileNavItemActiveStyle: CSSProperties = {
-  color: '#ffffff',
-  border: '1px solid rgba(214,166,75,0.3)',
-  background: 'linear-gradient(180deg, rgba(20,16,8,0.9), rgba(0,0,0,1))',
-  boxShadow: '0 0 14px rgba(214,166,75,0.12)',
-}
-
-const mobileNavIconStyle: CSSProperties = {
-  width: 18,
-  height: 18,
-  display: 'grid',
-  placeItems: 'center',
-}
-
-const mobileNavLabelStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  lineHeight: 1,
-}
-
-const mobileOverlayStyle: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 79,
-  background: 'rgba(0,0,0,0.75)',
-  backdropFilter: 'blur(8px)',
-  WebkitBackdropFilter: 'blur(8px)',
-}
-
-const mobileDrawerStyle: CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  bottom: 0,
-  zIndex: 80,
-  width: 'min(84vw, 320px)',
-  background: 'linear-gradient(180deg, rgba(8,6,3,0.98), rgba(0,0,0,1))',
-  borderRight: '1px solid rgba(214,166,75,0.22)',
-  boxShadow: '20px 0 60px rgba(0,0,0,0.7)',
-  padding: 16,
-  display: 'grid',
-  gridTemplateRows: 'auto 1fr auto',
-  gap: 16,
-}
-
-const mobileDrawerTopStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-}
-
-const mobileDrawerFooterStyle: CSSProperties = {
-  display: 'grid',
-}
+const iconSvgStyle: CSSProperties = { width: 18, height: 18, strokeWidth: 1.8 }
+const shellStyle: CSSProperties = { minHeight: '100dvh', width: '100%', display: 'grid', position: 'relative', backgroundColor: 'var(--bg-0, #000000)' }
+const glowBgContainerStyle: CSSProperties = { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }
+const goldGlowTopStyle: CSSProperties = { position: 'absolute', top: '-10%', right: '15%', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(214,166,75,0.12) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(60px)' }
+const goldGlowBottomStyle: CSSProperties = { position: 'absolute', bottom: '-15%', left: '5%', width: '700px', height: '700px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(214,166,75,0.08) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(80px)' }
+const sidebarStyle: CSSProperties = { position: 'sticky', top: 0, height: '100dvh', zIndex: 60, display: 'grid', gridTemplateRows: 'auto 1fr auto', gap: 18, padding: 18, borderRight: '1px solid rgba(255,255,255,0.06)', background: 'linear-gradient(180deg, rgba(6,5,3,0.92), rgba(0,0,0,0.98))', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: 'inset -1px 0 0 rgba(214,166,75,0.12), 10px 0 30px rgba(0,0,0,0.5)' }
+const brandWrapStyle: CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }
+const brandMarkStyle: CSSProperties = { width: 44, height: 44, borderRadius: 14, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 18, color: '#ebc477', border: '1px solid rgba(214,166,75,0.35)', background: 'linear-gradient(180deg, rgba(20,16,8,0.95), rgba(0,0,0,1))', boxShadow: '0 0 20px rgba(214,166,75,0.18)', flexShrink: 0 }
+const brandTextWrapStyle: CSSProperties = { display: 'grid', gap: 2, minWidth: 0 }
+const brandTitleStyle: CSSProperties = { fontSize: 13, fontWeight: 700, color: '#ffffff', lineHeight: 1.2, letterSpacing: '-0.01em' }
+const brandSubtitleStyle: CSSProperties = { fontSize: 11, color: 'rgba(255,255,255,0.54)', lineHeight: 1.2 }
+const navStyle: CSSProperties = { display: 'grid', alignContent: 'start', gap: 8 }
+const navItemStyle: CSSProperties = { minHeight: 46, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', borderRadius: 14, border: '1px solid transparent', color: 'rgba(255,255,255,0.72)', background: 'transparent', textDecoration: 'none', transition: 'all 160ms ease' }
+const mobileDrawerNavStyle: CSSProperties = { display: 'grid', gap: 8, paddingTop: 8 }
+const mobileDrawerItemStyle: CSSProperties = { minHeight: 48, display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', borderRadius: 14, border: '1px solid transparent', color: 'rgba(255,255,255,0.72)', background: 'transparent', textDecoration: 'none' }
+const navItemActiveStyle: CSSProperties = { color: '#ffffff', border: '1px solid rgba(214,166,75,0.32)', background: 'linear-gradient(180deg, rgba(22,18,10,0.85), rgba(0,0,0,0.95))', boxShadow: '0 0 16px rgba(214,166,75,0.12), inset 0 1px 0 rgba(255,255,255,0.05)' }
+const navIconStyle: CSSProperties = { width: 18, height: 18, display: 'grid', placeItems: 'center', flexShrink: 0 }
+const navLabelStyle: CSSProperties = { fontSize: 13, fontWeight: 600 }
+const sidebarFooterStyle: CSSProperties = { display: 'grid', gap: 12 }
+const footerCardStyle: CSSProperties = { borderRadius: 14, border: '1px solid rgba(214,166,75,0.18)', background: 'linear-gradient(180deg, rgba(12,10,6,0.85), rgba(0,0,0,0.92))', padding: 12, display: 'grid', gap: 4, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }
+const footerCardTitleStyle: CSSProperties = { fontSize: 11, fontWeight: 700, color: '#ebc477' }
+const footerCardTextStyle: CSSProperties = { fontSize: 11, color: 'rgba(255,255,255,0.52)' }
+const mainStyle: CSSProperties = { minWidth: 0, width: '100%', display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', position: 'relative', zIndex: 1 }
+const topbarStyle: CSSProperties = { position: 'sticky', top: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'linear-gradient(180deg, rgba(6,5,3,0.88), rgba(0,0,0,0.92))', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 4px 20px rgba(0,0,0,0.6)' }
+const topbarLeftStyle: CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }
+const pageTitleWrapStyle: CSSProperties = { display: 'grid', gap: 2, minWidth: 0 }
+const pageKickerStyle: CSSProperties = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(214,166,75,0.65)' }
+const pageTitleStyle: CSSProperties = { fontSize: 18, fontWeight: 750, color: '#ffffff', lineHeight: 1.1, letterSpacing: '-0.02em' }
+const topbarRightStyle: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }
+const menuButtonStyle: CSSProperties = { width: 42, height: 42, borderRadius: 12, border: '1px solid rgba(214,166,75,0.25)', background: 'linear-gradient(180deg, rgba(14,12,7,0.95), rgba(0,0,0,1))', color: '#ffffff', display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'pointer' }
+const contentAreaStyle: CSSProperties = { minWidth: 0, width: '100%' }
+const mobileBottomNavStyle: CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 40, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, padding: '10px 10px calc(10px + env(safe-area-inset-bottom))', borderTop: '1px solid rgba(214,166,75,0.18)', background: 'linear-gradient(180deg, rgba(8,6,3,0.96), rgba(0,0,0,0.98))', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 -8px 30px rgba(0,0,0,0.6)' }
+const mobileNavItemStyle: CSSProperties = { minHeight: 58, borderRadius: 14, display: 'grid', justifyItems: 'center', alignContent: 'center', gap: 4, color: 'rgba(255,255,255,0.68)', border: '1px solid transparent', textDecoration: 'none', background: 'transparent' }
+const mobileNavItemActiveStyle: CSSProperties = { color: '#ffffff', border: '1px solid rgba(214,166,75,0.3)', background: 'linear-gradient(180deg, rgba(20,16,8,0.9), rgba(0,0,0,1))', boxShadow: '0 0 14px rgba(214,166,75,0.12)' }
+const mobileNavIconStyle: CSSProperties = { width: 18, height: 18, display: 'grid', placeItems: 'center' }
+const mobileNavLabelStyle: CSSProperties = { fontSize: 10, fontWeight: 700, lineHeight: 1 }
+const mobileOverlayStyle: CSSProperties = { position: 'fixed', inset: 0, zIndex: 79, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }
+const mobileDrawerStyle: CSSProperties = { position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 80, width: 'min(84vw, 320px)', background: 'linear-gradient(180deg, rgba(8,6,3,0.98), rgba(0,0,0,1))', borderRight: '1px solid rgba(214,166,75,0.22)', boxShadow: '20px 0 60px rgba(0,0,0,0.7)', padding: 16, display: 'grid', gridTemplateRows: 'auto 1fr auto', gap: 16 }
+const mobileDrawerTopStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }
+const mobileDrawerFooterStyle: CSSProperties = { display: 'grid' }
