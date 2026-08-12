@@ -1,47 +1,5 @@
-'span'
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import PageShell from '@/components/ui/page-shell'
-import SectionCard from '@/components/ui/section-card'
-import ActionButton from '@/components/ui/action-button'
+import ToolWorkspace from '../tool-workspace'
 
 export default function BuyerBlastPage() {
-  const router = useRouter()
-  const [subject, setSubject] = useState('New Off-Market Wholesale Deal in Florida - Under Contract')
-  const [propertyDetails, setPropertyDetails] = useState('3 Bed / 2 Bath single-family home. ARV: $300,000 | Estimated Repairs: $25,000 | Asking Price: $210,000')
-  const [targetList, setTargetList] = useState('all-buyers')
-
-  return (
-    <PageShell title="Buyer Blast Broadcast" subtitle="Broadcast newly locked wholesale inventory directly to your cash buyers list via email and SMS.">
-      <SectionCard>
-        <div style={{ display: 'grid', gap: 16, maxWidth: 600 }}>
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Target Buyer Segment</label>
-            <select value={targetList} onChange={(e) => setTargetList(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }}>
-              <option value="all-buyers">All Active Cash Buyers (St. Pete / Tampa Bay)</option>
-              <option value="vip-buyers">VIP Tier 1 Buyers Only</option>
-              <option value="fix-and-flip">Fix & Flip Specialists</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Broadcast Subject Line</label>
-            <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
-          </div>
-
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Deal Overview & Numbers</label>
-            <textarea rows={4} value={propertyDetails} onChange={(e) => setPropertyDetails(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff', resize: 'vertical' }} />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
-            <ActionButton tone="ghost" onClick={() => router.push('/tools')}>Back to Tools</ActionButton>
-            <ActionButton tone="gold" onClick={() => alert('Buyer blast broadcast successfully queued for delivery!')}>Send Blast Now</ActionButton>
-          </div>
-        </div>
-      </SectionCard>
-    </PageShell>
-  )
+  return <ToolWorkspace slug="buyer-blast" />
 }
