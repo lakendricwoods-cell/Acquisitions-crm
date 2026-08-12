@@ -16,7 +16,7 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -27,12 +27,7 @@ export default function LoginPage() {
       return
     }
 
-    if (data.session) {
-      window.location.href = '/'
-    } else {
-      setError('Authentication failed. No active session returned.')
-      setLoading(false)
-    }
+    router.push('/dashboard')
   }
 
   return (
