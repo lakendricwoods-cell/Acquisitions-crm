@@ -16,7 +16,7 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -27,9 +27,13 @@ export default function LoginPage() {
       return
     }
 
-    // Force router refresh and push to bypass frozen states and sync cookies
-    router.refresh()
-    router.push('/')
+    if (data.session) {
+      // Force direct window location assignment to bypass Next.js client router hang and hard-commit cookies
+      window.location.href = '/'
+    } else {
+      setError('Authentication failed. No active session returned.')
+      setLoading(false)
+    }
   }
 
   return (
