@@ -1,0 +1,98 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import PageShell from '@/components/ui/page-shell'
+import SectionCard from '@/components/ui/section-card'
+import ActionButton from '@/components/ui/action-button'
+
+export default function ScriptGeneratorPage() {
+  const router = useRouter()
+  const [leadType, setLeadType] = useState('cold-call-absentee')
+  const [sellerMotivation, setSellerMotivation] = useState('distressed-timeline')
+  const [customNotes, setCustomNotes] = useState('Property needs roof repairs and full cosmetic updates.')
+  const [generatedScript, setGeneratedScript] = useState(`AGENT: Hi, is this [Seller Name]? I'm reaching out regarding your property at [Property Address]. I noticed it might be sitting vacant or you might be looking to offload it without dealing with agents or open houses. Are you open to a cash offer?\n\nSELLER: I might be, but what are you offering?\n\nAGENT: We specialize in buying properties completely as-is with zero closing costs or commissions, and we can close on whatever timeline works best for you—whether that's 14 days or 30 days. Based on similar sales in St. Petersburg, we can present a clean cash number today. What's the biggest headache you're facing with the property right now?`)
+
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  const handleGenerateScript = () => {
+    setIsGenerating(true)
+    setTimeout(() => {
+      setIsGenerating(false)
+      if (leadType === 'sms-outbound') {
+        setGeneratedScript(`Hi [Seller Name], I’m looking at properties in St. Petersburg / Tampa Bay and noticed yours on [Street Name]. Are you open to a fair cash offer on an as-is basis with no realtor fees? Reply YES if interested!`)
+      } else if (leadType === 'probate-intro') {
+        setGeneratedScript(`AGENT: Hello [Name], first let me express my condolences regarding your family's recent passing. I know dealing with probate properties in Florida can be an overwhelming administrative burden. We help families liquidate estate properties quickly and cleanly without forcing you to clean out repairs or pay commissions. Have you appointed a personal representative yet?`)
+      } else {
+        setGeneratedScript(`AGENT: Hi [Seller Name], I'm following up on your property at [Property Address]. I know you mentioned needing flexibility on your moving timeline. We can structure an as-is cash agreement with a delayed closing or a cash advance on equity if needed. Does a quick 14-day close work, or do you need a bit more runway?`)
+      }
+    }, 500)
+  }
+
+  const handleCopyScript = () => {
+    navigator.clipboard.writeText(generatedScript)
+    alert('Script successfully copied to clipboard!')
+  }
+
+  return (
+    <PageShell title="Cold Call & SMS Script Generator" subtitle="Generate tailored conversational scripts optimized for wholesale acquisitions, distressed sellers, and probate leads.">
+      <SectionCard>
+        <div style={{ display: 'grid', gap: 20, maxWidth: 680 }}>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Channel / Lead Type</label>
+              <select value={leadType} onChange={(e) => setLeadType(e.target.value)} style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff', fontSize: 14 }}>
+                <option value="cold-call-absentee">Cold Call - Absentee Owner</option>
+                <option value="sms-outbound">SMS Outbound Broadcast</option>
+                <option value="probate-intro">Probate / Inherited Property</option>
+                <option value="follow-up">Warm Follow-Up / Negotiation</option>
+              </select>
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Seller Motivation Hook</label>
+              <select value={sellerMotivation} onChange={(e) => setSellerMotivation(e.target.value)} style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff', fontSize: 14 }}>
+                <option value="distressed-timeline">Distressed Timeline / Speed</option>
+                <option value="repair-fatigue">High Repair Costs / Maintenance Fatigue</option>
+                <option value="financial-burden">Financial Pressure / Tax Liens</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Property / Conversation Context Notes</label>
+            <input 
+              type="text" 
+              value={customNotes} 
+              onChange={(e) => setCustomNotes(e.target.value)} 
+              style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff', fontSize: 14 }} 
+            />
+          </div>
+
+          <ActionButton tone="gold" onClick={handleGenerateScript}>
+            {isGenerating ? 'Synthesizing Custom Script...' : 'Generate Script ⚡'}
+          </ActionButton>
+
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Generated Output Script</label>
+              <ActionButton tone="ghost" onClick={handleCopyScript}>Copy to Clipboard 📋</ActionButton>
+            </div>
+            <textarea 
+              rows={8} 
+              value={generatedScript} 
+              onChange={(e) => setGeneratedScript(e.target.value)} 
+              style={{ padding: '14px', borderRadius: 8, background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff', fontSize: 13, lineHeight: 1.6, resize: 'vertical' }} 
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
+            <ActionButton tone="ghost" onClick={() => router.push('/tools')}>Back to Tools</ActionButton>
+            <ActionButton tone="gold" onClick={() => alert('Script template saved to library!')}>Save Script</ActionButton>
+          </div>
+
+        </div>
+      </SectionCard>
+    </PageShell>
+  )
+}
