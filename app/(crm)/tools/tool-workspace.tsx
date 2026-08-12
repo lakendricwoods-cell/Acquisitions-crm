@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
 
@@ -209,7 +209,7 @@ function ToolHeader({
   )
 }
 
-export default function ToolWorkspace({
+function ToolWorkspaceContent({
   slug,
 }: {
   slug: ToolSlug
