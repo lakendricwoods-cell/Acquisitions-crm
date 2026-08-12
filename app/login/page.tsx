@@ -28,7 +28,6 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      // Force direct window location assignment to bypass Next.js client router hang and hard-commit cookies
       window.location.href = '/'
     } else {
       setError('Authentication failed. No active session returned.')
