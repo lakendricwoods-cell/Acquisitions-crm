@@ -1,0 +1,54 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import PageShell from '@/components/ui/page-shell'
+import SectionCard from '@/components/ui/section-card'
+import ActionButton from '@/components/ui/action-button'
+
+export default function RepairEstimatorPage() {
+  const router = useRouter()
+  const [roof, setRoof] = useState('8500')
+  const [hvac, setHvac] = useState('6500')
+  const [kitchen, setKitchen] = useState('12000')
+  const [paintFloors, setPaintFloors] = useState('7500')
+
+  const totalRepairs = (parseFloat(roof) || 0) + (parseFloat(hvac) || 0) + (parseFloat(kitchen) || 0) + (parseFloat(paintFloors) || 0)
+
+  return (
+    <PageShell title="Itemized Repair Estimator" subtitle="Generate itemized rehabilitation budgets across interior, exterior, roofing, and mechanical systems.">
+      <SectionCard>
+        <div style={{ display: 'grid', gap: 16, maxWidth: 600 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Roof Replacement / Repair</label>
+              <input type="number" value={roof} onChange={(e) => setRoof(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>HVAC System</label>
+              <input type="number" value={hvac} onChange={(e) => setHvac(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Kitchen & Bath Remodel</label>
+              <input type="number" value={kitchen} onChange={(e) => setKitchen(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: '#ebc477', fontWeight: 600 }}>Paint & Flooring</label>
+              <input type="number" value={paintFloors} onChange={(e) => setPaintFloors(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(214,166,75,0.3)', color: '#fff' }} />
+            </div>
+          </div>
+
+          <div style={{ padding: 16, borderRadius: 10, background: 'rgba(214,166,75,0.1)', border: '1px solid rgba(214,166,75,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 14, color: '#fff', fontWeight: 600 }}>Total Estimated Budget:</span>
+            <span style={{ fontSize: 20, color: '#ebc477', fontWeight: 800 }}>${totalRepairs.toLocaleString()}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+            <ActionButton tone="ghost" onClick={() => router.push('/tools')}>Back to Tools</ActionButton>
+            <ActionButton tone="gold" onClick={() => alert(`Saved total repair budget of $${totalRepairs.toLocaleString()}`)}>Save Estimate</ActionButton>
+          </div>
+        </div>
+      </SectionCard>
+    </PageShell>
+  )
+}
