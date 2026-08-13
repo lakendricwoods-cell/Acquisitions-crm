@@ -932,303 +932,152 @@ function ClosingCostTool({
    COMPS ANALYZER
 ========================================================= */
 
-type Comp = {
-  id: number
-  salePrice: number
-  sqft: number
-  bedrooms: number
-  bathrooms: number
-  ageMonths: number
-}
+function CompsAnalyzerWorkspace() {
+  const [leadSearch, setLeadSearch] = useState('')
+  const [leadResults, setLeadResults] = useState<LeadOption[]>([])
+  const [selectedLead, setSelectedLead] = useState<LeadOption | null>(null)
+  const [loadingLeads, setLoadingLeads] = useState(false)
 
-function CompsAnalyzerTool({
-  lead,
-}: {
-  lead: Lead | null
-}) {
-  const subjectSqft = lead?.square_feet ?? 0
-  const subjectBedrooms = lead?.bedrooms ?? 0
-  const subjectBathrooms = lead?.bathrooms ?? 0
+  const [subjectAddress, setSubjectAddress] = useState('')
+  const [subjectBeds, setSubjectBeds] = useState('')
+  const [subjectBaths, setSubjectBaths] = useState('')
+  const [subjectSqft, setSubjectSqft] = useState('')
+  const [subjectYear, setSubjectYear] = useState('')
 
-  const [comps, setComps] = useState<Comp[]>([
+  const [comps, setComps] = useState<CompRow[]>([
     {
-      id: 1,
-      salePrice: 0,
-      sqft: subjectSqft,
-      bedrooms: subjectBedrooms,
-      bathrooms: subjectBathrooms,
-      ageMonths: 0,
+      id: crypto.randomUUID(),
+      salePrice: '',
+      sqft: '',
+      beds: '',
+      baths: '',
+      year: '',
     },
     {
-      id: 2,
-      salePrice: 0,
-      sqft: subjectSqft,
-      bedrooms: subjectBedrooms,
-      bathrooms: subjectBathrooms,
-      ageMonths: 0,
+      id: crypto.randomUUID(),
+      salePrice: '',
+      sqft: '',
+      beds: '',
+      baths: '',
+      year: '',
     },
     {
-      id: 3,
-      salePrice: 0,
-      sqft: subjectSqft,
-      bedrooms: subjectBedrooms,
-      bathrooms: subjectBathrooms,
-      ageMonths: 0,
+      id: crypto.randomUUID(),
+      salePrice: '',
+      sqft: '',
+      beds: '',
+      baths: '',
+      year: '',
     },
   ])
 
-  /*
-    Only comps with a sale price and square footage
-    can be used in the ARV calculation.
-  */
-  const calculated = comps.filter(
-    (comp) =>
-      comp.salePrice > 0 &&
-      comp.sqft > 0
-  )
+  const [result, setResult] = useState<CompResult | null>(null)
 
-  /*
-    Calculate price per square foot for each comp.
-  */
-  const compsWithPsf = calculated.map((comp) => ({
-    ...comp,
-    pricePerSqft:
-      comp.salePrice / comp.sqft,
-  }))
+  async function searchLeads(value: string) {
+    setLeadSearch(value)
 
-  /*
-    Calculate a similarity score for each comp.
+    if (!value.trim()) {
+      setLeadResults([])
+      return
+    }
 
-    Sq Ft = 40%
-    Bedrooms = 20%
-    Bathrooms = 20%
-    Recency = 20%
+    setLoadingLeads(true)
 
-    The score is used to weight more similar
-    properties more heavily in the ARV.
-  */
-  function getSimilarityScore(comp: Comp) {
-    let score = 0
+    const search = value.trim()
 
-    // Square footage similarity
-    if (subjectSqft > 0 && comp.sqft > 0) {
-      const sqftDifference =
-        Math.abs(comp.sqft - subjectSqft) /
-        subjectSqft
-
-      const sqftScore = Math.max(
-        0,
-        1 - sqftDifference
+    const { data, error } = await supabase
+      .from('leads')
+      .select(
+        `
+          id,
+          property_address_1,
+          city,
+          state,
+          zip,
+          bedrooms,
+          bathrooms,
+          square_feet,
+          year_built
+        `
       )
+      .or(
+        `property_address_1.ilike.%${search}%,city.ilike.%${search}%,zip.ilike.%${search}%`
+      )
+      .order('property_address_1', { ascending: true })
+      .limit(10)
 
-      score += sqftScore * 40
-    } else {
-      score += 20
+    if (error) {
+      console.error('Lead search error:', error)
+      setLeadResults([])
+      setLoadingLeads(false)
+      return
     }
 
-    // Bedroom similarity
-    if (
-      subjectBedrooms > 0 &&
-      comp.bedrooms > 0
-    ) {
-      const bedroomDifference =
-        Math.abs(
-          comp.bedrooms - subjectBedrooms
-        )
-
-      const bedroomScore =
-        bedroomDifference === 0
-          ? 1
-          : bedroomDifference === 1
-            ? 0.5
-            : 0
-
-      score += bedroomScore * 20
-    } else {
-      score += 10
-    }
-
-    // Bathroom similarity
-    if (
-      subjectBathrooms > 0 &&
-      comp.bathrooms > 0
-    ) {
-      const bathroomDifference =
-        Math.abs(
-          comp.bathrooms -
-            subjectBathrooms
-        )
-
-      const bathroomScore =
-        bathroomDifference === 0
-          ? 1
-          : bathroomDifference <= 0.5
-            ? 0.5
-            : 0
-
-      score += bathroomScore * 20
-    } else {
-      score += 10
-    }
-
-    // Sale recency
-    if (comp.ageMonths >= 0) {
-      const recencyScore =
-        comp.ageMonths <= 3
-          ? 1
-          : comp.ageMonths <= 6
-            ? 0.85
-            : comp.ageMonths <= 12
-              ? 0.7
-              : comp.ageMonths <= 18
-                ? 0.5
-                : 0.25
-
-      score += recencyScore * 20
-    }
-
-    return Math.max(1, score)
-  }
-
-  const scoredComps = compsWithPsf.map(
-    (comp) => ({
-      ...comp,
-      similarityScore:
-        getSimilarityScore(comp),
-    })
-  )
-
-  /*
-    Average sale price.
-  */
-  const averagePrice =
-    calculated.length > 0
-      ? calculated.reduce(
-          (sum, comp) =>
-            sum + comp.salePrice,
-          0
-        ) / calculated.length
-      : 0
-
-  /*
-    Average price per square foot.
-  */
-  const averagePricePerSqft =
-    calculated.length > 0
-      ? calculated.reduce(
-          (sum, comp) =>
-            sum +
-            comp.salePrice /
-              comp.sqft,
-          0
-        ) / calculated.length
-      : 0
-
-  /*
-    Simple ARV based on average $/SF.
-  */
-  const psfArv =
-    subjectSqft > 0
-      ? subjectSqft *
-        averagePricePerSqft
-      : averagePrice
-
-  /*
-    Weighted ARV.
-
-    More similar comps receive more influence.
-  */
-  const totalWeight =
-    scoredComps.reduce(
-      (sum, comp) =>
-        sum + comp.similarityScore,
-      0
+    setLeadResults(
+      ((data || []) as LeadOption[]).map((lead) => ({
+        ...lead,
+        bedrooms: toNumber(lead.bedrooms),
+        bathrooms: toNumber(lead.bathrooms),
+        square_feet: toNumber(lead.square_feet),
+        year_built: toNumber(lead.year_built),
+      }))
     )
 
-  const weightedPricePerSqft =
-    totalWeight > 0
-      ? scoredComps.reduce(
-          (sum, comp) =>
-            sum +
-            comp.pricePerSqft *
-              comp.similarityScore,
-          0
-        ) / totalWeight
-      : 0
+    setLoadingLeads(false)
+  }
 
-  const weightedArv =
-    subjectSqft > 0
-      ? subjectSqft *
-        weightedPricePerSqft
-      : averagePrice
+  function selectLead(lead: LeadOption) {
+    setSelectedLead(lead)
+    setLeadSearch(
+      [lead.property_address_1, lead.city, lead.state]
+        .filter(Boolean)
+        .join(', ')
+    )
 
-  /*
-    ARV range.
+    setLeadResults([])
 
-    We use the weighted ARV as the center
-    and create a reasonable analytical range
-    rather than pretending the estimate is exact.
-  */
-  const lowArv =
-    weightedArv > 0
-      ? weightedArv * 0.9
-      : 0
+    setSubjectAddress(
+      [lead.property_address_1, lead.city, lead.state, lead.zip]
+        .filter(Boolean)
+        .join(', ')
+    )
 
-  const highArv =
-    weightedArv > 0
-      ? weightedArv * 1.1
-      : 0
+    setSubjectBeds(
+      lead.bedrooms !== null && lead.bedrooms !== undefined
+        ? String(lead.bedrooms)
+        : ''
+    )
 
-  /*
-    Confidence is based on:
-    - Number of comps
-    - Subject property data
-    - Comp similarity
-  */
-  const averageSimilarity =
-    scoredComps.length > 0
-      ? scoredComps.reduce(
-          (sum, comp) =>
-            sum + comp.similarityScore,
-          0
-        ) / scoredComps.length
-      : 0
+    setSubjectBaths(
+      lead.bathrooms !== null && lead.bathrooms !== undefined
+        ? String(lead.bathrooms)
+        : ''
+    )
 
-  let confidence =
-    'Insufficient'
+    setSubjectSqft(
+      lead.square_feet !== null && lead.square_feet !== undefined
+        ? String(lead.square_feet)
+        : ''
+    )
 
-  if (calculated.length >= 3) {
-    if (
-      averageSimilarity >= 80
-    ) {
-      confidence = 'High'
-    } else if (
-      averageSimilarity >= 60
-    ) {
-      confidence = 'Moderate'
-    } else {
-      confidence = 'Low'
-    }
-  } else if (calculated.length === 2) {
-    confidence =
-      averageSimilarity >= 70
-        ? 'Moderate'
-        : 'Low'
-  } else if (calculated.length === 1) {
-    confidence = 'Low'
+    setSubjectYear(
+      lead.year_built !== null && lead.year_built !== undefined
+        ? String(lead.year_built)
+        : ''
+    )
   }
 
   function updateComp(
-    id: number,
-    key: keyof Comp,
-    value: number
+    id: string,
+    field: keyof Omit<CompRow, 'id'>,
+    value: string
   ) {
     setComps((current) =>
       current.map((comp) =>
         comp.id === id
           ? {
               ...comp,
-              [key]: value,
+              [field]: value,
             }
           : comp
       )
@@ -1239,470 +1088,597 @@ function CompsAnalyzerTool({
     setComps((current) => [
       ...current,
       {
-        id:
-          current.length > 0
-            ? Math.max(
-                ...current.map(
-                  (comp) => comp.id
-                )
-              ) + 1
-            : 1,
-        salePrice: 0,
-        sqft: subjectSqft,
-        bedrooms:
-          subjectBedrooms,
-        bathrooms:
-          subjectBathrooms,
-        ageMonths: 0,
+        id: crypto.randomUUID(),
+        salePrice: '',
+        sqft: '',
+        beds: '',
+        baths: '',
+        year: '',
       },
     ])
   }
 
-  function removeComp(id: number) {
-    setComps((current) =>
-      current.filter(
-        (comp) => comp.id !== id
-      )
+  function removeComp(id: string) {
+    setComps((current) => current.filter((comp) => comp.id !== id))
+  }
+
+  function calculateComps() {
+    const subject = {
+      beds: Number(subjectBeds) || 0,
+      baths: Number(subjectBaths) || 0,
+      sqft: Number(subjectSqft) || 0,
+      year: Number(subjectYear) || 0,
+    }
+
+    const validComps = comps
+      .map((comp) => ({
+        salePrice: Number(comp.salePrice) || 0,
+        sqft: Number(comp.sqft) || 0,
+        beds: Number(comp.beds) || 0,
+        baths: Number(comp.baths) || 0,
+        year: Number(comp.year) || 0,
+      }))
+      .filter((comp) => comp.salePrice > 0 && comp.sqft > 0)
+
+    if (!validComps.length) {
+      alert('Add at least one comp with a sale price and square footage.')
+      return
+    }
+
+    const pricePerSqft = validComps.map(
+      (comp) => comp.salePrice / comp.sqft
     )
+
+    const averagePricePerSqft =
+      pricePerSqft.reduce((sum, value) => sum + value, 0) /
+      pricePerSqft.length
+
+    /*
+     * Weight comps based on similarity to the subject.
+     *
+     * Beds and baths are intentionally included.
+     * Distance/miles is NOT used.
+     */
+    const weightedComps = validComps.map((comp) => {
+      let weight = 1
+
+      if (subject.beds && comp.beds) {
+        const bedDifference = Math.abs(subject.beds - comp.beds)
+
+        if (bedDifference === 0) weight += 2
+        else if (bedDifference === 1) weight += 1
+      }
+
+      if (subject.baths && comp.baths) {
+        const bathDifference = Math.abs(subject.baths - comp.baths)
+
+        if (bathDifference === 0) weight += 1.5
+        else if (bathDifference <= 0.5) weight += 0.75
+      }
+
+      if (subject.sqft && comp.sqft) {
+        const sqftDifference =
+          Math.abs(subject.sqft - comp.sqft) / subject.sqft
+
+        if (sqftDifference <= 0.1) weight += 2
+        else if (sqftDifference <= 0.2) weight += 1
+      }
+
+      if (subject.year && comp.year) {
+        const ageDifference = Math.abs(subject.year - comp.year)
+
+        if (ageDifference <= 5) weight += 1
+        else if (ageDifference <= 15) weight += 0.5
+      }
+
+      return {
+        ...comp,
+        pricePerSqft: comp.salePrice / comp.sqft,
+        weight,
+      }
+    })
+
+    const totalWeight = weightedComps.reduce(
+      (sum, comp) => sum + comp.weight,
+      0
+    )
+
+    const weightedPricePerSqft =
+      weightedComps.reduce(
+        (sum, comp) => sum + comp.pricePerSqft * comp.weight,
+        0
+      ) / totalWeight
+
+    const arv =
+      subject.sqft > 0
+        ? weightedPricePerSqft * subject.sqft
+        : validComps.reduce((sum, comp) => sum + comp.salePrice, 0) /
+          validComps.length
+
+    setResult({
+      arv,
+      averagePricePerSqft,
+      weightedPricePerSqft,
+      compCount: validComps.length,
+    })
   }
 
   return (
-    <div style={toolGridStyle}>
-      {/* SUBJECT PROPERTY */}
+    <div style={compsWorkspaceStyle}>
       <SectionCard
         title="Subject Property"
-        subtitle="Property characteristics used to compare the comps."
+        subtitle="Choose a property from your Leads or enter the subject property manually."
       >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Bedrooms"
-            value={
-              subjectBedrooms
-                ? String(
-                    subjectBedrooms
-                  )
-                : '—'
-            }
-            tone="blue"
-          />
+        <div style={compsSubjectSectionStyle}>
+          <div style={leadSearchWrapStyle}>
+            <label style={workspaceLabelStyle}>
+              Choose From Leads
+            </label>
 
-          <ResultCard
-            label="Bathrooms"
-            value={
-              subjectBathrooms
-                ? String(
-                    subjectBathrooms
-                  )
-                : '—'
-            }
-            tone="blue"
-          />
+            <input
+              value={leadSearch}
+              onChange={(event) => searchLeads(event.target.value)}
+              placeholder="Search address, city, or ZIP..."
+              style={workspaceInputStyle}
+            />
 
-          <ResultCard
-            label="Square Feet"
-            value={
-              subjectSqft
-                ? number(subjectSqft)
-                : '—'
-            }
-            tone="gold"
-          />
-
-          <ResultCard
-            label="Current Value"
-            value={money(
-              lead?.estimated_value ??
-                lead?.house_value ??
-                lead?.market_value ??
-                0
+            {loadingLeads && (
+              <div style={leadSearchStatusStyle}>
+                Searching leads...
+              </div>
             )}
-            tone="green"
-          />
+
+            {leadResults.length > 0 && (
+              <div style={leadResultsStyle}>
+                {leadResults.map((lead) => (
+                  <button
+                    key={lead.id}
+                    type="button"
+                    onClick={() => selectLead(lead)}
+                    style={leadResultButtonStyle}
+                  >
+                    <div style={leadResultAddressStyle}>
+                      {lead.property_address_1 || 'Unknown Address'}
+                    </div>
+
+                    <div style={leadResultMetaStyle}>
+                      {[lead.city, lead.state, lead.zip]
+                        .filter(Boolean)
+                        .join(', ')}
+
+                      {lead.bedrooms !== null &&
+                        lead.bedrooms !== undefined && (
+                          <> · {lead.bedrooms} bd</>
+                        )}
+
+                      {lead.bathrooms !== null &&
+                        lead.bathrooms !== undefined && (
+                          <> · {lead.bathrooms} ba</>
+                        )}
+
+                      {lead.square_feet !== null &&
+                        lead.square_feet !== undefined && (
+                          <> · {lead.square_feet.toLocaleString()} sf</>
+                        )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedLead && (
+              <div style={selectedLeadStyle}>
+                <span>Selected Lead</span>
+                <strong>
+                  {selectedLead.property_address_1 ||
+                    'Selected Property'}
+                </strong>
+              </div>
+            )}
+          </div>
+
+          <div style={subjectGridStyle}>
+            <WorkspaceField
+              label="Subject Address"
+              value={subjectAddress}
+              onChange={setSubjectAddress}
+              placeholder="123 Main St"
+            />
+
+            <WorkspaceField
+              label="Beds"
+              value={subjectBeds}
+              onChange={setSubjectBeds}
+              placeholder="3"
+              type="number"
+            />
+
+            <WorkspaceField
+              label="Baths"
+              value={subjectBaths}
+              onChange={setSubjectBaths}
+              placeholder="2"
+              type="number"
+            />
+
+            <WorkspaceField
+              label="Square Feet"
+              value={subjectSqft}
+              onChange={setSubjectSqft}
+              placeholder="1,200"
+              type="number"
+            />
+
+            <WorkspaceField
+              label="Year Built"
+              value={subjectYear}
+              onChange={setSubjectYear}
+              placeholder="1985"
+              type="number"
+            />
+          </div>
         </div>
       </SectionCard>
 
-      {/* COMPS */}
       <SectionCard
         title="Comparable Sales"
-        subtitle="Enter the characteristics of nearby sold properties."
+        subtitle="Enter the strongest comparable sales. Miles/distance is not required."
+        actions={
+          <ActionButton compact tone="gold" onClick={addComp}>
+            + Add Comp
+          </ActionButton>
+        }
       >
-        <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>
-                  Comp
-                </th>
+        <div style={compListStyle}>
+          {comps.map((comp, index) => (
+            <div key={comp.id} style={compRowStyle}>
+              <div style={compHeaderStyle}>
+                <div style={compNumberStyle}>
+                  COMP {index + 1}
+                </div>
 
-                <th style={thStyle}>
-                  Sale Price
-                </th>
+                {comps.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeComp(comp.id)}
+                    style={removeCompStyle}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
 
-                <th style={thStyle}>
-                  Sq Ft
-                </th>
+              <div style={compInputGridStyle}>
+                <WorkspaceField
+                  label="Sale Price"
+                  value={comp.salePrice}
+                  onChange={(value) =>
+                    updateComp(comp.id, 'salePrice', value)
+                  }
+                  placeholder="250000"
+                  type="number"
+                />
 
-                <th style={thStyle}>
-                  Beds
-                </th>
+                <WorkspaceField
+                  label="Square Feet"
+                  value={comp.sqft}
+                  onChange={(value) =>
+                    updateComp(comp.id, 'sqft', value)
+                  }
+                  placeholder="1200"
+                  type="number"
+                />
 
-                <th style={thStyle}>
-                  Baths
-                </th>
+                <WorkspaceField
+                  label="Beds"
+                  value={comp.beds}
+                  onChange={(value) =>
+                    updateComp(comp.id, 'beds', value)
+                  }
+                  placeholder="3"
+                  type="number"
+                />
 
-                <th style={thStyle}>
-                  Sale Age
-                </th>
+                <WorkspaceField
+                  label="Baths"
+                  value={comp.baths}
+                  onChange={(value) =>
+                    updateComp(comp.id, 'baths', value)
+                  }
+                  placeholder="2"
+                  type="number"
+                />
 
-                <th style={thStyle}>
-                  $/SF
-                </th>
-
-                <th style={thStyle}>
-                  Similarity
-                </th>
-
-                <th style={thStyle}>
-                  Action
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {comps.map((comp) => {
-                const pricePerSqft =
-                  comp.salePrice > 0 &&
-                  comp.sqft > 0
-                    ? comp.salePrice /
-                      comp.sqft
-                    : 0
-
-                const similarity =
-                  comp.salePrice > 0 &&
-                  comp.sqft > 0
-                    ? getSimilarityScore(
-                        comp
-                      )
-                    : 0
-
-                return (
-                  <tr key={comp.id}>
-                    <td
-                      style={tdStyle}
-                    >
-                      Comp {comp.id}
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      <input
-                        type="number"
-                        value={
-                          comp.salePrice
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          updateComp(
-                            comp.id,
-                            'salePrice',
-                            Number(
-                              event.target
-                                .value
-                            ) || 0
-                          )
-                        }
-                        style={
-                          tableInputStyle
-                        }
-                        placeholder="0"
-                      />
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      <input
-                        type="number"
-                        value={
-                          comp.sqft
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          updateComp(
-                            comp.id,
-                            'sqft',
-                            Number(
-                              event.target
-                                .value
-                            ) || 0
-                          )
-                        }
-                        style={
-                          tableInputStyle
-                        }
-                        placeholder="0"
-                      />
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={
-                          comp.bedrooms
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          updateComp(
-                            comp.id,
-                            'bedrooms',
-                            Number(
-                              event.target
-                                .value
-                            ) || 0
-                          )
-                        }
-                        style={
-                          tableInputStyle
-                        }
-                        placeholder="0"
-                      />
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={
-                          comp.bathrooms
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          updateComp(
-                            comp.id,
-                            'bathrooms',
-                            Number(
-                              event.target
-                                .value
-                            ) || 0
-                          )
-                        }
-                        style={
-                          tableInputStyle
-                        }
-                        placeholder="0"
-                      />
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      <input
-                        type="number"
-                        min="0"
-                        value={
-                          comp.ageMonths
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          updateComp(
-                            comp.id,
-                            'ageMonths',
-                            Number(
-                              event.target
-                                .value
-                            ) || 0
-                          )
-                        }
-                        style={
-                          tableInputStyle
-                        }
-                        placeholder="0"
-                      />
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      {pricePerSqft
-                        ? money(
-                            pricePerSqft
-                          )
-                        : '—'}
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      {similarity
-                        ? `${similarity.toFixed(
-                            0
-                          )}/100`
-                        : '—'}
-                    </td>
-
-                    <td
-                      style={tdStyle}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          removeComp(
-                            comp.id
-                          )
-                        }
-                        style={{
-                          border:
-                            '1px solid rgba(255,255,255,0.08)',
-                          background:
-                            'rgba(255,255,255,0.03)',
-                          color:
-                            'rgba(255,255,255,0.55)',
-                          borderRadius: 7,
-                          padding:
-                            '6px 8px',
-                          cursor:
-                            'pointer',
-                          fontSize: 10,
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                <WorkspaceField
+                  label="Year Built"
+                  value={comp.year}
+                  onChange={(value) =>
+                    updateComp(comp.id, 'year', value)
+                  }
+                  placeholder="1985"
+                  type="number"
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div style={actionRowStyle}>
-          <ActionButton
-            tone="gold"
-            onClick={addComp}
-          >
-            + Add Comp
+        <div style={calculateWrapStyle}>
+          <ActionButton tone="gold" onClick={calculateComps}>
+            Calculate ARV
           </ActionButton>
         </div>
       </SectionCard>
 
-      {/* ARV ANALYSIS */}
-      <SectionCard
-        title="ARV Analysis"
-        subtitle="Weighted using size, bedrooms, bathrooms, and sale recency."
-      >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Valid Comps"
-            value={String(
-              calculated.length
-            )}
-            tone="blue"
-          />
+      {result && (
+        <SectionCard
+          title="Comps Analysis"
+          subtitle={`Calculated from ${result.compCount} comparable ${
+            result.compCount === 1 ? 'sale' : 'sales'
+          }.`}
+        >
+          <div style={compsResultGridStyle}>
+            <HeroSignal
+              label="Estimated ARV"
+              value={money(result.arv)}
+              tone="gold"
+            />
 
-          <ResultCard
-            label="Average Sale Price"
-            value={money(
-              averagePrice
-            )}
-          />
+            <HeroSignal
+              label="Average Price / SF"
+              value={`$${result.averagePricePerSqft.toFixed(0)}`}
+              tone="ice"
+            />
 
-          <ResultCard
-            label="Average $/SF"
-            value={
-              averagePricePerSqft
-                ? `$${averagePricePerSqft.toFixed(
-                    2
-                  )}`
-                : '$0'
-            }
-            tone="blue"
-          />
+            <HeroSignal
+              label="Weighted Price / SF"
+              value={`$${result.weightedPricePerSqft.toFixed(0)}`}
+              tone="green"
+            />
 
-          <ResultCard
-            label="$/SF ARV"
-            value={money(psfArv)}
-            tone="gold"
-          />
-
-          <ResultCard
-            label="Weighted ARV"
-            value={money(
-              weightedArv
-            )}
-            tone="green"
-          />
-
-          <ResultCard
-            label="Low ARV"
-            value={money(lowArv)}
-            tone="blue"
-          />
-
-          <ResultCard
-            label="High ARV"
-            value={money(highArv)}
-            tone="green"
-          />
-
-          <ResultCard
-            label="Confidence"
-            value={confidence}
-            tone={
-              confidence === 'High'
-                ? 'green'
-                : 'gold'
-            }
-          />
-        </div>
-
-        {calculated.length > 0 && (
-          <div
-            style={outputBoxStyle}
-          >
-            <strong>
-              ARV Methodology
-            </strong>
-
-            <p>
-              The estimated ARV is based
-              on comparable sale prices,
-              price per square foot,
-              square-footage similarity,
-              bedroom count, bathroom
-              count, and sale recency.
-            </p>
-
-            <p>
-              The weighted ARV gives more
-              influence to comps that are
-              more similar to the subject
-              property.
-            </p>
-
-            <p>
-              Estimated ARV:{' '}
-              <strong>
-                {money(weightedArv)}
-              </strong>
-            </p>
+            <HeroSignal
+              label="Comparable Sales"
+              value={String(result.compCount)}
+              tone="gold"
+            />
           </div>
-        )}
-      </SectionCard>
+        </SectionCard>
+      )}
     </div>
   )
+}
+
+/* =========================================================
+   COMPS TYPES
+========================================================= */
+
+type LeadOption = {
+  id: string
+  property_address_1?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  bedrooms?: number | null
+  bathrooms?: number | null
+  square_feet?: number | null
+  year_built?: number | null
+}
+
+type CompRow = {
+  id: string
+  salePrice: string
+  sqft: string
+  beds: string
+  baths: string
+  year: string
+}
+
+type CompResult = {
+  arv: number
+  averagePricePerSqft: number
+  weightedPricePerSqft: number
+  compCount: number
+}
+
+/* =========================================================
+   COMPS COMPONENT HELPERS
+========================================================= */
+
+function WorkspaceField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  type?: string
+}) {
+  return (
+    <label style={workspaceFieldStyle}>
+      <span style={workspaceLabelStyle}>{label}</span>
+
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        style={workspaceInputStyle}
+      />
+    </label>
+  )
+}
+
+/* =========================================================
+   COMPS STYLES
+========================================================= */
+
+const compsWorkspaceStyle: CSSProperties = {
+  display: 'grid',
+  gap: 16,
+}
+
+const compsSubjectSectionStyle: CSSProperties = {
+  display: 'grid',
+  gap: 18,
+}
+
+const leadSearchWrapStyle: CSSProperties = {
+  position: 'relative',
+  display: 'grid',
+  gap: 7,
+}
+
+const workspaceFieldStyle: CSSProperties = {
+  display: 'grid',
+  gap: 7,
+}
+
+const workspaceLabelStyle: CSSProperties = {
+  fontSize: 9.5,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'rgba(255,255,255,0.45)',
+}
+
+const workspaceInputStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 40,
+  boxSizing: 'border-box',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.09)',
+  background: 'rgba(255,255,255,0.035)',
+  color: '#fff',
+  padding: '0 11px',
+  outline: 'none',
+  fontSize: 12,
+}
+
+const leadSearchStatusStyle: CSSProperties = {
+  position: 'absolute',
+  top: 64,
+  left: 0,
+  right: 0,
+  zIndex: 20,
+  padding: 10,
+  borderRadius: 10,
+  background: '#111',
+  border: '1px solid rgba(255,255,255,0.08)',
+  color: 'rgba(255,255,255,0.45)',
+  fontSize: 11,
+}
+
+const leadResultsStyle: CSSProperties = {
+  position: 'absolute',
+  top: 64,
+  left: 0,
+  right: 0,
+  zIndex: 30,
+  display: 'grid',
+  gap: 1,
+  overflow: 'hidden',
+  borderRadius: 12,
+  border: '1px solid rgba(214,166,75,0.22)',
+  background: '#11100d',
+  boxShadow: '0 18px 40px rgba(0,0,0,0.45)',
+}
+
+const leadResultButtonStyle: CSSProperties = {
+  appearance: 'none',
+  border: 0,
+  borderBottom: '1px solid rgba(255,255,255,0.06)',
+  background: 'transparent',
+  color: '#fff',
+  textAlign: 'left',
+  padding: '11px 13px',
+  cursor: 'pointer',
+}
+
+const leadResultAddressStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 750,
+  color: '#fff',
+}
+
+const leadResultMetaStyle: CSSProperties = {
+  marginTop: 4,
+  fontSize: 10.5,
+  color: 'rgba(255,255,255,0.45)',
+}
+
+const selectedLeadStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  padding: '9px 11px',
+  borderRadius: 10,
+  border: '1px solid rgba(74,222,128,0.18)',
+  background: 'rgba(74,222,128,0.05)',
+  color: '#4ade80',
+  fontSize: 10,
+}
+
+const subjectGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
+  gap: 10,
+}
+
+const compListStyle: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
+
+const compRowStyle: CSSProperties = {
+  padding: 13,
+  borderRadius: 13,
+  border: '1px solid rgba(255,255,255,0.07)',
+  background: 'rgba(255,255,255,0.02)',
+}
+
+const compHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 11,
+}
+
+const compNumberStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.1em',
+  color: '#d6a64b',
+}
+
+const removeCompStyle: CSSProperties = {
+  border: 0,
+  background: 'transparent',
+  color: 'rgba(255,255,255,0.35)',
+  fontSize: 10,
+  cursor: 'pointer',
+}
+
+const compInputGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))',
+  gap: 9,
+}
+
+const calculateWrapStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  marginTop: 14,
+}
+
+const compsResultGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+  gap: 10,
 }
 
 /* =========================================================
