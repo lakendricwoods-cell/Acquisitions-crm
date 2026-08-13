@@ -1013,15 +1013,8 @@ function CompsAnalyzerWorkspace() {
       return
     }
 
-    setLeadResults(
-      ((data || []) as LeadOption[]).map((lead) => ({
-        ...lead,
-        bedrooms: toNumber(lead.bedrooms),
-        bathrooms: toNumber(lead.bathrooms),
-        square_feet: toNumber(lead.square_feet),
-        year_built: toNumber(lead.year_built),
-      }))
-    )
+    
+setLeadResults((data || []) as LeadOption[])
 
     setLoadingLeads(false)
   }
