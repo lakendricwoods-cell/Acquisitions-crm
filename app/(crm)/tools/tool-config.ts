@@ -34,9 +34,10 @@ export const TOOL_CONFIGS: ToolConfig[] = [
     slug: 'assignment-contract',
     name: 'Assignment Contract',
     shortName: 'Assignment',
-    description: 'Build and manage real estate assignment agreements.',
+    description:
+      'Calculate assignment deal terms and prepare an assignment summary.',
     longDescription:
-      'Create an assignment deal workspace with assignor, assignee, purchase contract, assignment fee, earnest money, and closing information.',
+      'Build an assignment deal workspace with assignor, assignee, original purchase price, assignment fee, earnest money, and closing information.',
     category: 'documents',
     icon: '▣',
     accent: 'gold',
@@ -51,19 +52,23 @@ export const TOOL_CONFIGS: ToolConfig[] = [
       'Closing Date',
     ],
     outputs: [
+      'Original Contract Price',
+      'Assignment Fee',
       'Assignment Price',
+      'Earnest Money',
       'Total Consideration',
       'Deal Summary',
-      'Contract Data',
     ],
   },
+
   {
     slug: 'buyer-blast',
     name: 'Buyer Blast',
     shortName: 'Buyer Blast',
-    description: 'Match deals to buyers and create buyer outreach.',
+    description:
+      'Match a deal to buyer criteria and generate buyer outreach.',
     longDescription:
-      'Organize your buyer criteria, calculate buyer fit, and generate a deal-focused outreach message.',
+      'Enter a buyer’s acquisition criteria, estimate the buyer’s fit for the current deal, and generate a ready-to-send off-market opportunity message.',
     category: 'marketing',
     icon: '◈',
     accent: 'green',
@@ -72,79 +77,85 @@ export const TOOL_CONFIGS: ToolConfig[] = [
       'Buyer Name',
       'Buyer Email',
       'Buyer Phone',
-      'Property Type',
-      'Price Range',
       'Strategy',
+      'Minimum Price',
+      'Maximum Price',
       'Target Area',
     ],
     outputs: [
       'Buyer Match Score',
-      'Outreach Message',
-      'Deal Summary',
-      'Buyer Status',
+      'Deal Value',
+      'Buyer Maximum',
+      'Buyer Outreach Message',
     ],
   },
+
   {
     slug: 'closing-cost',
     name: 'Closing Cost Calculator',
     shortName: 'Closing Costs',
-    description: 'Estimate acquisition, disposition, and transaction costs.',
+    description:
+      'Estimate buyer-side acquisition and transaction closing costs.',
     longDescription:
-      'Calculate projected closing expenses including title, recording, taxes, prorations, commissions, and other transaction costs.',
+      'Estimate projected buyer-side closing expenses including title or settlement, recording, transfer taxes, property tax prorations, insurance, inspection, and other transaction costs.',
     category: 'deal',
     icon: '$',
     accent: 'blue',
     href: '/tools/closing-cost',
     inputs: [
       'Purchase Price',
-      'Title',
+      'Title / Settlement',
       'Recording',
       'Transfer Tax',
-      'Property Tax',
+      'Property Tax / Proration',
       'Insurance',
       'Inspection',
-      'Other Costs',
+      'Other',
     ],
     outputs: [
-      'Buyer Costs',
-      'Seller Costs',
-      'Total Costs',
+      'Purchase Price',
+      'Total Closing Costs',
       'Cash Required',
+      'Closing Cost Percentage',
     ],
   },
+
   {
     slug: 'comps-analyzer',
     name: 'Comps Analyzer',
     shortName: 'Comps',
-    description: 'Analyze comparable sales and calculate an estimated ARV.',
+    description:
+      'Analyze comparable sales and estimate after-repair value.',
     longDescription:
-      'Compare nearby sales, price per square foot, sale recency, size, and property characteristics to produce a weighted ARV estimate.',
+      'Enter comparable sales, square footage, distance, and sale age to estimate ARV using average comparable price per square foot and the subject property size.',
     category: 'analysis',
     icon: '⌁',
     accent: 'gold',
     href: '/tools/comps-analyzer',
     inputs: [
-      'Subject Value',
       'Subject Sq Ft',
       'Comp Sale Prices',
       'Comp Sq Ft',
       'Comp Distance',
-      'Comp Sale Date',
+      'Comp Age',
     ],
     outputs: [
+      'Valid Comps',
       'Average Sale Price',
       'Average Price/SF',
-      'Weighted ARV',
+      'Estimated ARV',
       'Confidence',
     ],
   },
+
   {
     slug: 'contract-generator',
     name: 'Contract Generator',
     shortName: 'Contracts',
-    description: 'Generate structured purchase contract data.',
+    description:
+      'Generate a structured purchase agreement term summary.',
     longDescription:
-      'Prepare purchase agreement information including parties, price, financing, closing, contingencies, and assignment provisions.',
+      'Prepare purchase agreement information including buyer, seller, property, purchase price, earnest money, closing date, financing, and contingencies.',
     category: 'documents',
     icon: '▤',
     accent: 'gold',
@@ -160,19 +171,26 @@ export const TOOL_CONFIGS: ToolConfig[] = [
       'Contingencies',
     ],
     outputs: [
-      'Contract Summary',
-      'Deal Terms',
-      'Closing Terms',
-      'Contract Data',
+      'Buyer',
+      'Seller',
+      'Property',
+      'Purchase Price',
+      'Earnest Money',
+      'Closing Date',
+      'Financing',
+      'Contingencies',
+      'Contract Term Summary',
     ],
   },
+
   {
     slug: 'marketing-roi',
     name: 'Marketing ROI',
     shortName: 'Marketing ROI',
-    description: 'Measure marketing performance from lead to closing.',
+    description:
+      'Measure marketing performance from lead generation through closing.',
     longDescription:
-      'Track spend, leads, appointments, offers, contracts, closings, revenue, acquisition cost, and return on marketing spend.',
+      'Track marketing spend, leads, contacts, appointments, offers, contracts, closings, and revenue to measure acquisition costs, ROI, and return on ad spend.',
     category: 'marketing',
     icon: '%',
     accent: 'green',
@@ -189,19 +207,21 @@ export const TOOL_CONFIGS: ToolConfig[] = [
     ],
     outputs: [
       'Cost Per Lead',
-      'Conversion Rate',
-      'Cost Per Deal',
+      'Cost Per Contract',
+      'Lead → Close Rate',
       'ROI',
       'ROAS',
     ],
   },
+
   {
     slug: 'repair-estimator',
     name: 'Repair Estimator',
     shortName: 'Repairs',
-    description: 'Estimate renovation and property repair costs.',
+    description:
+      'Estimate renovation and property repair costs by category.',
     longDescription:
-      'Build a repair budget by category with quantities, unit costs, labor, materials, contingency, and total project cost.',
+      'Build a renovation budget using estimated costs for major repair categories and apply a contingency percentage to calculate the projected total repair budget.',
     category: 'analysis',
     icon: '⌂',
     accent: 'gold',
@@ -217,21 +237,24 @@ export const TOOL_CONFIGS: ToolConfig[] = [
       'Paint',
       'Landscaping',
       'Other',
+      'Contingency',
     ],
     outputs: [
       'Base Repairs',
-      'Contingency',
+      'Contingency Amount',
       'Total Repairs',
       'Repair Level',
     ],
   },
+
   {
     slug: 'script-generator',
     name: 'Script Generator',
     shortName: 'Scripts',
-    description: 'Create seller and buyer conversation scripts.',
+    description:
+      'Create customized seller conversation scripts.',
     longDescription:
-      'Generate structured call flows based on lead type, motivation, property condition, objections, and desired outcome.',
+      'Generate a structured seller conversation based on lead type, seller motivation, property condition, call objective, and likely objection.',
     category: 'operations',
     icon: '✎',
     accent: 'blue',
@@ -240,13 +263,13 @@ export const TOOL_CONFIGS: ToolConfig[] = [
       'Lead Type',
       'Motivation',
       'Property Condition',
-      'Desired Outcome',
-      'Objection',
-      'Follow Up',
+      'Call Objective',
+      'Likely Objection',
     ],
     outputs: [
       'Opening',
       'Discovery Questions',
+      'Objective',
       'Objection Response',
       'Offer Transition',
       'Follow Up',
@@ -254,7 +277,8 @@ export const TOOL_CONFIGS: ToolConfig[] = [
   },
 ]
 
-
-export function getToolConfig(slug: string): ToolConfig | undefined {
+export function getToolConfig(
+  slug: string
+): ToolConfig | undefined {
   return TOOL_CONFIGS.find((tool) => tool.slug === slug)
 }
