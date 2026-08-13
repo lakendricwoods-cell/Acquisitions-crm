@@ -1,27 +1,20 @@
 import { Suspense } from 'react'
-import ToolWorkspace from '@/components/tool-workspace' // Or use relative path '../tool-workspace' matching your directory structure
+import ToolWorkspace from '../tool-workspace' // Adjust relative path if your file is nested differently (e.g. '@/components/tool-workspace')
 
 function LoadingBuyerBlast() {
   return (
     <div
       style={{
-        minHeight: '100vh',
-        backgroundColor: '#0B0B0E',
+        minHeight: 300,
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 24,
-        color: 'rgba(212, 175, 55, 0.7)', // Luxury gold accent tint
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: 14,
-        letterSpacing: '0.05em',
+        color: 'rgba(255,255,255,0.45)',
+        fontSize: 13,
       }}
     >
-      <div className="animate-pulse flex flex-col items-center gap-3">
-        <div className="w-8 h-8 rounded-full border-2 border-amber-500/20 border-t-amber-500 animate-spin" />
-        <span>Loading Buyer Blast Workspace...</span>
-      </div>
+      Loading buyer blast...
     </div>
   )
 }
