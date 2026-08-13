@@ -16,6 +16,7 @@ import { computeOwnershipYears } from '@/lib/compute-fields'
 
 type LeadRecord = {
   id: string
+
   property_address_1?: string | null
   city?: string | null
   state?: string | null
@@ -24,8 +25,9 @@ type LeadRecord = {
 
   owner_name?: string | null
   owner_phone?: string | null
-  phone?: string | null
   owner_email?: string | null
+
+  phone?: string | null
   email?: string | null
 
   owner_mailing_address?: string | null
@@ -35,10 +37,12 @@ type LeadRecord = {
 
   property_type?: string | null
   property_use?: string | null
+
   bedrooms?: number | null
   bathrooms?: number | null
   square_feet?: number | null
   year_built?: number | null
+
   apn?: string | null
 
   status?: string | null
@@ -51,15 +55,20 @@ type LeadRecord = {
   house_value?: number | null
   estimated_value?: number | null
   market_value?: number | null
+
   equity_amount?: number | null
   equity_percent?: number | null
   mortgage_balance?: number | null
+
   last_sale_amount?: number | null
   last_sale_date?: string | null
+
   default_amount?: number | null
   auction_date?: string | null
   lender_name?: string | null
+
   ownership_length?: number | null
+
   owner_occupied?: boolean | null
   vacant?: boolean | null
 
@@ -80,7 +89,9 @@ const STAGE_OPTIONS = [
 ]
 
 function money(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(value)) return '—'
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return '—'
+  }
 
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -99,12 +110,16 @@ function yn(
 }
 
 function toNumber(value: unknown) {
-  if (value === null || value === undefined || value === '') return null
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null
   }
 
   const parsed = Number(String(value).replace(/[$,%\s,]/g, ''))
+
   return Number.isFinite(parsed) ? parsed : null
 }
 
@@ -112,11 +127,13 @@ function toText(value: unknown) {
   if (value === null || value === undefined) return null
 
   const text = String(value).trim()
+
   return text.length ? text : null
 }
 
 function toBoolean(value: unknown) {
   if (value === null || value === undefined) return null
+
   if (typeof value === 'boolean') return value
 
   const text = String(value).trim().toLowerCase()
@@ -153,154 +170,30 @@ function toBoolean(value: unknown) {
   return null
 }
 
-function getNestedText(
-  lead: LeadRecord,
-  keys: string[]
-) {
-  const sources = [
-    lead as Record<string, unknown>,
-    (lead.lead_intelligence || {}) as Record<string, unknown>,
-    (lead.raw_import_data || {}) as Record<string, unknown>,
-    (lead.source_columns || {}) as Record<string, unknown>,
-  ]
+function firstText(...values: unknown[]) {
+  for (const value of values) {
+    const text = toText(value)
 
-  for (const source of sources) {
-    for (const key of keys) {
-      const value = toText(source[key])
-      if (value) return value
-    }
+    if (text) return text
   }
 
   return null
 }
 
-function getOwnerPhone(lead: LeadRecord) {
-  return getNestedText(lead, [
-    'owner_phone',
-    'owner_phone_number',
-    'phone',
-    'phone_number',
-    'primary_phone',
-    'contact_phone',
-    'mobile_phone',
-    'telephone',
-  ])
+function firstNumber(...values: unknown[]) {
+  for (const value of values) {
+    const number = toNumber(value)
+
+    if (number !== null) return number
+  }
+
+  return null
 }
-
-function getOwnerEmail(lead: LeadRecord) {
-  return getNestedText(lead, [
-    'owner_email',
-    'email',
-    'email_address',
-    'owner_email_address',
-    'primary_email',
-    'contact_email',
-  ])
-}
-
-function debugBedroomSource(lead: LeadRecord) {
-  const checks = [
-    ['lead.bedrooms', lead.bedrooms],
-    [
-      'lead.lead_intelligence.bedrooms',
-      (lead.lead_intelligence as any)?.bedrooms,
-    ],
-    [
-      'lead.raw_import_data.bedrooms',
-      (lead.raw_import_data as any)?.bedrooms,
-    ],
-    [
-      'lead.raw_import_data.beds',
-      (lead.raw_import_data as any)?.beds,
-    ],
-    [
-      'lead.raw_import_data.bedroom_count',
-      (lead.raw_import_data as any)?.bedroom_count,
-    ],
-    [
-      'lead.raw_import_data.nbr_beds',
-      (lead.raw_import_data as any)?.nbr_beds,
-    ],
-    [
-      'lead.source_columns.bedrooms',
-      (lead.source_columns as any)?.bedrooms,
-    ],
-    [
-      'lead.source_columns.beds',
-      (lead.source_columns as any)?.beds,
-    ],
-  ]
-
-  return (
-    checks.find(
-      ([, value]) =>
-        value !== undefined && value !== null && value !== ''
-    ) || null
-  )
-}
-
-const TOOL_LINKS = [
-  {
-    slug: 'comps-analyzer',
-    name: 'Comps Analyzer',
-    description: 'Analyze sales and estimate ARV.',
-    icon: '⌁',
-    tone: 'gold',
-  },
-  {
-    slug: 'repair-estimator',
-    name: 'Repair Estimator',
-    description: 'Build a renovation budget.',
-    icon: '⌂',
-    tone: 'gold',
-  },
-  {
-    slug: 'closing-cost',
-    name: 'Closing Costs',
-    description: 'Estimate transaction costs.',
-    icon: '$',
-    tone: 'blue',
-  },
-  {
-    slug: 'assignment-contract',
-    name: 'Assignment',
-    description: 'Build an assignment workspace.',
-    icon: '▣',
-    tone: 'gold',
-  },
-  {
-    slug: 'contract-generator',
-    name: 'Contract',
-    description: 'Prepare purchase contract terms.',
-    icon: '▤',
-    tone: 'gold',
-  },
-  {
-    slug: 'buyer-blast',
-    name: 'Buyer Blast',
-    description: 'Match and contact buyers.',
-    icon: '◈',
-    tone: 'green',
-  },
-  {
-    slug: 'marketing-roi',
-    name: 'Marketing ROI',
-    description: 'Track marketing performance.',
-    icon: '%',
-    tone: 'green',
-  },
-  {
-    slug: 'script-generator',
-    name: 'Scripts',
-    description: 'Create seller and buyer scripts.',
-    icon: '✎',
-    tone: 'blue',
-  },
-] as const
 
 export default function LeadWorkspacePage() {
   const params = useParams()
   const router = useRouter()
+
   const leadId = String(params?.leadId || '')
 
   const [lead, setLead] = useState<LeadRecord | null>(null)
@@ -335,91 +228,129 @@ export default function LeadWorkspacePage() {
   const normalizedLead = useMemo(() => {
     if (!lead) return null
 
-    const resolvedBeds =
-      resolveNumericField(
-        lead as any,
-        FIELD_ALIASES.beds,
-        null,
-        {
-          treatZeroAsMissing: true,
-          min: 1,
-        }
-      ) ??
-      toNumber(lead.bedrooms) ??
-      toNumber((lead.lead_intelligence as any)?.bedrooms) ??
-      toNumber((lead.raw_import_data as any)?.bedrooms) ??
-      toNumber((lead.raw_import_data as any)?.beds) ??
-      toNumber((lead.source_columns as any)?.bedrooms) ??
-      toNumber((lead.source_columns as any)?.beds)
+    const raw = lead.raw_import_data as any
+    const source = lead.source_columns as any
+    const intelligence = lead.lead_intelligence as any
 
-    const baths = resolveNumericField(
-      lead as any,
-      FIELD_ALIASES.baths,
-      null,
-      {
-        treatZeroAsMissing: false,
-        min: 0,
-      }
-    )
-
-    const sqft = resolveNumericField(
-      lead as any,
-      FIELD_ALIASES.sqft,
-      null,
-      {
+    /*
+     * BEDROOMS
+     *
+     * Check the normal database field first, then the most common
+     * imported variations.
+     */
+    const beds =
+      resolveNumericField(lead as any, FIELD_ALIASES.beds, null, {
         treatZeroAsMissing: true,
         min: 1,
-      }
-    )
+      }) ??
+      firstNumber(
+        lead.bedrooms,
+        raw?.bedrooms,
+        raw?.beds,
+        raw?.bedroom_count,
+        raw?.nbr_beds,
+        source?.bedrooms,
+        source?.beds,
+        source?.bedroom_count,
+        source?.nbr_beds,
+        intelligence?.bedrooms,
+        intelligence?.beds
+      )
+
+    const baths =
+      resolveNumericField(lead as any, FIELD_ALIASES.baths, null, {
+        treatZeroAsMissing: false,
+        min: 0,
+      }) ??
+      firstNumber(
+        lead.bathrooms,
+        raw?.bathrooms,
+        raw?.baths,
+        raw?.bathroom_count,
+        raw?.nbr_baths,
+        source?.bathrooms,
+        source?.baths,
+        source?.bathroom_count,
+        source?.nbr_baths,
+        intelligence?.bathrooms,
+        intelligence?.baths
+      )
+
+    const sqft =
+      resolveNumericField(lead as any, FIELD_ALIASES.sqft, null, {
+        treatZeroAsMissing: true,
+        min: 1,
+      }) ??
+      firstNumber(
+        lead.square_feet,
+        raw?.square_feet,
+        raw?.sqft,
+        raw?.living_area,
+        source?.square_feet,
+        source?.sqft,
+        intelligence?.square_feet,
+        intelligence?.sqft
+      )
 
     const ownerName =
-      toText(resolveField(lead as any, FIELD_ALIASES.ownerName)) ||
-      toText((lead.lead_intelligence as any)?.owner_name) ||
-      lead.owner_name
+      firstText(
+        resolveField(lead as any, FIELD_ALIASES.ownerName),
+        intelligence?.owner_name,
+        lead.owner_name
+      ) || null
 
-    const ownerPhone = getOwnerPhone(lead)
-    const ownerEmail = getOwnerEmail(lead)
+    const ownerPhone = firstText(
+      intelligence?.owner_phone,
+      intelligence?.phone,
+      raw?.owner_phone,
+      raw?.phone,
+      raw?.phone_number,
+      raw?.primary_phone,
+      source?.owner_phone,
+      source?.phone,
+      source?.phone_number,
+      source?.primary_phone,
+      lead.owner_phone,
+      lead.phone
+    )
+
+    const ownerEmail = firstText(
+      intelligence?.owner_email,
+      intelligence?.email,
+      raw?.owner_email,
+      raw?.email,
+      raw?.email_address,
+      raw?.primary_email,
+      source?.owner_email,
+      source?.email,
+      source?.email_address,
+      source?.primary_email,
+      lead.owner_email,
+      lead.email
+    )
 
     const ownerOccupied =
-      toBoolean(
-        resolveField(lead as any, FIELD_ALIASES.ownerOccupied)
-      ) ??
-      toBoolean(
-        (lead.lead_intelligence as any)?.owner_occupied
-      ) ??
+      toBoolean(resolveField(lead as any, FIELD_ALIASES.ownerOccupied)) ??
+      toBoolean(intelligence?.owner_occupied) ??
       lead.owner_occupied
 
     const lastSaleDate =
-      toText(
-        resolveField(
-          lead as any,
-          FIELD_ALIASES.lastSaleDate
-        )
-      ) ||
-      toText(
-        (lead.lead_intelligence as any)?.last_sale_date
-      ) ||
-      lead.last_sale_date
+      firstText(
+        resolveField(lead as any, FIELD_ALIASES.lastSaleDate),
+        intelligence?.last_sale_date,
+        lead.last_sale_date
+      ) || null
 
     const estimatedValue =
-      toNumber(
-        resolveField(
-          lead as any,
-          FIELD_ALIASES.estimatedValue
-        )
-      ) ??
-      toNumber(
-        (lead.lead_intelligence as any)?.house_value
-      ) ??
-      toNumber(
-        (lead.lead_intelligence as any)?.estimated_value
-      ) ??
-      toNumber(
-        (lead.lead_intelligence as any)?.market_value
-      ) ??
-      lead.house_value ??
-      lead.estimated_value ??
-      lead.market_value
+      firstNumber(
+        resolveField(lead as any, FIELD_ALIASES.estimatedValue),
+        intelligence?.house_value,
+        intelligence?.estimated_value,
+        intelligence?.market_value,
+        lead.house_value,
+        lead.estimated_value,
+        lead.market_value
+      )
 
     const ownershipYears = computeOwnershipYears({
       ...lead,
@@ -436,24 +367,31 @@ export default function LeadWorkspacePage() {
 
     return {
       ...lead,
+
       stage: currentStage,
-      bedrooms: resolvedBeds ?? null,
+
+      bedrooms: beds ?? null,
       bathrooms: baths ?? null,
       square_feet: sqft ?? null,
-      owner_name: ownerName ?? null,
+
+      owner_name: ownerName,
       owner_phone: ownerPhone,
       owner_email: ownerEmail,
+
       owner_occupied: ownerOccupied,
-      last_sale_date: lastSaleDate ?? null,
+
+      last_sale_date: lastSaleDate,
+
       ownership_length:
         ownershipYears ?? lead.ownership_length ?? null,
+
       resolved_value: estimatedValue ?? null,
-      bed_debug_source: debugBedroomSource(lead),
     }
   }, [lead])
 
   const scores = useMemo(() => {
     if (!normalizedLead) return null
+
     return computeLeadScores(normalizedLead as any)
   }, [normalizedLead])
 
@@ -478,13 +416,12 @@ export default function LeadWorkspacePage() {
       return
     }
 
-    setLead((curr) =>
-      curr ? { ...curr, ...payload } : null
-    )
+    setLead((curr) => (curr ? { ...curr, ...payload } : null))
   }
 
   async function handleDeleteLead() {
     if (!leadId) return
+
     if (
       !confirm(
         'Are you sure you want to permanently delete this lead?'
@@ -569,16 +506,33 @@ export default function LeadWorkspacePage() {
       .filter(Boolean)
       .join(', ') || 'No city/state/zip'
 
-  const contactCount =
-    Number(Boolean(normalizedLead.owner_phone)) +
-    Number(Boolean(normalizedLead.owner_email))
+  const propertyAddress =
+    normalizedLead.property_address_1 || 'Lead'
 
-  const contactStatus =
-    contactCount === 2
-      ? 'Phone + email available'
-      : contactCount === 1
-        ? 'One contact method available'
-        : 'No phone or email found'
+  const compsHref =
+    `/tools/comps-analyzer?leadId=${encodeURIComponent(
+      normalizedLead.id
+    )}&address=${encodeURIComponent(propertyAddress)}`
+
+  const contractHref =
+    `/tools/contract-generator?leadId=${encodeURIComponent(
+      normalizedLead.id
+    )}`
+
+  const assignmentHref =
+    `/tools/assignment-contract?leadId=${encodeURIComponent(
+      normalizedLead.id
+    )}`
+
+  const repairHref =
+    `/tools/repair-estimator?leadId=${encodeURIComponent(
+      normalizedLead.id
+    )}`
+
+  const closingHref =
+    `/tools/closing-cost?leadId=${encodeURIComponent(
+      normalizedLead.id
+    )}`
 
   return (
     <PageShell
@@ -645,10 +599,7 @@ export default function LeadWorkspacePage() {
       <div style={pageGridStyle}>
         <div style={leftRailStyle}>
           <SectionCard
-            title={
-              normalizedLead.property_address_1 ||
-              'Unknown property'
-            }
+            title={propertyAddress}
             subtitle={addressLine}
             actions={
               <span style={typeBadgeStyle}>
@@ -665,9 +616,7 @@ export default function LeadWorkspacePage() {
 
               <HeroSignal
                 label="Equity"
-                value={money(
-                  normalizedLead.equity_amount
-                )}
+                value={money(normalizedLead.equity_amount)}
                 tone="green"
               />
 
@@ -707,22 +656,24 @@ export default function LeadWorkspacePage() {
 
           <SectionCard
             title="Owner Contact"
-            subtitle="Available contact information for the property owner."
+            subtitle="Contact information available from the imported lead data."
           >
             <div style={contactGridStyle}>
-              <ContactTile
+              <ContactCard
                 label="Owner"
                 value={
-                  normalizedLead.owner_name || '—'
+                  normalizedLead.owner_name || 'Not available'
                 }
+                tone="green"
               />
 
-              <ContactTile
+              <ContactCard
                 label="Phone"
                 value={
                   normalizedLead.owner_phone ||
                   'Not available'
                 }
+                tone="gold"
                 href={
                   normalizedLead.owner_phone
                     ? `tel:${normalizedLead.owner_phone}`
@@ -730,29 +681,25 @@ export default function LeadWorkspacePage() {
                 }
               />
 
-              <ContactTile
+              <ContactCard
                 label="Email"
                 value={
                   normalizedLead.owner_email ||
                   'Not available'
                 }
+                tone="ice"
                 href={
                   normalizedLead.owner_email
                     ? `mailto:${normalizedLead.owner_email}`
                     : undefined
                 }
               />
-
-              <ContactTile
-                label="Contact Status"
-                value={contactStatus}
-              />
             </div>
           </SectionCard>
 
           <SectionCard
             title="Property Signals"
-            subtitle="Key property information used for underwriting and scoring."
+            subtitle="Promoted from uploaded data and used for scoring."
           >
             <div style={propertyGridStyle}>
               <InfoTile
@@ -795,6 +742,14 @@ export default function LeadWorkspacePage() {
                     ? String(normalizedLead.bathrooms)
                     : '—'
                 }
+                tone="green"
+              />
+
+              <InfoTile
+                label="Beds / Baths"
+                value={`${normalizedLead.bedrooms ?? '—'} / ${
+                  normalizedLead.bathrooms ?? '—'
+                }`}
                 tone="gold"
               />
 
@@ -884,86 +839,104 @@ export default function LeadWorkspacePage() {
           </SectionCard>
 
           <SectionCard
-            title="Lead Strength Summary"
-            subtitle="A quick read on how actionable this lead is right now."
+            title="Lead Strength"
+            subtitle="Quick view of the signals that make this lead worth pursuing."
           >
             <div style={strengthSummaryStyle}>
-              <div style={strengthMainStyle}>
-                <div style={infoLabelStyle}>
-                  OVERALL LEAD STRENGTH
+              <div style={strengthHeroStyle}>
+                <div style={strengthHeroLabelStyle}>
+                  Overall Lead Strength
                 </div>
 
-                <div style={strengthNumberStyle}>
+                <div style={strengthHeroScoreStyle}>
                   {scores.overall.score}
                 </div>
 
-                <div style={strengthScaleStyle}>
-                  Out of 100
+                <div style={strengthHeroDescriptionStyle}>
+                  {getStrengthDescription(
+                    scores.overall.score
+                  )}
                 </div>
               </div>
 
-              <div style={strengthDetailsStyle}>
+              <div style={strengthRowsStyle}>
                 <StrengthRow
                   label="Motivation"
                   score={scores.motivation.score}
-                  reason={scores.motivation.reason}
                 />
 
                 <StrengthRow
                   label="Contactability"
                   score={scores.contactability.score}
-                  reason={scores.contactability.reason}
                 />
 
                 <StrengthRow
                   label="Marketability"
                   score={scores.marketability.score}
-                  reason={scores.marketability.reason}
                 />
-
-                <div style={contactSummaryStyle}>
-                  <span style={contactDotStyle} />
-                  <span>{contactStatus}</span>
-                </div>
               </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Deal Tools"
+            subtitle="Run analysis and create deal documents directly from this property."
+          >
+            <div style={toolGridStyle}>
+              <LeadTool
+                href={compsHref}
+                title="Comps Analyzer"
+                description="Analyze comparable sales and estimate ARV."
+                icon="⌁"
+                tone="gold"
+              />
+
+              <LeadTool
+                href={repairHref}
+                title="Repair Estimator"
+                description="Build a renovation budget and repair estimate."
+                icon="⌂"
+                tone="gold"
+              />
+
+              <LeadTool
+                href={closingHref}
+                title="Closing Costs"
+                description="Estimate transaction and closing expenses."
+                icon="$"
+                tone="ice"
+              />
+
+              <LeadTool
+                href={contractHref}
+                title="Contract Generator"
+                description="Prepare purchase agreement deal terms."
+                icon="▤"
+                tone="gold"
+              />
+
+              <LeadTool
+                href={assignmentHref}
+                title="Assignment Contract"
+                description="Structure the assignment and assignment fee."
+                icon="▣"
+                tone="green"
+              />
+
+              <LeadTool
+                href={`/tools/script-generator?leadId=${encodeURIComponent(
+                  normalizedLead.id
+                )}`}
+                title="Script Generator"
+                description="Create a seller call script for this lead."
+                icon="✎"
+                tone="ice"
+              />
             </div>
           </SectionCard>
         </div>
 
         <div style={rightRailStyle}>
-          <SectionCard
-            title="Deal Tools"
-            subtitle="Run analysis and build deal documents directly from this lead."
-          >
-            <div style={toolGridStyle}>
-              {TOOL_LINKS.map((tool) => {
-                const href =
-                  tool.slug === 'comps-analyzer'
-                    ? `/tools/${tool.slug}?leadId=${encodeURIComponent(
-                        normalizedLead.id
-                      )}`
-                    : `/tools/${tool.slug}?leadId=${encodeURIComponent(
-                        normalizedLead.id
-                      )}`
-
-                return (
-                  <Link
-                    key={tool.slug}
-                    href={href}
-                    style={toolLinkStyle}
-                  >
-                    <ToolButton
-                      name={tool.name}
-                      description={tool.description}
-                      icon={tool.icon}
-                      tone={tool.tone}
-                    />
-                  </Link>
-                )
-              })}
-            </div>
-          </SectionCard>
-
           <WorkspaceCanvas
             leadId={normalizedLead.id}
             leadTitle={
@@ -974,6 +947,144 @@ export default function LeadWorkspacePage() {
         </div>
       </div>
     </PageShell>
+  )
+}
+
+function getStrengthDescription(score: number) {
+  if (score >= 90) {
+    return 'Excellent lead. Multiple strong signals suggest this property deserves immediate attention.'
+  }
+
+  if (score >= 80) {
+    return 'Strong lead. The available property and market signals support active follow-up.'
+  }
+
+  if (score >= 70) {
+    return 'Promising lead. There are enough positive signals to justify further qualification.'
+  }
+
+  if (score >= 60) {
+    return 'Moderate lead. Additional owner and property information could materially improve the opportunity.'
+  }
+
+  return 'Needs qualification. Contact information, motivation, or property data may be limiting the opportunity.'
+}
+
+function StrengthRow({
+  label,
+  score,
+}: {
+  label: string
+  score: number
+}) {
+  const tone =
+    score >= 80
+      ? '#4ade80'
+      : score >= 60
+        ? '#d6a64b'
+        : '#93c5fd'
+
+  return (
+    <div style={strengthRowStyle}>
+      <div>
+        <div style={strengthRowLabelStyle}>
+          {label}
+        </div>
+
+        <div style={strengthRowStatusStyle}>
+          {score >= 80
+            ? 'Strong'
+            : score >= 60
+              ? 'Moderate'
+              : 'Needs Attention'}
+        </div>
+      </div>
+
+      <div
+        style={{
+          ...strengthRowScoreStyle,
+          color: tone,
+        }}
+      >
+        {score}
+      </div>
+    </div>
+  )
+}
+
+function LeadTool({
+  href,
+  title,
+  description,
+  icon,
+  tone,
+}: {
+  href: string
+  title: string
+  description: string
+  icon: string
+  tone: 'gold' | 'green' | 'ice'
+}) {
+  const palette =
+    tone === 'gold'
+      ? {
+          border: 'rgba(214,166,75,0.22)',
+          background:
+            'linear-gradient(180deg, rgba(31,25,14,0.82), rgba(8,7,4,0.96))',
+          icon: '#d6a64b',
+        }
+      : tone === 'green'
+        ? {
+            border: 'rgba(74,222,128,0.22)',
+            background:
+              'linear-gradient(180deg, rgba(13,28,18,0.82), rgba(5,10,7,0.96))',
+            icon: '#4ade80',
+          }
+        : {
+            border: 'rgba(147,197,253,0.22)',
+            background:
+              'linear-gradient(180deg, rgba(15,22,31,0.82), rgba(5,8,12,0.96))',
+            icon: '#93c5fd',
+          }
+
+  return (
+    <Link
+      href={href}
+      style={{
+        ...leadToolLinkStyle,
+        borderColor: palette.border,
+        background: palette.background,
+      }}
+    >
+      <div
+        style={{
+          ...leadToolIconStyle,
+          borderColor: palette.border,
+          color: palette.icon,
+        }}
+      >
+        {icon}
+      </div>
+
+      <div style={leadToolContentStyle}>
+        <div style={leadToolTitleStyle}>
+          {title}
+        </div>
+
+        <div style={leadToolDescriptionStyle}>
+          {description}
+        </div>
+
+        <div
+          style={{
+            ...leadToolOpenStyle,
+            color: palette.icon,
+          }}
+        >
+          Open Tool →
+        </div>
+      </div>
+    </Link>
   )
 }
 
@@ -1077,129 +1188,75 @@ function InfoTile({
   )
 }
 
-function ContactTile({
+function ContactCard({
   label,
   value,
+  tone,
   href,
 }: {
   label: string
   value: string
+  tone: 'gold' | 'ice' | 'green'
   href?: string
-}) {
-  const content = (
-    <div style={contactTileStyle}>
-      <div style={infoLabelStyle}>{label}</div>
-
-      <div style={contactValueStyle}>
-        {value}
-      </div>
-    </div>
-  )
-
-  if (!href) return content
-
-  return (
-    <a
-      href={href}
-      style={contactLinkStyle}
-    >
-      {content}
-    </a>
-  )
-}
-
-function StrengthRow({
-  label,
-  score,
-  reason,
-}: {
-  label: string
-  score: number
-  reason?: string | null
-}) {
-  return (
-    <div style={strengthRowStyle}>
-      <div style={strengthRowTopStyle}>
-        <span style={strengthRowLabelStyle}>
-          {label}
-        </span>
-
-        <span style={strengthRowScoreStyle}>
-          {score}
-        </span>
-      </div>
-
-      <div style={strengthReasonStyle}>
-        {reason || 'No explanation provided.'}
-      </div>
-    </div>
-  )
-}
-
-function ToolButton({
-  name,
-  description,
-  icon,
-  tone,
-}: {
-  name: string
-  description: string
-  icon: string
-  tone: 'gold' | 'green' | 'blue'
 }) {
   const palette =
     tone === 'gold'
       ? {
-          border: 'rgba(214,166,75,0.22)',
-          background: 'rgba(214,166,75,0.055)',
-          icon: '#d6a64b',
+          border: 'rgba(214,166,75,0.2)',
+          bg: 'rgba(214,166,75,0.05)',
+          text: '#f0ca7e',
         }
-      : tone === 'green'
+      : tone === 'ice'
         ? {
-            border: 'rgba(74,222,128,0.2)',
-            background: 'rgba(74,222,128,0.05)',
-            icon: '#4ade80',
+            border: 'rgba(147,197,253,0.2)',
+            bg: 'rgba(147,197,253,0.05)',
+            text: '#dcecff',
           }
         : {
-            border: 'rgba(147,197,253,0.2)',
-            background: 'rgba(147,197,253,0.05)',
-            icon: '#93c5fd',
+            border: 'rgba(74,222,128,0.2)',
+            bg: 'rgba(74,222,128,0.05)',
+            text: '#bbf7d0',
           }
+
+  const content = (
+    <>
+      <div style={infoLabelStyle}>{label}</div>
+
+      <div
+        style={{
+          ...contactValueStyle,
+          color: palette.text,
+        }}
+      >
+        {value}
+      </div>
+    </>
+  )
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        style={{
+          ...contactCardStyle,
+          borderColor: palette.border,
+          background: palette.bg,
+        }}
+      >
+        {content}
+      </a>
+    )
+  }
 
   return (
     <div
       style={{
-        ...toolButtonStyle,
+        ...contactCardStyle,
         borderColor: palette.border,
-        background: palette.background,
+        background: palette.bg,
       }}
     >
-      <div
-        style={{
-          ...toolIconStyle,
-          color: palette.icon,
-          borderColor: palette.border,
-        }}
-      >
-        {icon}
-      </div>
-
-      <div style={toolTextStyle}>
-        <div style={toolNameStyle}>{name}</div>
-
-        <div style={toolDescriptionStyle}>
-          {description}
-        </div>
-      </div>
-
-      <div
-        style={{
-          ...toolArrowStyle,
-          color: palette.icon,
-        }}
-      >
-        →
-      </div>
+      {content}
     </div>
   )
 }
@@ -1238,8 +1295,6 @@ const leftRailStyle: CSSProperties = {
 
 const rightRailStyle: CSSProperties = {
   minWidth: 0,
-  display: 'grid',
-  gap: 18,
 }
 
 const heroSignalGridStyle: CSSProperties = {
@@ -1263,173 +1318,148 @@ const contactGridStyle: CSSProperties = {
   gap: 10,
 }
 
-const contactTileStyle: CSSProperties = {
+const toolGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(200px, 1fr))',
+  gap: 10,
+}
+
+const strengthSummaryStyle: CSSProperties = {
+  display: 'grid',
+  gap: 12,
+}
+
+const strengthHeroStyle: CSSProperties = {
+  borderRadius: 16,
+  border: '1px solid rgba(214,166,75,0.24)',
+  background:
+    'linear-gradient(135deg, rgba(31,25,14,0.9), rgba(8,7,4,0.98))',
+  padding: 18,
+  display: 'grid',
+  gap: 7,
+}
+
+const strengthHeroLabelStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
+  color: 'rgba(255,255,255,0.45)',
+}
+
+const strengthHeroScoreStyle: CSSProperties = {
+  fontSize: 42,
+  lineHeight: 1,
+  fontWeight: 900,
+  color: '#d6a64b',
+}
+
+const strengthHeroDescriptionStyle: CSSProperties = {
+  fontSize: 12,
+  lineHeight: 1.5,
+  color: 'rgba(255,255,255,0.58)',
+  maxWidth: 620,
+}
+
+const strengthRowsStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(170px, 1fr))',
+  gap: 10,
+}
+
+const strengthRowStyle: CSSProperties = {
   borderRadius: 12,
-  border: '1px solid rgba(74,222,128,0.18)',
-  background: 'rgba(74,222,128,0.045)',
-  padding: '11px 12px',
+  border: '1px solid rgba(255,255,255,0.07)',
+  background: 'rgba(255,255,255,0.025)',
+  padding: '12px 14px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+}
+
+const strengthRowLabelStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 750,
+  color: '#ffffff',
+}
+
+const strengthRowStatusStyle: CSSProperties = {
+  marginTop: 3,
+  fontSize: 10,
+  color: 'rgba(255,255,255,0.4)',
+}
+
+const strengthRowScoreStyle: CSSProperties = {
+  fontSize: 24,
+  fontWeight: 900,
+}
+
+const leadToolLinkStyle: CSSProperties = {
+  textDecoration: 'none',
+  color: 'inherit',
+  borderRadius: 14,
+  border: '1px solid transparent',
+  padding: 13,
+  display: 'grid',
+  gridTemplateColumns: '38px minmax(0,1fr)',
+  gap: 11,
+  minWidth: 0,
+}
+
+const leadToolIconStyle: CSSProperties = {
+  width: 38,
+  height: 38,
+  borderRadius: 10,
+  border: '1px solid transparent',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 17,
+  fontWeight: 900,
+}
+
+const leadToolContentStyle: CSSProperties = {
+  minWidth: 0,
   display: 'grid',
   gap: 5,
 }
 
-const contactLinkStyle: CSSProperties = {
+const leadToolTitleStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  color: '#ffffff',
+}
+
+const leadToolDescriptionStyle: CSSProperties = {
+  fontSize: 10.5,
+  lineHeight: 1.45,
+  color: 'rgba(255,255,255,0.48)',
+}
+
+const leadToolOpenStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  marginTop: 3,
+}
+
+const contactCardStyle: CSSProperties = {
   textDecoration: 'none',
   color: 'inherit',
+  borderRadius: 12,
+  border: '1px solid transparent',
+  padding: '12px 13px',
+  display: 'grid',
+  gap: 5,
 }
 
 const contactValueStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
   lineHeight: 1.35,
-  color: '#bbf7d0',
-  wordBreak: 'break-word',
-}
-
-const strengthSummaryStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'minmax(140px, 0.45fr) minmax(0, 1fr)',
-  gap: 16,
-  alignItems: 'stretch',
-}
-
-const strengthMainStyle: CSSProperties = {
-  borderRadius: 14,
-  border: '1px solid rgba(214,166,75,0.25)',
-  background:
-    'linear-gradient(180deg, rgba(31,25,14,0.92), rgba(8,7,4,0.98))',
-  padding: 16,
-  display: 'grid',
-  alignContent: 'center',
-  gap: 6,
-}
-
-const strengthNumberStyle: CSSProperties = {
-  fontSize: 44,
-  lineHeight: 1,
-  fontWeight: 900,
-  color: '#d6a64b',
-  letterSpacing: '-0.04em',
-}
-
-const strengthScaleStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.38)',
-}
-
-const strengthDetailsStyle: CSSProperties = {
-  display: 'grid',
-  gap: 9,
-}
-
-const strengthRowStyle: CSSProperties = {
-  borderRadius: 11,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'rgba(255,255,255,0.025)',
-  padding: '9px 11px',
-}
-
-const strengthRowTopStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: 10,
-}
-
-const strengthRowLabelStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 800,
-  color: 'rgba(255,255,255,0.75)',
-}
-
-const strengthRowScoreStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 900,
-  color: '#d6a64b',
-}
-
-const strengthReasonStyle: CSSProperties = {
-  marginTop: 4,
-  fontSize: 10.5,
-  lineHeight: 1.4,
-  color: 'rgba(255,255,255,0.42)',
-}
-
-const contactSummaryStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 7,
-  padding: '7px 2px',
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.48)',
-}
-
-const contactDotStyle: CSSProperties = {
-  width: 7,
-  height: 7,
-  borderRadius: '50%',
-  background: '#4ade80',
-  boxShadow: '0 0 10px rgba(74,222,128,0.35)',
-}
-
-const toolGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(auto-fit, minmax(190px, 1fr))',
-  gap: 9,
-}
-
-const toolLinkStyle: CSSProperties = {
-  textDecoration: 'none',
-  color: 'inherit',
-}
-
-const toolButtonStyle: CSSProperties = {
-  minHeight: 74,
-  borderRadius: 12,
-  border: '1px solid transparent',
-  padding: 10,
-  display: 'grid',
-  gridTemplateColumns: '34px minmax(0,1fr) auto',
-  alignItems: 'center',
-  gap: 9,
-  transition:
-    'transform 120ms ease, border-color 120ms ease',
-}
-
-const toolIconStyle: CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: 9,
-  border: '1px solid transparent',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 15,
-  fontWeight: 900,
-}
-
-const toolTextStyle: CSSProperties = {
-  minWidth: 0,
-  display: 'grid',
-  gap: 3,
-}
-
-const toolNameStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 800,
-  color: '#fff',
-}
-
-const toolDescriptionStyle: CSSProperties = {
-  fontSize: 10,
-  lineHeight: 1.35,
-  color: 'rgba(255,255,255,0.45)',
-}
-
-const toolArrowStyle: CSSProperties = {
-  fontSize: 15,
-  fontWeight: 900,
+  overflowWrap: 'anywhere',
 }
 
 const heroSignalStyle: CSSProperties = {
@@ -1448,20 +1478,6 @@ const infoTileStyle: CSSProperties = {
   padding: '10px 12px',
   display: 'grid',
   gap: 4,
-}
-
-const typeBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '4px 10px',
-  borderRadius: 8,
-  border: '1px solid rgba(214, 166, 75, 0.3)',
-  background: 'rgba(214, 166, 75, 0.1)',
-  color: '#d6a64b',
-  fontSize: 11,
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
 }
 
 const infoLabelStyle: CSSProperties = {
@@ -1501,4 +1517,18 @@ const spinnerStyle: CSSProperties = {
   border: '2px solid rgba(214, 166, 75, 0.2)',
   borderTopColor: '#d6a64b',
   animation: 'spin 0.8s linear infinite',
+}
+
+const typeBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '4px 10px',
+  borderRadius: 8,
+  border: '1px solid rgba(214, 166, 75, 0.3)',
+  background: 'rgba(214, 166, 75, 0.1)',
+  color: '#d6a64b',
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
 }
