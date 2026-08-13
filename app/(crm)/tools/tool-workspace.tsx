@@ -91,6 +91,12 @@ function copyText(text: string) {
   }
 }
 
+function createLocalId() {
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`
+}
+
 /* =========================================================
    BASIC INPUTS
 ========================================================= */
@@ -929,519 +935,6 @@ function ClosingCostTool({
 }
 
 /* =========================================================
-   COMPS ANALYZER
-========================================================= */
-
-function CompsAnalyzerWorkspace() {
-  const [leadSearch, setLeadSearch] = useState('')
-  const [leadResults, setLeadResults] = useState<LeadOption[]>([])
-  const [selectedLead, setSelectedLead] = useState<LeadOption | null>(null)
-  const [loadingLeads, setLoadingLeads] = useState(false)
-
-  const [subjectAddress, setSubjectAddress] = useState('')
-  const [subjectBeds, setSubjectBeds] = useState('')
-  const [subjectBaths, setSubjectBaths] = useState('')
-  const [subjectSqft, setSubjectSqft] = useState('')
-  const [subjectYear, setSubjectYear] = useState('')
-
-  const [comps, setComps] = useState<CompRow[]>([
-    {
-      id: crypto.randomUUID(),
-      salePrice: '',
-      sqft: '',
-      beds: '',
-      baths: '',
-      year: '',
-    },
-    {
-      id: crypto.randomUUID(),
-      salePrice: '',
-      sqft: '',
-      beds: '',
-      baths: '',
-      year: '',
-    },
-    {
-      id: crypto.randomUUID(),
-      salePrice: '',
-      sqft: '',
-      beds: '',
-      baths: '',
-      year: '',
-    },
-  ])
-
-  const [result, setResult] = useState<CompResult | null>(null)
-
-  async function searchLeads(value: string) {
-    setLeadSearch(value)
-
-    if (!value.trim()) {
-      setLeadResults([])
-      return
-    }
-
-    setLoadingLeads(true)
-
-    const search = value.trim()
-
-    const { data, error } = await supabase
-      .from('leads')
-      .select(
-        `
-          id,
-          property_address_1,
-          city,
-          state,
-          zip,
-          bedrooms,
-          bathrooms,
-          square_feet,
-          year_built
-        `
-      )
-      .or(
-        `property_address_1.ilike.%${search}%,city.ilike.%${search}%,zip.ilike.%${search}%`
-      )
-      .order('property_address_1', { ascending: true })
-      .limit(10)
-
-    if (error) {
-      console.error('Lead search error:', error)
-      setLeadResults([])
-      setLoadingLeads(false)
-      return
-    }
-
-    
-setLeadResults((data || []) as LeadOption[])
-
-    setLoadingLeads(false)
-  }
-
-  function selectLead(lead: LeadOption) {
-    setSelectedLead(lead)
-    setLeadSearch(
-      [lead.property_address_1, lead.city, lead.state]
-        .filter(Boolean)
-        .join(', ')
-    )
-
-    setLeadResults([])
-
-    setSubjectAddress(
-      [lead.property_address_1, lead.city, lead.state, lead.zip]
-        .filter(Boolean)
-        .join(', ')
-    )
-
-    setSubjectBeds(
-      lead.bedrooms !== null && lead.bedrooms !== undefined
-        ? String(lead.bedrooms)
-        : ''
-    )
-
-    setSubjectBaths(
-      lead.bathrooms !== null && lead.bathrooms !== undefined
-        ? String(lead.bathrooms)
-        : ''
-    )
-
-    setSubjectSqft(
-      lead.square_feet !== null && lead.square_feet !== undefined
-        ? String(lead.square_feet)
-        : ''
-    )
-
-    setSubjectYear(
-      lead.year_built !== null && lead.year_built !== undefined
-        ? String(lead.year_built)
-        : ''
-    )
-  }
-
-  function updateComp(
-    id: string,
-    field: keyof Omit<CompRow, 'id'>,
-    value: string
-  ) {
-    setComps((current) =>
-      current.map((comp) =>
-        comp.id === id
-          ? {
-              ...comp,
-              [field]: value,
-            }
-          : comp
-      )
-    )
-  }
-
-  function addComp() {
-    setComps((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        salePrice: '',
-        sqft: '',
-        beds: '',
-        baths: '',
-        year: '',
-      },
-    ])
-  }
-
-  function removeComp(id: string) {
-    setComps((current) => current.filter((comp) => comp.id !== id))
-  }
-
-  function calculateComps() {
-    const subject = {
-      beds: Number(subjectBeds) || 0,
-      baths: Number(subjectBaths) || 0,
-      sqft: Number(subjectSqft) || 0,
-      year: Number(subjectYear) || 0,
-    }
-
-    const validComps = comps
-      .map((comp) => ({
-        salePrice: Number(comp.salePrice) || 0,
-        sqft: Number(comp.sqft) || 0,
-        beds: Number(comp.beds) || 0,
-        baths: Number(comp.baths) || 0,
-        year: Number(comp.year) || 0,
-      }))
-      .filter((comp) => comp.salePrice > 0 && comp.sqft > 0)
-
-    if (!validComps.length) {
-      alert('Add at least one comp with a sale price and square footage.')
-      return
-    }
-
-    const pricePerSqft = validComps.map(
-      (comp) => comp.salePrice / comp.sqft
-    )
-
-    const averagePricePerSqft =
-      pricePerSqft.reduce((sum, value) => sum + value, 0) /
-      pricePerSqft.length
-
-    /*
-     * Weight comps based on similarity to the subject.
-     *
-     * Beds and baths are intentionally included.
-     * Distance/miles is NOT used.
-     */
-    const weightedComps = validComps.map((comp) => {
-      let weight = 1
-
-      if (subject.beds && comp.beds) {
-        const bedDifference = Math.abs(subject.beds - comp.beds)
-
-        if (bedDifference === 0) weight += 2
-        else if (bedDifference === 1) weight += 1
-      }
-
-      if (subject.baths && comp.baths) {
-        const bathDifference = Math.abs(subject.baths - comp.baths)
-
-        if (bathDifference === 0) weight += 1.5
-        else if (bathDifference <= 0.5) weight += 0.75
-      }
-
-      if (subject.sqft && comp.sqft) {
-        const sqftDifference =
-          Math.abs(subject.sqft - comp.sqft) / subject.sqft
-
-        if (sqftDifference <= 0.1) weight += 2
-        else if (sqftDifference <= 0.2) weight += 1
-      }
-
-      if (subject.year && comp.year) {
-        const ageDifference = Math.abs(subject.year - comp.year)
-
-        if (ageDifference <= 5) weight += 1
-        else if (ageDifference <= 15) weight += 0.5
-      }
-
-      return {
-        ...comp,
-        pricePerSqft: comp.salePrice / comp.sqft,
-        weight,
-      }
-    })
-
-    const totalWeight = weightedComps.reduce(
-      (sum, comp) => sum + comp.weight,
-      0
-    )
-
-    const weightedPricePerSqft =
-      weightedComps.reduce(
-        (sum, comp) => sum + comp.pricePerSqft * comp.weight,
-        0
-      ) / totalWeight
-
-    const arv =
-      subject.sqft > 0
-        ? weightedPricePerSqft * subject.sqft
-        : validComps.reduce((sum, comp) => sum + comp.salePrice, 0) /
-          validComps.length
-
-    setResult({
-      arv,
-      averagePricePerSqft,
-      weightedPricePerSqft,
-      compCount: validComps.length,
-    })
-  }
-
-  return (
-    <div style={compsWorkspaceStyle}>
-      <SectionCard
-        title="Subject Property"
-        subtitle="Choose a property from your Leads or enter the subject property manually."
-      >
-        <div style={compsSubjectSectionStyle}>
-          <div style={leadSearchWrapStyle}>
-            <label style={workspaceLabelStyle}>
-              Choose From Leads
-            </label>
-
-            <input
-              value={leadSearch}
-              onChange={(event) => searchLeads(event.target.value)}
-              placeholder="Search address, city, or ZIP..."
-              style={workspaceInputStyle}
-            />
-
-            {loadingLeads && (
-              <div style={leadSearchStatusStyle}>
-                Searching leads...
-              </div>
-            )}
-
-            {leadResults.length > 0 && (
-              <div style={leadResultsStyle}>
-                {leadResults.map((lead) => (
-                  <button
-                    key={lead.id}
-                    type="button"
-                    onClick={() => selectLead(lead)}
-                    style={leadResultButtonStyle}
-                  >
-                    <div style={leadResultAddressStyle}>
-                      {lead.property_address_1 || 'Unknown Address'}
-                    </div>
-
-                    <div style={leadResultMetaStyle}>
-                      {[lead.city, lead.state, lead.zip]
-                        .filter(Boolean)
-                        .join(', ')}
-
-                      {lead.bedrooms !== null &&
-                        lead.bedrooms !== undefined && (
-                          <> · {lead.bedrooms} bd</>
-                        )}
-
-                      {lead.bathrooms !== null &&
-                        lead.bathrooms !== undefined && (
-                          <> · {lead.bathrooms} ba</>
-                        )}
-
-                      {lead.square_feet !== null &&
-                        lead.square_feet !== undefined && (
-                          <> · {lead.square_feet.toLocaleString()} sf</>
-                        )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {selectedLead && (
-              <div style={selectedLeadStyle}>
-                <span>Selected Lead</span>
-                <strong>
-                  {selectedLead.property_address_1 ||
-                    'Selected Property'}
-                </strong>
-              </div>
-            )}
-          </div>
-
-          <div style={subjectGridStyle}>
-            <WorkspaceField
-              label="Subject Address"
-              value={subjectAddress}
-              onChange={setSubjectAddress}
-              placeholder="123 Main St"
-            />
-
-            <WorkspaceField
-              label="Beds"
-              value={subjectBeds}
-              onChange={setSubjectBeds}
-              placeholder="3"
-              type="number"
-            />
-
-            <WorkspaceField
-              label="Baths"
-              value={subjectBaths}
-              onChange={setSubjectBaths}
-              placeholder="2"
-              type="number"
-            />
-
-            <WorkspaceField
-              label="Square Feet"
-              value={subjectSqft}
-              onChange={setSubjectSqft}
-              placeholder="1,200"
-              type="number"
-            />
-
-            <WorkspaceField
-              label="Year Built"
-              value={subjectYear}
-              onChange={setSubjectYear}
-              placeholder="1985"
-              type="number"
-            />
-          </div>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Comparable Sales"
-        subtitle="Enter the strongest comparable sales. Miles/distance is not required."
-        actions={
-          <ActionButton compact tone="gold" onClick={addComp}>
-            + Add Comp
-          </ActionButton>
-        }
-      >
-        <div style={compListStyle}>
-          {comps.map((comp, index) => (
-            <div key={comp.id} style={compRowStyle}>
-              <div style={compHeaderStyle}>
-                <div style={compNumberStyle}>
-                  COMP {index + 1}
-                </div>
-
-                {comps.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeComp(comp.id)}
-                    style={removeCompStyle}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-
-              <div style={compInputGridStyle}>
-                <WorkspaceField
-                  label="Sale Price"
-                  value={comp.salePrice}
-                  onChange={(value) =>
-                    updateComp(comp.id, 'salePrice', value)
-                  }
-                  placeholder="250000"
-                  type="number"
-                />
-
-                <WorkspaceField
-                  label="Square Feet"
-                  value={comp.sqft}
-                  onChange={(value) =>
-                    updateComp(comp.id, 'sqft', value)
-                  }
-                  placeholder="1200"
-                  type="number"
-                />
-
-                <WorkspaceField
-                  label="Beds"
-                  value={comp.beds}
-                  onChange={(value) =>
-                    updateComp(comp.id, 'beds', value)
-                  }
-                  placeholder="3"
-                  type="number"
-                />
-
-                <WorkspaceField
-                  label="Baths"
-                  value={comp.baths}
-                  onChange={(value) =>
-                    updateComp(comp.id, 'baths', value)
-                  }
-                  placeholder="2"
-                  type="number"
-                />
-
-                <WorkspaceField
-                  label="Year Built"
-                  value={comp.year}
-                  onChange={(value) =>
-                    updateComp(comp.id, 'year', value)
-                  }
-                  placeholder="1985"
-                  type="number"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={calculateWrapStyle}>
-          <ActionButton tone="gold" onClick={calculateComps}>
-            Calculate ARV
-          </ActionButton>
-        </div>
-      </SectionCard>
-
-      {result && (
-        <SectionCard
-          title="Comps Analysis"
-          subtitle={`Calculated from ${result.compCount} comparable ${
-            result.compCount === 1 ? 'sale' : 'sales'
-          }.`}
-        >
-          <div style={compsResultGridStyle}>
-            <HeroSignal
-              label="Estimated ARV"
-              value={money(result.arv)}
-              tone="gold"
-            />
-
-            <HeroSignal
-              label="Average Price / SF"
-              value={`$${result.averagePricePerSqft.toFixed(0)}`}
-              tone="ice"
-            />
-
-            <HeroSignal
-              label="Weighted Price / SF"
-              value={`$${result.weightedPricePerSqft.toFixed(0)}`}
-              tone="green"
-            />
-
-            <HeroSignal
-              label="Comparable Sales"
-              value={String(result.compCount)}
-              tone="gold"
-            />
-          </div>
-        </SectionCard>
-      )}
-    </div>
-  )
-}
-
-/* =========================================================
    COMPS TYPES
 ========================================================= */
 
@@ -1474,6 +967,1056 @@ type CompResult = {
 }
 
 /* =========================================================
+   COMPS RESULT CARD
+========================================================= */
+
+function CompResultCard({
+  label,
+  value,
+  tone = 'gold',
+}: {
+  label: string
+  value: string
+  tone?: 'gold' | 'green' | 'blue'
+}) {
+  const palette =
+    tone === 'green'
+      ? {
+          border: 'rgba(74,222,128,0.24)',
+          background: 'rgba(74,222,128,0.06)',
+          value: '#4ade80',
+        }
+      : tone === 'blue'
+        ? {
+            border: 'rgba(147,197,253,0.24)',
+            background: 'rgba(147,197,253,0.06)',
+            value: '#93c5fd',
+          }
+        : {
+            border: 'rgba(214,166,75,0.28)',
+            background: 'rgba(214,166,75,0.07)',
+            value: '#d6a64b',
+          }
+
+  return (
+    <div
+      style={{
+        border: `1px solid ${palette.border}`,
+        background: palette.background,
+        borderRadius: 14,
+        padding: '16px 15px',
+        minHeight: 88,
+        display: 'grid',
+        alignContent: 'center',
+        gap: 7,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          fontWeight: 800,
+          letterSpacing: '0.09em',
+          textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.42)',
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          fontSize: 23,
+          fontWeight: 850,
+          color: palette.value,
+          lineHeight: 1.1,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+/* =========================================================
+   COMPS ANALYZER
+========================================================= */
+
+function CompsAnalyzerWorkspace() {
+  const [leadSearch, setLeadSearch] =
+    useState('')
+
+  const [leadResults, setLeadResults] =
+    useState<LeadOption[]>([])
+
+  const [selectedLead, setSelectedLead] =
+    useState<LeadOption | null>(null)
+
+  const [loadingLeads, setLoadingLeads] =
+    useState(false)
+
+  const [leadSearchError, setLeadSearchError] =
+    useState('')
+
+  const [subjectAddress, setSubjectAddress] =
+    useState('')
+
+  const [subjectBeds, setSubjectBeds] =
+    useState('')
+
+  const [subjectBaths, setSubjectBaths] =
+    useState('')
+
+  const [subjectSqft, setSubjectSqft] =
+    useState('')
+
+  const [subjectYear, setSubjectYear] =
+    useState('')
+
+  const [comps, setComps] =
+    useState<CompRow[]>([
+      {
+        id: createLocalId(),
+        salePrice: '',
+        sqft: '',
+        beds: '',
+        baths: '',
+        year: '',
+      },
+      {
+        id: createLocalId(),
+        salePrice: '',
+        sqft: '',
+        beds: '',
+        baths: '',
+        year: '',
+      },
+      {
+        id: createLocalId(),
+        salePrice: '',
+        sqft: '',
+        beds: '',
+        baths: '',
+        year: '',
+      },
+    ])
+
+  const [result, setResult] =
+    useState<CompResult | null>(null)
+
+  async function searchLeads(
+    value: string
+  ) {
+    setLeadSearch(value)
+    setLeadSearchError('')
+
+    if (!value.trim()) {
+      setLeadResults([])
+      return
+    }
+
+    setLoadingLeads(true)
+
+    const search = value
+      .trim()
+      .replace(/[%_,]/g, ' ')
+      .replace(/\s+/g, ' ')
+
+    const { data, error } =
+      await supabase
+        .from('leads')
+        .select(
+          `
+            id,
+            property_address_1,
+            city,
+            state,
+            zip,
+            bedrooms,
+            bathrooms,
+            square_feet,
+            year_built
+          `
+        )
+        .or(
+          [
+            `property_address_1.ilike.%${search}%`,
+            `city.ilike.%${search}%`,
+            `state.ilike.%${search}%`,
+            `zip.ilike.%${search}%`,
+          ].join(',')
+        )
+        .order(
+          'property_address_1',
+          {
+            ascending: true,
+          }
+        )
+        .limit(10)
+
+    if (error) {
+      console.error(
+        'Lead search error:',
+        error
+      )
+
+      setLeadResults([])
+      setLeadSearchError(
+        'Unable to search Leads right now.'
+      )
+
+      setLoadingLeads(false)
+      return
+    }
+
+    setLeadResults(
+      (data || []) as LeadOption[]
+    )
+
+    setLoadingLeads(false)
+  }
+
+  function clearLeadSelection() {
+    setSelectedLead(null)
+    setLeadSearch('')
+    setLeadResults([])
+    setLeadSearchError('')
+  }
+
+  function selectLead(
+    lead: LeadOption
+  ) {
+    setSelectedLead(lead)
+
+    setLeadSearch(
+      [
+        lead.property_address_1,
+        lead.city,
+        lead.state,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    )
+
+    setLeadResults([])
+
+    setSubjectAddress(
+      [
+        lead.property_address_1,
+        lead.city,
+        lead.state,
+        lead.zip,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    )
+
+    setSubjectBeds(
+      lead.bedrooms !== null &&
+        lead.bedrooms !== undefined
+        ? String(lead.bedrooms)
+        : ''
+    )
+
+    setSubjectBaths(
+      lead.bathrooms !== null &&
+        lead.bathrooms !== undefined
+        ? String(lead.bathrooms)
+        : ''
+    )
+
+    setSubjectSqft(
+      lead.square_feet !== null &&
+        lead.square_feet !== undefined
+        ? String(lead.square_feet)
+        : ''
+    )
+
+    setSubjectYear(
+      lead.year_built !== null &&
+        lead.year_built !== undefined
+        ? String(lead.year_built)
+        : ''
+    )
+
+    setResult(null)
+  }
+
+  function updateComp(
+    id: string,
+    field: keyof Omit<
+      CompRow,
+      'id'
+    >,
+    value: string
+  ) {
+    setComps((current) =>
+      current.map((comp) =>
+        comp.id === id
+          ? {
+              ...comp,
+              [field]: value,
+            }
+          : comp
+      )
+    )
+  }
+
+  function addComp() {
+    setComps((current) => [
+      ...current,
+      {
+        id: createLocalId(),
+        salePrice: '',
+        sqft: '',
+        beds: '',
+        baths: '',
+        year: '',
+      },
+    ])
+  }
+
+  function removeComp(
+    id: string
+  ) {
+    setComps((current) =>
+      current.filter(
+        (comp) => comp.id !== id
+      )
+    )
+  }
+
+  function calculateComps() {
+    const subject = {
+      beds:
+        Number(subjectBeds) || 0,
+      baths:
+        Number(subjectBaths) || 0,
+      sqft:
+        Number(subjectSqft) || 0,
+      year:
+        Number(subjectYear) || 0,
+    }
+
+    const validComps =
+      comps
+        .map((comp) => ({
+          salePrice:
+            Number(comp.salePrice) || 0,
+          sqft:
+            Number(comp.sqft) || 0,
+          beds:
+            Number(comp.beds) || 0,
+          baths:
+            Number(comp.baths) || 0,
+          year:
+            Number(comp.year) || 0,
+        }))
+        .filter(
+          (comp) =>
+            comp.salePrice > 0 &&
+            comp.sqft > 0
+        )
+
+    if (!validComps.length) {
+      alert(
+        'Add at least one comp with a sale price and square footage.'
+      )
+      return
+    }
+
+    const pricePerSqft =
+      validComps.map(
+        (comp) =>
+          comp.salePrice /
+          comp.sqft
+      )
+
+    const averagePricePerSqft =
+      pricePerSqft.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) /
+      pricePerSqft.length
+
+    /*
+     * Weight comps based on similarity
+     * to the subject.
+     *
+     * Beds and baths are included.
+     * Distance/miles is intentionally
+     * not required.
+     */
+    const weightedComps =
+      validComps.map((comp) => {
+        let weight = 1
+
+        if (
+          subject.beds &&
+          comp.beds
+        ) {
+          const bedDifference =
+            Math.abs(
+              subject.beds -
+                comp.beds
+            )
+
+          if (
+            bedDifference === 0
+          ) {
+            weight += 2
+          } else if (
+            bedDifference === 1
+          ) {
+            weight += 1
+          }
+        }
+
+        if (
+          subject.baths &&
+          comp.baths
+        ) {
+          const bathDifference =
+            Math.abs(
+              subject.baths -
+                comp.baths
+            )
+
+          if (
+            bathDifference === 0
+          ) {
+            weight += 1.5
+          } else if (
+            bathDifference <= 0.5
+          ) {
+            weight += 0.75
+          }
+        }
+
+        if (
+          subject.sqft &&
+          comp.sqft
+        ) {
+          const sqftDifference =
+            Math.abs(
+              subject.sqft -
+                comp.sqft
+            ) /
+            subject.sqft
+
+          if (
+            sqftDifference <= 0.1
+          ) {
+            weight += 2
+          } else if (
+            sqftDifference <= 0.2
+          ) {
+            weight += 1
+          }
+        }
+
+        if (
+          subject.year &&
+          comp.year
+        ) {
+          const ageDifference =
+            Math.abs(
+              subject.year -
+                comp.year
+            )
+
+          if (
+            ageDifference <= 5
+          ) {
+            weight += 1
+          } else if (
+            ageDifference <= 15
+          ) {
+            weight += 0.5
+          }
+        }
+
+        return {
+          ...comp,
+          pricePerSqft:
+            comp.salePrice /
+            comp.sqft,
+          weight,
+        }
+      })
+
+    const totalWeight =
+      weightedComps.reduce(
+        (sum, comp) =>
+          sum + comp.weight,
+        0
+      )
+
+    const weightedPricePerSqft =
+      weightedComps.reduce(
+        (sum, comp) =>
+          sum +
+          comp.pricePerSqft *
+            comp.weight,
+        0
+      ) /
+      totalWeight
+
+    const arv =
+      subject.sqft > 0
+        ? weightedPricePerSqft *
+          subject.sqft
+        : validComps.reduce(
+            (
+              sum,
+              comp
+            ) =>
+              sum +
+              comp.salePrice,
+            0
+          ) /
+          validComps.length
+
+    setResult({
+      arv,
+      averagePricePerSqft,
+      weightedPricePerSqft,
+      compCount:
+        validComps.length,
+    })
+  }
+
+  return (
+    <div
+      style={
+        compsWorkspaceStyle
+      }
+    >
+      <SectionCard
+        title="Subject Property"
+        subtitle="Choose a property from your Leads or enter the subject property manually."
+      >
+        <div
+          style={
+            compsSubjectSectionStyle
+          }
+        >
+          <div
+            style={
+              leadSearchWrapStyle
+            }
+          >
+            <label
+              style={
+                workspaceLabelStyle
+              }
+            >
+              Choose From Leads
+            </label>
+
+            <div
+              style={
+                leadSearchInputWrapStyle
+              }
+            >
+              <input
+                value={leadSearch}
+                onChange={(
+                  event
+                ) =>
+                  void searchLeads(
+                    event
+                      .target
+                      .value
+                  )
+                }
+                placeholder="Search address, city, state, or ZIP..."
+                style={
+                  workspaceInputStyle
+                }
+              />
+
+              {leadSearch && (
+                <button
+                  type="button"
+                  onClick={
+                    clearLeadSelection
+                  }
+                  style={
+                    clearSearchButtonStyle
+                  }
+                  aria-label="Clear lead search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            {loadingLeads && (
+              <div
+                style={
+                  leadSearchStatusStyle
+                }
+              >
+                Searching leads...
+              </div>
+            )}
+
+            {!loadingLeads &&
+              leadSearch.trim() &&
+              !leadResults.length &&
+              !leadSearchError && (
+                <div
+                  style={
+                    leadSearchStatusStyle
+                  }
+                >
+                  No matching properties found.
+                </div>
+              )}
+
+            {leadSearchError && (
+              <div
+                style={
+                  leadSearchErrorStyle
+                }
+              >
+                {leadSearchError}
+              </div>
+            )}
+
+            {leadResults.length >
+              0 && (
+              <div
+                style={
+                  leadResultsStyle
+                }
+              >
+                {leadResults.map(
+                  (lead) => (
+                    <button
+                      key={
+                        lead.id
+                      }
+                      type="button"
+                      onClick={() =>
+                        selectLead(
+                          lead
+                        )
+                      }
+                      style={
+                        leadResultButtonStyle
+                      }
+                    >
+                      <div
+                        style={
+                          leadResultAddressStyle
+                        }
+                      >
+                        {lead.property_address_1 ||
+                          'Unknown Address'}
+                      </div>
+
+                      <div
+                        style={
+                          leadResultMetaStyle
+                        }
+                      >
+                        {[
+                          lead.city,
+                          lead.state,
+                          lead.zip,
+                        ]
+                          .filter(
+                            Boolean
+                          )
+                          .join(
+                            ', '
+                          )}
+
+                        {lead.bedrooms !==
+                          null &&
+                          lead.bedrooms !==
+                            undefined && (
+                            <>
+                              {' '}
+                              ·{' '}
+                              {
+                                lead.bedrooms
+                              }{' '}
+                              bd
+                            </>
+                          )}
+
+                        {lead.bathrooms !==
+                          null &&
+                          lead.bathrooms !==
+                            undefined && (
+                            <>
+                              {' '}
+                              ·{' '}
+                              {
+                                lead.bathrooms
+                              }{' '}
+                              ba
+                            </>
+                          )}
+
+                        {lead.square_feet !==
+                          null &&
+                          lead.square_feet !==
+                            undefined && (
+                            <>
+                              {' '}
+                              ·{' '}
+                              {Number(
+                                lead.square_feet
+                              ).toLocaleString()}{' '}
+                              sf
+                            </>
+                          )}
+                      </div>
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+
+            {selectedLead && (
+              <div
+                style={
+                  selectedLeadStyle
+                }
+              >
+                <div
+                  style={
+                    selectedLeadInfoStyle
+                  }
+                >
+                  <span>
+                    Selected Lead
+                  </span>
+
+                  <strong>
+                    {selectedLead.property_address_1 ||
+                      'Selected Property'}
+                  </strong>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    clearLeadSelection
+                  }
+                  style={
+                    clearSelectedLeadStyle
+                  }
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div
+            style={
+              subjectGridStyle
+            }
+          >
+            <WorkspaceField
+              label="Subject Address"
+              value={
+                subjectAddress
+              }
+              onChange={
+                setSubjectAddress
+              }
+              placeholder="123 Main St"
+            />
+
+            <WorkspaceField
+              label="Beds"
+              value={
+                subjectBeds
+              }
+              onChange={
+                setSubjectBeds
+              }
+              placeholder="3"
+              type="number"
+            />
+
+            <WorkspaceField
+              label="Baths"
+              value={
+                subjectBaths
+              }
+              onChange={
+                setSubjectBaths
+              }
+              placeholder="2"
+              type="number"
+            />
+
+            <WorkspaceField
+              label="Square Feet"
+              value={
+                subjectSqft
+              }
+              onChange={
+                setSubjectSqft
+              }
+              placeholder="1200"
+              type="number"
+            />
+
+            <WorkspaceField
+              label="Year Built"
+              value={
+                subjectYear
+              }
+              onChange={
+                setSubjectYear
+              }
+              placeholder="1985"
+              type="number"
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Comparable Sales"
+        subtitle="Enter the strongest comparable sales. Miles/distance is not required."
+        actions={
+          <ActionButton
+            compact
+            tone="gold"
+            onClick={addComp}
+          >
+            + Add Comp
+          </ActionButton>
+        }
+      >
+        <div
+          style={
+            compListStyle
+          }
+        >
+          {comps.map(
+            (comp, index) => (
+              <div
+                key={
+                  comp.id
+                }
+                style={
+                  compRowStyle
+                }
+              >
+                <div
+                  style={
+                    compHeaderStyle
+                  }
+                >
+                  <div
+                    style={
+                      compNumberStyle
+                    }
+                  >
+                    COMP{' '}
+                    {index + 1}
+                  </div>
+
+                  {comps.length >
+                    1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeComp(
+                          comp.id
+                        )
+                      }
+                      style={
+                        removeCompStyle
+                      }
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <div
+                  style={
+                    compInputGridStyle
+                  }
+                >
+                  <WorkspaceField
+                    label="Sale Price"
+                    value={
+                      comp.salePrice
+                    }
+                    onChange={(
+                      value
+                    ) =>
+                      updateComp(
+                        comp.id,
+                        'salePrice',
+                        value
+                      )
+                    }
+                    placeholder="250000"
+                    type="number"
+                  />
+
+                  <WorkspaceField
+                    label="Square Feet"
+                    value={
+                      comp.sqft
+                    }
+                    onChange={(
+                      value
+                    ) =>
+                      updateComp(
+                        comp.id,
+                        'sqft',
+                        value
+                      )
+                    }
+                    placeholder="1200"
+                    type="number"
+                  />
+
+                  <WorkspaceField
+                    label="Beds"
+                    value={
+                      comp.beds
+                    }
+                    onChange={(
+                      value
+                    ) =>
+                      updateComp(
+                        comp.id,
+                        'beds',
+                        value
+                      )
+                    }
+                    placeholder="3"
+                    type="number"
+                  />
+
+                  <WorkspaceField
+                    label="Baths"
+                    value={
+                      comp.baths
+                    }
+                    onChange={(
+                      value
+                    ) =>
+                      updateComp(
+                        comp.id,
+                        'baths',
+                        value
+                      )
+                    }
+                    placeholder="2"
+                    type="number"
+                  />
+
+                  <WorkspaceField
+                    label="Year Built"
+                    value={
+                      comp.year
+                    }
+                    onChange={(
+                      value
+                    ) =>
+                      updateComp(
+                        comp.id,
+                        'year',
+                        value
+                      )
+                    }
+                    placeholder="1985"
+                    type="number"
+                  />
+                </div>
+              </div>
+            )
+          )}
+        </div>
+
+        <div
+          style={
+            calculateWrapStyle
+          }
+        >
+          <ActionButton
+            tone="gold"
+            onClick={
+              calculateComps
+            }
+          >
+            Calculate ARV
+          </ActionButton>
+        </div>
+      </SectionCard>
+
+      {result && (
+        <SectionCard
+          title="Comps Analysis"
+          subtitle={`Calculated from ${
+            result.compCount
+          } comparable ${
+            result.compCount ===
+            1
+              ? 'sale'
+              : 'sales'
+          }.`}
+        >
+          <div
+            style={
+              compsResultGridStyle
+            }
+          >
+            <CompResultCard
+              label="Estimated ARV"
+              value={money(
+                result.arv
+              )}
+              tone="gold"
+            />
+
+            <CompResultCard
+              label="Average Price / SF"
+              value={`$${result.averagePricePerSqft.toFixed(
+                0
+              )}`}
+              tone="blue"
+            />
+
+            <CompResultCard
+              label="Weighted Price / SF"
+              value={`$${result.weightedPricePerSqft.toFixed(
+                0
+              )}`}
+              tone="green"
+            />
+
+            <CompResultCard
+              label="Comparable Sales"
+              value={String(
+                result.compCount
+              )}
+              tone="gold"
+            />
+          </div>
+        </SectionCard>
+      )}
+    </div>
+  )
+}
+
+/* =========================================================
    COMPS COMPONENT HELPERS
 ========================================================= */
 
@@ -1491,187 +2034,36 @@ function WorkspaceField({
   type?: string
 }) {
   return (
-    <label style={workspaceFieldStyle}>
-      <span style={workspaceLabelStyle}>{label}</span>
+    <label
+      style={
+        workspaceFieldStyle
+      }
+    >
+      <span
+        style={
+          workspaceLabelStyle
+        }
+      >
+        {label}
+      </span>
 
       <input
         type={type}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        style={workspaceInputStyle}
+        onChange={(event) =>
+          onChange(
+            event.target.value
+          )
+        }
+        placeholder={
+          placeholder
+        }
+        style={
+          workspaceInputStyle
+        }
       />
     </label>
   )
-}
-
-/* =========================================================
-   COMPS STYLES
-========================================================= */
-
-const compsWorkspaceStyle: CSSProperties = {
-  display: 'grid',
-  gap: 16,
-}
-
-const compsSubjectSectionStyle: CSSProperties = {
-  display: 'grid',
-  gap: 18,
-}
-
-const leadSearchWrapStyle: CSSProperties = {
-  position: 'relative',
-  display: 'grid',
-  gap: 7,
-}
-
-const workspaceFieldStyle: CSSProperties = {
-  display: 'grid',
-  gap: 7,
-}
-
-const workspaceLabelStyle: CSSProperties = {
-  fontSize: 9.5,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-  color: 'rgba(255,255,255,0.45)',
-}
-
-const workspaceInputStyle: CSSProperties = {
-  width: '100%',
-  minHeight: 40,
-  boxSizing: 'border-box',
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.09)',
-  background: 'rgba(255,255,255,0.035)',
-  color: '#fff',
-  padding: '0 11px',
-  outline: 'none',
-  fontSize: 12,
-}
-
-const leadSearchStatusStyle: CSSProperties = {
-  position: 'absolute',
-  top: 64,
-  left: 0,
-  right: 0,
-  zIndex: 20,
-  padding: 10,
-  borderRadius: 10,
-  background: '#111',
-  border: '1px solid rgba(255,255,255,0.08)',
-  color: 'rgba(255,255,255,0.45)',
-  fontSize: 11,
-}
-
-const leadResultsStyle: CSSProperties = {
-  position: 'absolute',
-  top: 64,
-  left: 0,
-  right: 0,
-  zIndex: 30,
-  display: 'grid',
-  gap: 1,
-  overflow: 'hidden',
-  borderRadius: 12,
-  border: '1px solid rgba(214,166,75,0.22)',
-  background: '#11100d',
-  boxShadow: '0 18px 40px rgba(0,0,0,0.45)',
-}
-
-const leadResultButtonStyle: CSSProperties = {
-  appearance: 'none',
-  border: 0,
-  borderBottom: '1px solid rgba(255,255,255,0.06)',
-  background: 'transparent',
-  color: '#fff',
-  textAlign: 'left',
-  padding: '11px 13px',
-  cursor: 'pointer',
-}
-
-const leadResultAddressStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 750,
-  color: '#fff',
-}
-
-const leadResultMetaStyle: CSSProperties = {
-  marginTop: 4,
-  fontSize: 10.5,
-  color: 'rgba(255,255,255,0.45)',
-}
-
-const selectedLeadStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  padding: '9px 11px',
-  borderRadius: 10,
-  border: '1px solid rgba(74,222,128,0.18)',
-  background: 'rgba(74,222,128,0.05)',
-  color: '#4ade80',
-  fontSize: 10,
-}
-
-const subjectGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
-  gap: 10,
-}
-
-const compListStyle: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-}
-
-const compRowStyle: CSSProperties = {
-  padding: 13,
-  borderRadius: 13,
-  border: '1px solid rgba(255,255,255,0.07)',
-  background: 'rgba(255,255,255,0.02)',
-}
-
-const compHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginBottom: 11,
-}
-
-const compNumberStyle: CSSProperties = {
-  fontSize: 9,
-  fontWeight: 800,
-  letterSpacing: '0.1em',
-  color: '#d6a64b',
-}
-
-const removeCompStyle: CSSProperties = {
-  border: 0,
-  background: 'transparent',
-  color: 'rgba(255,255,255,0.35)',
-  fontSize: 10,
-  cursor: 'pointer',
-}
-
-const compInputGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))',
-  gap: 9,
-}
-
-const calculateWrapStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  marginTop: 14,
-}
-
-const compsResultGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-  gap: 10,
 }
 
 /* =========================================================
@@ -2457,7 +2849,7 @@ const TOOL_COMPONENTS: Record<
     ClosingCostTool,
 
   'comps-analyzer':
-    CompsAnalyzerTool,
+    CompsAnalyzerWorkspace,
 
   'contract-generator':
     ContractGeneratorTool,
@@ -2967,4 +3359,59 @@ const errorTextStyle: CSSProperties = {
   color: 'rgba(255,255,255,0.6)',
   fontSize: 13,
   lineHeight: 1.5,
+}
+
+/* =========================================================
+   COMPS ADDITIONAL STYLES
+========================================================= */
+
+const leadSearchInputWrapStyle: CSSProperties = {
+  position: 'relative',
+  width: '100%',
+}
+
+const clearSearchButtonStyle: CSSProperties = {
+  position: 'absolute',
+  right: 7,
+  top: 7,
+  width: 26,
+  height: 26,
+  border: 0,
+  borderRadius: 7,
+  background:
+    'rgba(255,255,255,0.07)',
+  color:
+    'rgba(255,255,255,0.55)',
+  cursor: 'pointer',
+  fontSize: 18,
+  lineHeight: 1,
+}
+
+const leadSearchErrorStyle: CSSProperties = {
+  padding: 10,
+  borderRadius: 10,
+  background:
+    'rgba(248,113,113,0.06)',
+  border:
+    '1px solid rgba(248,113,113,0.18)',
+  color: '#fca5a5',
+  fontSize: 11,
+}
+
+const selectedLeadInfoStyle: CSSProperties = {
+  display: 'grid',
+  gap: 3,
+}
+
+const clearSelectedLeadStyle: CSSProperties = {
+  border:
+    '1px solid rgba(255,255,255,0.08)',
+  background:
+    'rgba(255,255,255,0.04)',
+  color:
+    'rgba(255,255,255,0.55)',
+  borderRadius: 7,
+  padding: '6px 9px',
+  cursor: 'pointer',
+  fontSize: 10,
 }
