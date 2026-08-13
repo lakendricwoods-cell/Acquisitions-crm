@@ -2,17 +2,20 @@
 
 import Link from 'next/link'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ComponentType } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
 import ActionButton from '@/components/ui/action-button'
-import StatPill from '@/components/ui/stat-pill'
 import WorkspaceCanvas from '@/components/workspace-canvas'
 
 import { supabase } from '@/lib/supabase'
 import { getToolConfig, type ToolSlug } from './tool-config'
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type Lead = {
   id: string
@@ -46,6 +49,14 @@ type NumberInputProps = {
   suffix?: string
 }
 
+type ToolProps = {
+  lead: Lead | null
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
 function money(value: number) {
   if (!Number.isFinite(value)) return '$0'
 
@@ -62,6 +73,28 @@ function number(value: number) {
   }).format(value)
 }
 
+function leadValue(lead: Lead | null) {
+  return (
+    lead?.estimated_value ??
+    lead?.house_value ??
+    lead?.market_value ??
+    0
+  )
+}
+
+function copyText(text: string) {
+  if (
+    typeof navigator !== 'undefined' &&
+    navigator.clipboard
+  ) {
+    void navigator.clipboard.writeText(text)
+  }
+}
+
+/* =========================================================
+   BASIC INPUTS
+========================================================= */
+
 function NumberInput({
   label,
   value,
@@ -74,19 +107,26 @@ function NumberInput({
       <span style={fieldLabelStyle}>{label}</span>
 
       <div style={inputWrapStyle}>
-        {prefix && <span style={prefixStyle}>{prefix}</span>}
+        {prefix && (
+          <span style={prefixStyle}>{prefix}</span>
+        )}
 
         <input
           type="number"
           value={Number.isFinite(value) ? value : 0}
           onChange={(event) => {
             const parsed = Number(event.target.value)
-            onChange(Number.isFinite(parsed) ? parsed : 0)
+
+            onChange(
+              Number.isFinite(parsed) ? parsed : 0
+            )
           }}
           style={inputStyle}
         />
 
-        {suffix && <span style={prefixStyle}>{suffix}</span>}
+        {suffix && (
+          <span style={prefixStyle}>{suffix}</span>
+        )}
       </div>
     </label>
   )
@@ -109,7 +149,9 @@ function TextInput({
 
       <input
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
         placeholder={placeholder}
         style={inputStyle}
       />
@@ -134,7 +176,9 @@ function SelectInput({
 
       <select
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
         style={inputStyle}
       >
         {options.map((option) => (
@@ -146,6 +190,10 @@ function SelectInput({
     </label>
   )
 }
+
+/* =========================================================
+   RESULT CARD
+========================================================= */
 
 function ResultCard({
   label,
@@ -185,12 +233,97 @@ function ResultCard({
     >
       <div style={fieldLabelStyle}>{label}</div>
 
-      <div style={{ ...resultValueStyle, color: palette.text }}>
+      <div
+        style={{
+          ...resultValueStyle,
+          color: palette.text,
+        }}
+      >
         {value}
       </div>
     </div>
   )
 }
+
+/* =========================================================
+   PROPERTY SNAPSHOT
+========================================================= */
+
+function PropertySnapshot({
+  lead,
+}: {
+  lead: Lead
+}) {
+  const value = leadValue(lead)
+
+  return (
+    <SectionCard
+      title={
+        lead.property_address_1 ||
+        'Subject Property'
+      }
+      subtitle={[
+        lead.city,
+        lead.state,
+        lead.zip,
+      ]
+        .filter(Boolean)
+        .join(', ')}
+    >
+      <div style={leadGridStyle}>
+        <ResultCard
+          label="Estimated Value"
+          value={money(value)}
+          tone="gold"
+        />
+
+        <ResultCard
+          label="Equity"
+          value={money(
+            lead.equity_amount ?? 0
+          )}
+          tone="green"
+        />
+
+        <ResultCard
+          label="Mortgage"
+          value={money(
+            lead.mortgage_balance ?? 0
+          )}
+          tone="blue"
+        />
+
+        <ResultCard
+          label="Square Feet"
+          value={number(
+            lead.square_feet ?? 0
+          )}
+          tone="blue"
+        />
+
+        <ResultCard
+          label="Bedrooms"
+          value={String(
+            lead.bedrooms ?? 0
+          )}
+          tone="gold"
+        />
+
+        <ResultCard
+          label="Bathrooms"
+          value={String(
+            lead.bathrooms ?? 0
+          )}
+          tone="gold"
+        />
+      </div>
+    </SectionCard>
+  )
+}
+
+/* =========================================================
+   TOOL HEADER
+========================================================= */
 
 function ToolHeader({
   title,
@@ -201,247 +334,16 @@ function ToolHeader({
 }) {
   return (
     <div style={toolHeaderStyle}>
-      <div>
-        <div style={eyebrowStyle}>Foundation Acquisitions LLC</div>
-
-        <h1 style={toolTitleStyle}>{title}</h1>
-
-        <p style={toolDescriptionStyle}>{description}</p>
+      <div style={eyebrowStyle}>
+        FOUNDATION ACQUISITIONS LLC
       </div>
+
+      <h1 style={toolTitleStyle}>{title}</h1>
+
+      <p style={toolDescriptionStyle}>
+        {description}
+      </p>
     </div>
-  )
-}
-
-/* =========================================================
-   TOOL WORKSPACE CONTENT
-========================================================= */
-
-function ToolWorkspaceContent({
-  slug,
-}: {
-  slug: ToolSlug
-}) {
-  const searchParams = useSearchParams()
-
-  const leadId = searchParams.get('leadId')
-  const config = getToolConfig(slug)
-
-  const [lead, setLead] = useState<Lead | null>(null)
-  const [loadingLead, setLoadingLead] = useState(Boolean(leadId))
-
-  useEffect(() => {
-    async function loadLead() {
-      if (!leadId) {
-        setLoadingLead(false)
-        return
-      }
-
-      setLoadingLead(true)
-
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', leadId)
-        .single()
-
-      if (error) {
-        console.error(error)
-        setLead(null)
-      } else {
-        setLead(data as Lead)
-      }
-
-      setLoadingLead(false)
-    }
-
-    void loadLead()
-  }, [leadId])
-
-  if (!config) {
-    return (
-      <PageShell
-        title="Tool Not Found"
-        subtitle="The requested acquisition tool does not exist."
-      >
-        <SectionCard title="Unknown Tool">
-          <Link href="/tools">
-            <ActionButton tone="gold">
-              Back to Tools
-            </ActionButton>
-          </Link>
-        </SectionCard>
-      </PageShell>
-    )
-  }
-
-  if (loadingLead) {
-    return (
-      <PageShell
-        title={config.name}
-        subtitle="Loading property workspace..."
-      >
-        <SectionCard title="Loading">
-          <div style={loadingStyle}>
-            Loading lead intelligence...
-          </div>
-        </SectionCard>
-      </PageShell>
-    )
-  }
-
-  const address = lead
-    ? [
-        lead.property_address_1,
-        lead.city,
-        lead.state,
-        lead.zip,
-      ]
-        .filter(Boolean)
-        .join(', ')
-    : 'Standalone analysis'
-
-  return (
-    <PageShell
-      title={config.name}
-      subtitle={config.description}
-      actions={
-        <>
-          <Link href="/tools">
-            <ActionButton compact tone="ghost">
-              Tools
-            </ActionButton>
-          </Link>
-
-          {leadId && (
-            <Link href={`/leads/${leadId}`}>
-              <ActionButton compact tone="gold">
-                Lead Workspace
-              </ActionButton>
-            </Link>
-          )}
-        </>
-      }
-    >
-      <div style={pageStyle}>
-        <ToolHeader
-          title={config.name}
-          description={config.longDescription}
-        />
-
-        {lead && (
-          <SectionCard
-            title={lead.property_address_1 || 'Subject Property'}
-            subtitle={address}
-            actions={
-              <div style={leadBadgeStyle}>
-                {lead.lead_type || 'Lead'}
-              </div>
-            }
-          >
-            <div style={leadGridStyle}>
-              <ResultCard
-                label="Estimated Value"
-                value={money(
-                  lead.estimated_value ??
-                    lead.house_value ??
-                    lead.market_value ??
-                    0
-                )}
-                tone="gold"
-              />
-
-              <ResultCard
-                label="Equity"
-                value={money(lead.equity_amount ?? 0)}
-                tone="green"
-              />
-
-              <ResultCard
-                label="Mortgage"
-                value={money(lead.mortgage_balance ?? 0)}
-                tone="blue"
-              />
-
-              <ResultCard
-                label="Square Feet"
-                value={number(lead.square_feet ?? 0)}
-                tone="blue"
-              />
-            </div>
-          </SectionCard>
-        )}
-
-        {slug === 'assignment-contract' && (
-          <AssignmentContractTool lead={lead} />
-        )}
-
-        {slug === 'buyer-blast' && (
-          <BuyerBlastTool lead={lead} />
-        )}
-
-        {slug === 'closing-cost' && (
-          <ClosingCostTool lead={lead} />
-        )}
-
-        {slug === 'comps-analyzer' && (
-          <CompsAnalyzerTool lead={lead} />
-        )}
-
-        {slug === 'contract-generator' && (
-          <ContractGeneratorTool lead={lead} />
-        )}
-
-        {slug === 'marketing-roi' && (
-          <MarketingROITool />
-        )}
-
-        {slug === 'repair-estimator' && (
-          <RepairEstimatorTool />
-        )}
-
-        {slug === 'script-generator' && (
-          <ScriptGeneratorTool lead={lead} />
-        )}
-
-        {leadId && (
-          <div style={workspaceSectionStyle}>
-            <WorkspaceCanvas
-              leadId={leadId}
-              leadTitle={lead?.property_address_1 || config.name}
-            />
-          </div>
-        )}
-      </div>
-    </PageShell>
-  )
-}
-
-/* =========================================================
-   SUSPENSE WRAPPER
-========================================================= */
-
-export default function ToolWorkspace({
-  slug,
-}: {
-  slug: ToolSlug
-}) {
-  return (
-    <Suspense
-      fallback={
-        <PageShell
-          title="Loading Tool"
-          subtitle="Preparing your acquisition workspace..."
-        >
-          <SectionCard title="Loading">
-            <div style={loadingStyle}>
-              Loading tool workspace...
-            </div>
-          </SectionCard>
-        </PageShell>
-      }
-    >
-      <ToolWorkspaceContent slug={slug} />
-    </Suspense>
   )
 }
 
@@ -451,20 +353,55 @@ export default function ToolWorkspace({
 
 function AssignmentContractTool({
   lead,
-}: {
-  lead: Lead | null
-}) {
+}: ToolProps) {
   const [assignor, setAssignor] = useState('')
   const [assignee, setAssignee] = useState('')
-  const [purchasePrice, setPurchasePrice] = useState(
-    lead?.last_sale_amount ?? 0
-  )
-  const [assignmentFee, setAssignmentFee] = useState(20000)
-  const [earnestMoney, setEarnestMoney] = useState(5000)
-  const [closingDate, setClosingDate] = useState('')
 
-  const assignmentPrice = purchasePrice + assignmentFee
-  const totalConsideration = assignmentPrice + earnestMoney
+  const [purchasePrice, setPurchasePrice] =
+    useState(
+      lead?.last_sale_amount ??
+        leadValue(lead)
+    )
+
+  const [assignmentFee, setAssignmentFee] =
+    useState(20000)
+
+  const [earnestMoney, setEarnestMoney] =
+    useState(5000)
+
+  const [closingDate, setClosingDate] =
+    useState('')
+
+  const assignmentPrice =
+    purchasePrice + assignmentFee
+
+  const totalConsideration =
+    assignmentPrice + earnestMoney
+
+  const summary = [
+    'ASSIGNMENT DEAL SUMMARY',
+    '',
+    `Property: ${
+      lead?.property_address_1 || '—'
+    }`,
+    `Assignor: ${assignor || '—'}`,
+    `Assignee: ${assignee || '—'}`,
+    `Original Purchase Price: ${money(
+      purchasePrice
+    )}`,
+    `Assignment Fee: ${money(
+      assignmentFee
+    )}`,
+    `Assignment Price: ${money(
+      assignmentPrice
+    )}`,
+    `Earnest Money: ${money(
+      earnestMoney
+    )}`,
+    `Closing Date: ${
+      closingDate || '—'
+    }`,
+  ].join('\n')
 
   return (
     <div style={toolGridStyle}>
@@ -519,7 +456,7 @@ function AssignmentContractTool({
 
       <SectionCard
         title="Assignment Analysis"
-        subtitle="Calculated deal terms."
+        subtitle="Calculated deal economics."
       >
         <div style={resultGridStyle}>
           <ResultCard
@@ -535,7 +472,9 @@ function AssignmentContractTool({
 
           <ResultCard
             label="Assignment Price"
-            value={money(assignmentPrice)}
+            value={money(
+              assignmentPrice
+            )}
             tone="gold"
           />
 
@@ -547,7 +486,9 @@ function AssignmentContractTool({
 
           <ResultCard
             label="Total Consideration"
-            value={money(totalConsideration)}
+            value={money(
+              totalConsideration
+            )}
             tone="green"
           />
         </div>
@@ -556,41 +497,28 @@ function AssignmentContractTool({
           <strong>Deal Summary</strong>
 
           <p>
-            {assignor || 'Assignor'} intends to assign the purchase
-            agreement to {assignee || 'Assignee'} for an assignment fee
-            of {money(assignmentFee)}.
+            {assignor || 'Assignor'} intends
+            to assign the purchase agreement to{' '}
+            {assignee || 'Assignee'}.
           </p>
 
           <p>
-            Original contract price: {money(purchasePrice)}.
+            Assignment fee:{' '}
+            {money(assignmentFee)}.
           </p>
 
           <p>
-            Assignment price: {money(assignmentPrice)}.
+            Assignment price:{' '}
+            {money(assignmentPrice)}.
           </p>
-
-          {closingDate && (
-            <p>Target closing date: {closingDate}.</p>
-          )}
         </div>
 
         <div style={actionRowStyle}>
           <ActionButton
             tone="gold"
-            onClick={() => {
-              const text = [
-                'ASSIGNMENT DEAL SUMMARY',
-                `Assignor: ${assignor || '—'}`,
-                `Assignee: ${assignee || '—'}`,
-                `Original Purchase Price: ${money(purchasePrice)}`,
-                `Assignment Fee: ${money(assignmentFee)}`,
-                `Assignment Price: ${money(assignmentPrice)}`,
-                `Earnest Money: ${money(earnestMoney)}`,
-                `Closing Date: ${closingDate || '—'}`,
-              ].join('\n')
-
-              navigator.clipboard?.writeText(text)
-            }}
+            onClick={() =>
+              copyText(summary)
+            }
           >
             Copy Deal Summary
           </ActionButton>
@@ -606,39 +534,67 @@ function AssignmentContractTool({
 
 function BuyerBlastTool({
   lead,
-}: {
-  lead: Lead | null
-}) {
-  const [buyerName, setBuyerName] = useState('')
-  const [buyerEmail, setBuyerEmail] = useState('')
-  const [buyerPhone, setBuyerPhone] = useState('')
-  const [strategy, setStrategy] = useState('Fix & Flip')
-  const [minPrice, setMinPrice] = useState(0)
-  const [maxPrice, setMaxPrice] = useState(
-    lead?.estimated_value ?? lead?.house_value ?? 0
-  )
-  const [area, setArea] = useState(lead?.city ?? '')
-  const [message, setMessage] = useState('')
+}: ToolProps) {
+  const [buyerName, setBuyerName] =
+    useState('')
+
+  const [buyerEmail, setBuyerEmail] =
+    useState('')
+
+  const [buyerPhone, setBuyerPhone] =
+    useState('')
+
+  const [strategy, setStrategy] =
+    useState('Fix & Flip')
+
+  const [minPrice, setMinPrice] =
+    useState(0)
+
+  const [maxPrice, setMaxPrice] =
+    useState(leadValue(lead))
+
+  const [area, setArea] =
+    useState(lead?.city ?? '')
+
+  const [propertyType, setPropertyType] =
+    useState(
+      lead?.property_type ??
+        'Single Family'
+    )
+
+  const [message, setMessage] =
+    useState('')
 
   const propertyValue =
-    lead?.estimated_value ??
-    lead?.house_value ??
-    lead?.market_value ??
-    0
+    leadValue(lead)
 
   const matchScore = useMemo(() => {
     let score = 50
 
-    if (maxPrice >= propertyValue && maxPrice > 0) score += 20
-    if (minPrice <= propertyValue) score += 10
     if (
-      area &&
-      lead?.city?.toLowerCase() === area.toLowerCase()
+      maxPrice >= propertyValue &&
+      maxPrice > 0
+    ) {
+      score += 20
+    }
+
+    if (
+      minPrice <= propertyValue
     ) {
       score += 10
     }
 
-    if (strategy) score += 10
+    if (
+      area &&
+      lead?.city?.toLowerCase() ===
+        area.toLowerCase()
+    ) {
+      score += 10
+    }
+
+    if (strategy) {
+      score += 10
+    }
 
     return Math.min(score, 100)
   }, [
@@ -652,21 +608,25 @@ function BuyerBlastTool({
 
   function generateBlast() {
     const address =
-      lead?.property_address_1 || 'off-market property'
+      lead?.property_address_1 ||
+      'off-market property'
 
     const city =
-      lead?.city || area || 'the target market'
-
-    const price = propertyValue
-      ? money(propertyValue)
-      : 'price available upon request'
+      lead?.city ||
+      area ||
+      'the target market'
 
     setMessage(
       [
         `OFF-MARKET OPPORTUNITY — ${address}`,
         '',
         `Location: ${city}`,
-        `Estimated Value: ${price}`,
+        `Property Type: ${propertyType}`,
+        `Estimated Value: ${
+          propertyValue
+            ? money(propertyValue)
+            : 'Available upon request'
+        }`,
         `Strategy: ${strategy}`,
         '',
         `Looking for a buyer interested in ${strategy.toLowerCase()} opportunities in ${city}.`,
@@ -681,8 +641,8 @@ function BuyerBlastTool({
   return (
     <div style={toolGridStyle}>
       <SectionCard
-        title="Buyer Criteria"
-        subtitle="Enter a buyer's acquisition preferences."
+        title="Buyer Buy Box"
+        subtitle="Enter the buyer's acquisition criteria."
       >
         <div style={formGridStyle}>
           <TextInput
@@ -701,6 +661,20 @@ function BuyerBlastTool({
             label="Buyer Phone"
             value={buyerPhone}
             onChange={setBuyerPhone}
+          />
+
+          <SelectInput
+            label="Property Type"
+            value={propertyType}
+            onChange={setPropertyType}
+            options={[
+              'Single Family',
+              'Multi Family',
+              'Townhouse',
+              'Condo',
+              'Land',
+              'Other',
+            ]}
           />
 
           <SelectInput
@@ -748,7 +722,11 @@ function BuyerBlastTool({
           <ResultCard
             label="Match Score"
             value={`${matchScore}/100`}
-            tone={matchScore >= 80 ? 'green' : 'gold'}
+            tone={
+              matchScore >= 80
+                ? 'green'
+                : 'gold'
+            }
           />
 
           <ResultCard
@@ -764,17 +742,35 @@ function BuyerBlastTool({
         </div>
 
         <div style={actionRowStyle}>
-          <ActionButton tone="gold" onClick={generateBlast}>
+          <ActionButton
+            tone="gold"
+            onClick={generateBlast}
+          >
             Generate Buyer Blast
           </ActionButton>
         </div>
 
         <textarea
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
+          onChange={(event) =>
+            setMessage(event.target.value)
+          }
           placeholder="Generated buyer outreach will appear here..."
           style={textareaStyle}
         />
+
+        {message && (
+          <div style={actionRowStyle}>
+            <ActionButton
+              tone="ghost"
+              onClick={() =>
+                copyText(message)
+              }
+            >
+              Copy Outreach
+            </ActionButton>
+          </div>
+        )}
       </SectionCard>
     </div>
   )
@@ -786,20 +782,30 @@ function BuyerBlastTool({
 
 function ClosingCostTool({
   lead,
-}: {
-  lead: Lead | null
-}) {
-  const [purchasePrice, setPurchasePrice] = useState(
-    lead?.estimated_value ?? lead?.house_value ?? 0
-  )
+}: ToolProps) {
+  const [purchasePrice, setPurchasePrice] =
+    useState(leadValue(lead))
 
-  const [title, setTitle] = useState(1500)
-  const [recording, setRecording] = useState(100)
-  const [transferTax, setTransferTax] = useState(0)
-  const [propertyTax, setPropertyTax] = useState(0)
-  const [insurance, setInsurance] = useState(0)
-  const [inspection, setInspection] = useState(500)
-  const [other, setOther] = useState(0)
+  const [title, setTitle] =
+    useState(1500)
+
+  const [recording, setRecording] =
+    useState(100)
+
+  const [transferTax, setTransferTax] =
+    useState(0)
+
+  const [propertyTax, setPropertyTax] =
+    useState(0)
+
+  const [insurance, setInsurance] =
+    useState(0)
+
+  const [inspection, setInspection] =
+    useState(500)
+
+  const [other, setOther] =
+    useState(0)
 
   const total =
     title +
@@ -810,13 +816,19 @@ function ClosingCostTool({
     inspection +
     other
 
-  const cashRequired = purchasePrice + total
+  const cashRequired =
+    purchasePrice + total
+
+  const costPercent =
+    purchasePrice > 0
+      ? (total / purchasePrice) * 100
+      : 0
 
   return (
     <div style={toolGridStyle}>
       <SectionCard
         title="Transaction Inputs"
-        subtitle="Estimate buyer-side closing expenses."
+        subtitle="Estimate acquisition-side closing expenses."
       >
         <div style={formGridStyle}>
           <NumberInput
@@ -869,7 +881,7 @@ function ClosingCostTool({
           />
 
           <NumberInput
-            label="Other"
+            label="Other Costs"
             value={other}
             onChange={setOther}
             prefix="$"
@@ -879,12 +891,14 @@ function ClosingCostTool({
 
       <SectionCard
         title="Closing Analysis"
-        subtitle="Projected transaction cost."
+        subtitle="Projected transaction economics."
       >
         <div style={resultGridStyle}>
           <ResultCard
             label="Purchase Price"
-            value={money(purchasePrice)}
+            value={money(
+              purchasePrice
+            )}
           />
 
           <ResultCard
@@ -895,17 +909,17 @@ function ClosingCostTool({
 
           <ResultCard
             label="Cash Required"
-            value={money(cashRequired)}
+            value={money(
+              cashRequired
+            )}
             tone="green"
           />
 
           <ResultCard
             label="Cost %"
-            value={
-              purchasePrice
-                ? `${((total / purchasePrice) * 100).toFixed(2)}%`
-                : '0%'
-            }
+            value={`${costPercent.toFixed(
+              2
+            )}%`}
             tone="blue"
           />
         </div>
@@ -928,59 +942,66 @@ type Comp = {
 
 function CompsAnalyzerTool({
   lead,
-}: {
-  lead: Lead | null
-}) {
-  const subjectSqft = lead?.square_feet ?? 0
+}: ToolProps) {
+  const subjectSqft =
+    lead?.square_feet ?? 0
 
-  const [comps, setComps] = useState<Comp[]>([
-    {
-      id: 1,
-      salePrice: 0,
-      sqft: subjectSqft,
-      distance: 0,
-      ageMonths: 0,
-    },
-    {
-      id: 2,
-      salePrice: 0,
-      sqft: subjectSqft,
-      distance: 0,
-      ageMonths: 0,
-    },
-    {
-      id: 3,
-      salePrice: 0,
-      sqft: subjectSqft,
-      distance: 0,
-      ageMonths: 0,
-    },
-  ])
+  const [comps, setComps] =
+    useState<Comp[]>([
+      {
+        id: 1,
+        salePrice: 0,
+        sqft: subjectSqft,
+        distance: 0,
+        ageMonths: 0,
+      },
+      {
+        id: 2,
+        salePrice: 0,
+        sqft: subjectSqft,
+        distance: 0,
+        ageMonths: 0,
+      },
+      {
+        id: 3,
+        salePrice: 0,
+        sqft: subjectSqft,
+        distance: 0,
+        ageMonths: 0,
+      },
+    ])
 
-  const calculated = comps.filter(
-    (comp) => comp.salePrice > 0 && comp.sqft > 0
-  )
+  const calculated =
+    comps.filter(
+      (comp) =>
+        comp.salePrice > 0 &&
+        comp.sqft > 0
+    )
 
   const averagePrice =
-    calculated.length > 0
+    calculated.length
       ? calculated.reduce(
-          (sum, comp) => sum + comp.salePrice,
+          (sum, comp) =>
+            sum + comp.salePrice,
           0
         ) / calculated.length
       : 0
 
   const averagePricePerSqft =
-    calculated.length > 0
+    calculated.length
       ? calculated.reduce(
           (sum, comp) =>
-            sum + comp.salePrice / comp.sqft,
+            sum +
+            comp.salePrice /
+              comp.sqft,
           0
         ) / calculated.length
       : 0
 
-  const weightedArv =
+  const estimatedArv =
     subjectSqft > 0
-      ? subjectSqft * averagePricePerSqft
+      ? subjectSqft *
+        averagePricePerSqft
       : averagePrice
 
   const confidence =
@@ -1012,39 +1033,102 @@ function CompsAnalyzerTool({
   return (
     <div style={toolGridStyle}>
       <SectionCard
-        title="Comparable Sales"
-        subtitle="Enter comparable sales to estimate ARV."
+        title="Subject Property"
+        subtitle="Use the current lead as the ARV subject."
       >
-        <div style={{ overflowX: 'auto' }}>
+        <div style={leadGridStyle}>
+          <ResultCard
+            label="Subject Value"
+            value={money(
+              leadValue(lead)
+            )}
+          />
+
+          <ResultCard
+            label="Subject Sq Ft"
+            value={number(
+              subjectSqft
+            )}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Bedrooms"
+            value={String(
+              lead?.bedrooms ?? 0
+            )}
+            tone="gold"
+          />
+
+          <ResultCard
+            label="Bathrooms"
+            value={String(
+              lead?.bathrooms ?? 0
+            )}
+            tone="gold"
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Comparable Sales"
+        subtitle="Enter nearby comparable sales."
+      >
+        <div
+          style={{
+            overflowX: 'auto',
+          }}
+        >
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>Comp</th>
-                <th style={thStyle}>Sale Price</th>
-                <th style={thStyle}>Sq Ft</th>
-                <th style={thStyle}>Miles</th>
-                <th style={thStyle}>Age</th>
-                <th style={thStyle}>$/SF</th>
+                <th style={thStyle}>
+                  Comp
+                </th>
+                <th style={thStyle}>
+                  Sale Price
+                </th>
+                <th style={thStyle}>
+                  Sq Ft
+                </th>
+                <th style={thStyle}>
+                  Miles
+                </th>
+                <th style={thStyle}>
+                  Age
+                </th>
+                <th style={thStyle}>
+                  $/SF
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {comps.map((comp) => (
                 <tr key={comp.id}>
-                  <td style={tdStyle}>Comp {comp.id}</td>
+                  <td style={tdStyle}>
+                    Comp {comp.id}
+                  </td>
 
                   <td style={tdStyle}>
                     <input
                       type="number"
-                      value={comp.salePrice}
+                      value={
+                        comp.salePrice
+                      }
                       onChange={(event) =>
                         updateComp(
                           comp.id,
                           'salePrice',
-                          Number(event.target.value) || 0
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
                         )
                       }
-                      style={tableInputStyle}
+                      style={
+                        tableInputStyle
+                      }
                     />
                   </td>
 
@@ -1056,10 +1140,15 @@ function CompsAnalyzerTool({
                         updateComp(
                           comp.id,
                           'sqft',
-                          Number(event.target.value) || 0
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
                         )
                       }
-                      style={tableInputStyle}
+                      style={
+                        tableInputStyle
+                      }
                     />
                   </td>
 
@@ -1067,35 +1156,50 @@ function CompsAnalyzerTool({
                     <input
                       type="number"
                       step="0.1"
-                      value={comp.distance}
+                      value={
+                        comp.distance
+                      }
                       onChange={(event) =>
                         updateComp(
                           comp.id,
                           'distance',
-                          Number(event.target.value) || 0
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
                         )
                       }
-                      style={tableInputStyle}
+                      style={
+                        tableInputStyle
+                      }
                     />
                   </td>
 
                   <td style={tdStyle}>
                     <input
                       type="number"
-                      value={comp.ageMonths}
+                      value={
+                        comp.ageMonths
+                      }
                       onChange={(event) =>
                         updateComp(
                           comp.id,
                           'ageMonths',
-                          Number(event.target.value) || 0
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
                         )
                       }
-                      style={tableInputStyle}
+                      style={
+                        tableInputStyle
+                      }
                     />
                   </td>
 
                   <td style={tdStyle}>
-                    {comp.salePrice && comp.sqft
+                    {comp.salePrice > 0 &&
+                    comp.sqft > 0
                       ? money(
                           comp.salePrice /
                             comp.sqft
@@ -1112,16 +1216,21 @@ function CompsAnalyzerTool({
           <ActionButton
             tone="gold"
             onClick={() =>
-              setComps((current) => [
-                ...current,
-                {
-                  id: current.length + 1,
-                  salePrice: 0,
-                  sqft: subjectSqft,
-                  distance: 0,
-                  ageMonths: 0,
-                },
-              ])
+              setComps(
+                (current) => [
+                  ...current,
+                  {
+                    id:
+                      current.length +
+                      1,
+                    salePrice: 0,
+                    sqft:
+                      subjectSqft,
+                    distance: 0,
+                    ageMonths: 0,
+                  },
+                ]
+              )
             }
           >
             + Add Comp
@@ -1131,29 +1240,37 @@ function CompsAnalyzerTool({
 
       <SectionCard
         title="ARV Analysis"
-        subtitle="Weighted using average comparable price per square foot."
+        subtitle="Estimated using comparable price per square foot."
       >
         <div style={resultGridStyle}>
           <ResultCard
             label="Valid Comps"
-            value={String(calculated.length)}
+            value={String(
+              calculated.length
+            )}
             tone="blue"
           />
 
           <ResultCard
             label="Average Sale Price"
-            value={money(averagePrice)}
+            value={money(
+              averagePrice
+            )}
           />
 
           <ResultCard
             label="Average $/SF"
-            value={`$${averagePricePerSqft.toFixed(2)}`}
+            value={`$${averagePricePerSqft.toFixed(
+              2
+            )}`}
             tone="blue"
           />
 
           <ResultCard
             label="Estimated ARV"
-            value={money(weightedArv)}
+            value={money(
+              estimatedArv
+            )}
             tone="green"
           />
 
@@ -1178,27 +1295,34 @@ function CompsAnalyzerTool({
 
 function ContractGeneratorTool({
   lead,
-}: {
-  lead: Lead | null
-}) {
-  const [buyer, setBuyer] = useState('')
-  const [seller, setSeller] = useState(
-    lead?.owner_name ?? ''
-  )
-  const [purchasePrice, setPurchasePrice] = useState(
-    lead?.estimated_value ??
-      lead?.house_value ??
-      0
-  )
+}: ToolProps) {
+  const [buyer, setBuyer] =
+    useState('')
+
+  const [seller, setSeller] =
+    useState(
+      lead?.owner_name ?? ''
+    )
+
+  const [purchasePrice, setPurchasePrice] =
+    useState(leadValue(lead))
+
   const [earnestMoney, setEarnestMoney] =
     useState(5000)
+
   const [closingDate, setClosingDate] =
     useState('')
+
   const [financing, setFinancing] =
     useState('Cash')
+
   const [contingencies, setContingencies] =
-    useState('Inspection and due diligence')
-  const [generated, setGenerated] = useState('')
+    useState(
+      'Inspection and due diligence'
+    )
+
+  const [generated, setGenerated] =
+    useState('')
 
   function generate() {
     setGenerated(
@@ -1208,11 +1332,18 @@ function ContractGeneratorTool({
         `Buyer: ${buyer || '—'}`,
         `Seller: ${seller || '—'}`,
         `Property: ${
-          lead?.property_address_1 || '—'
+          lead?.property_address_1 ||
+          '—'
         }`,
-        `Purchase Price: ${money(purchasePrice)}`,
-        `Earnest Money: ${money(earnestMoney)}`,
-        `Closing Date: ${closingDate || '—'}`,
+        `Purchase Price: ${money(
+          purchasePrice
+        )}`,
+        `Earnest Money: ${money(
+          earnestMoney
+        )}`,
+        `Closing Date: ${
+          closingDate || '—'
+        }`,
         `Financing: ${financing}`,
         `Contingencies: ${contingencies}`,
         '',
@@ -1275,7 +1406,11 @@ function ContractGeneratorTool({
           />
         </div>
 
-        <div style={{ marginTop: 12 }}>
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
           <label style={fieldStyle}>
             <span style={fieldLabelStyle}>
               Contingencies
@@ -1310,7 +1445,9 @@ function ContractGeneratorTool({
         <textarea
           value={generated}
           onChange={(event) =>
-            setGenerated(event.target.value)
+            setGenerated(
+              event.target.value
+            )
           }
           placeholder="Your generated contract terms will appear here..."
           style={{
@@ -1318,6 +1455,19 @@ function ContractGeneratorTool({
             minHeight: 330,
           }}
         />
+
+        {generated && (
+          <div style={actionRowStyle}>
+            <ActionButton
+              tone="ghost"
+              onClick={() =>
+                copyText(generated)
+              }
+            >
+              Copy Contract Data
+            </ActionButton>
+          </div>
+        )}
       </SectionCard>
     </div>
   )
@@ -1327,35 +1477,59 @@ function ContractGeneratorTool({
    MARKETING ROI
 ========================================================= */
 
-function MarketingROITool() {
-  const [spend, setSpend] = useState(0)
-  const [leads, setLeads] = useState(0)
-  const [contacts, setContacts] = useState(0)
+function MarketingROITool({
+  lead: _lead,
+}: ToolProps) {
+  const [spend, setSpend] =
+    useState(0)
+
+  const [leads, setLeads] =
+    useState(0)
+
+  const [contacts, setContacts] =
+    useState(0)
+
   const [appointments, setAppointments] =
     useState(0)
-  const [offers, setOffers] = useState(0)
-  const [contracts, setContracts] = useState(0)
-  const [closings, setClosings] = useState(0)
-  const [revenue, setRevenue] = useState(0)
+
+  const [offers, setOffers] =
+    useState(0)
+
+  const [contracts, setContracts] =
+    useState(0)
+
+  const [closings, setClosings] =
+    useState(0)
+
+  const [revenue, setRevenue] =
+    useState(0)
 
   const costPerLead =
-    leads ? spend / leads : 0
+    leads > 0
+      ? spend / leads
+      : 0
 
   const costPerContract =
-    contracts ? spend / contracts : 0
+    contracts > 0
+      ? spend / contracts
+      : 0
 
   const conversionRate =
-    leads
+    leads > 0
       ? (closings / leads) * 100
       : 0
 
   const roi =
-    spend
-      ? ((revenue - spend) / spend) * 100
+    spend > 0
+      ? ((revenue - spend) /
+          spend) *
+        100
       : 0
 
   const roas =
-    spend ? revenue / spend : 0
+    spend > 0
+      ? revenue / spend
+      : 0
 
   return (
     <div style={toolGridStyle}>
@@ -1423,33 +1597,45 @@ function MarketingROITool() {
         <div style={resultGridStyle}>
           <ResultCard
             label="Cost Per Lead"
-            value={money(costPerLead)}
+            value={money(
+              costPerLead
+            )}
             tone="gold"
           />
 
           <ResultCard
             label="Cost Per Contract"
-            value={money(costPerContract)}
+            value={money(
+              costPerContract
+            )}
             tone="blue"
           />
 
           <ResultCard
             label="Lead → Close"
-            value={`${conversionRate.toFixed(2)}%`}
+            value={`${conversionRate.toFixed(
+              2
+            )}%`}
             tone="green"
           />
 
           <ResultCard
             label="ROI"
-            value={`${roi.toFixed(2)}%`}
+            value={`${roi.toFixed(
+              2
+            )}%`}
             tone={
-              roi >= 0 ? 'green' : 'gold'
+              roi >= 0
+                ? 'green'
+                : 'gold'
             }
           />
 
           <ResultCard
             label="ROAS"
-            value={`${roas.toFixed(2)}x`}
+            value={`${roas.toFixed(
+              2
+            )}x`}
             tone="green"
           />
         </div>
@@ -1462,22 +1648,39 @@ function MarketingROITool() {
    REPAIR ESTIMATOR
 ========================================================= */
 
-function RepairEstimatorTool() {
-  const [roof, setRoof] = useState(0)
-  const [hvac, setHvac] = useState(0)
+function RepairEstimatorTool({
+  lead,
+}: ToolProps) {
+  const [roof, setRoof] =
+    useState(0)
+
+  const [hvac, setHvac] =
+    useState(0)
+
   const [plumbing, setPlumbing] =
     useState(0)
+
   const [electrical, setElectrical] =
     useState(0)
-  const [kitchen, setKitchen] = useState(0)
+
+  const [kitchen, setKitchen] =
+    useState(0)
+
   const [bathrooms, setBathrooms] =
     useState(0)
+
   const [flooring, setFlooring] =
     useState(0)
-  const [paint, setPaint] = useState(0)
+
+  const [paint, setPaint] =
+    useState(0)
+
   const [landscaping, setLandscaping] =
     useState(0)
-  const [other, setOther] = useState(0)
+
+  const [other, setOther] =
+    useState(0)
+
   const [contingency, setContingency] =
     useState(10)
 
@@ -1494,10 +1697,12 @@ function RepairEstimatorTool() {
     other
 
   const contingencyAmount =
-    base * (contingency / 100)
+    base *
+    (contingency / 100)
 
   const total =
-    base + contingencyAmount
+    base +
+    contingencyAmount
 
   const repairLevel =
     total === 0
@@ -1509,6 +1714,21 @@ function RepairEstimatorTool() {
           : total < 100000
             ? 'Heavy'
             : 'Major Rehab'
+
+  const summary = [
+    'REPAIR ESTIMATE',
+    '',
+    `Property: ${
+      lead?.property_address_1 ||
+      'Standalone Estimate'
+    }`,
+    `Base Repairs: ${money(base)}`,
+    `Contingency: ${money(
+      contingencyAmount
+    )}`,
+    `Total Repairs: ${money(total)}`,
+    `Repair Level: ${repairLevel}`,
+  ].join('\n')
 
   return (
     <div style={toolGridStyle}>
@@ -1627,6 +1847,17 @@ function RepairEstimatorTool() {
             tone="gold"
           />
         </div>
+
+        <div style={actionRowStyle}>
+          <ActionButton
+            tone="ghost"
+            onClick={() =>
+              copyText(summary)
+            }
+          >
+            Copy Repair Summary
+          </ActionButton>
+        </div>
       </SectionCard>
     </div>
   )
@@ -1638,9 +1869,7 @@ function RepairEstimatorTool() {
 
 function ScriptGeneratorTool({
   lead,
-}: {
-  lead: Lead | null
-}) {
+}: ToolProps) {
   const [leadType, setLeadType] =
     useState(
       lead?.lead_type ||
@@ -1678,7 +1907,7 @@ function ScriptGeneratorTool({
         `Property Condition: ${condition}`,
         '',
         'OPENING',
-        `“Hi, this is Foundation Acquisitions. I’m reaching out about the property. I wanted to see if you had a few minutes to talk about it.”`,
+        '“Hi, this is Foundation Acquisitions. I’m reaching out about the property. I wanted to see if you had a few minutes to talk about it.”',
         '',
         'DISCOVERY',
         '1. What are you looking to do with the property?',
@@ -1744,7 +1973,11 @@ function ScriptGeneratorTool({
           />
         </div>
 
-        <div style={{ marginTop: 12 }}>
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
           <TextInput
             label="Motivation"
             value={motivation}
@@ -1752,7 +1985,11 @@ function ScriptGeneratorTool({
           />
         </div>
 
-        <div style={{ marginTop: 12 }}>
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
           <TextInput
             label="Call Objective"
             value={objective}
@@ -1760,7 +1997,11 @@ function ScriptGeneratorTool({
           />
         </div>
 
-        <div style={{ marginTop: 12 }}>
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
           <TextInput
             label="Likely Objection"
             value={objection}
@@ -1785,7 +2026,9 @@ function ScriptGeneratorTool({
         <textarea
           value={script}
           onChange={(event) =>
-            setScript(event.target.value)
+            setScript(
+              event.target.value
+            )
           }
           placeholder="Your script will appear here..."
           style={{
@@ -1793,26 +2036,327 @@ function ScriptGeneratorTool({
             minHeight: 500,
           }}
         />
+
+        {script && (
+          <div style={actionRowStyle}>
+            <ActionButton
+              tone="ghost"
+              onClick={() =>
+                copyText(script)
+              }
+            >
+              Copy Script
+            </ActionButton>
+          </div>
+        )}
       </SectionCard>
     </div>
   )
 }
 
 /* =========================================================
-   SHARED STYLES
+   TOOL REGISTRY
+========================================================= */
+
+const TOOL_COMPONENTS: Record<
+  ToolSlug,
+  ComponentType<ToolProps>
+> = {
+  'assignment-contract':
+    AssignmentContractTool,
+
+  'buyer-blast':
+    BuyerBlastTool,
+
+  'closing-cost':
+    ClosingCostTool,
+
+  'comps-analyzer':
+    CompsAnalyzerTool,
+
+  'contract-generator':
+    ContractGeneratorTool,
+
+  'marketing-roi':
+    MarketingROITool,
+
+  'repair-estimator':
+    RepairEstimatorTool,
+
+  'script-generator':
+    ScriptGeneratorTool,
+}
+
+/* =========================================================
+   TOOL WORKSPACE CONTENT
+========================================================= */
+
+function ToolWorkspaceContent({
+  slug,
+}: {
+  slug: ToolSlug
+}) {
+  const searchParams =
+    useSearchParams()
+
+  const leadId =
+    searchParams.get('leadId')
+
+  const config =
+    getToolConfig(slug)
+
+  const [
+    lead,
+    setLead,
+  ] = useState<Lead | null>(null)
+
+  const [
+    loadingLead,
+    setLoadingLead,
+  ] = useState(
+    Boolean(leadId)
+  )
+
+  const [
+    leadError,
+    setLeadError,
+  ] = useState<string | null>(
+    null
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadLead() {
+      if (!leadId) {
+        setLoadingLead(false)
+        return
+      }
+
+      setLoadingLead(true)
+      setLeadError(null)
+
+      const {
+        data,
+        error,
+      } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .single()
+
+      if (cancelled) return
+
+      if (error) {
+        console.error(
+          'Tool lead load error:',
+          error
+        )
+
+        setLead(null)
+        setLeadError(
+          'The property information could not be loaded. The tool can still be used manually.'
+        )
+      } else {
+        setLead(
+          data as Lead
+        )
+      }
+
+      setLoadingLead(false)
+    }
+
+    void loadLead()
+
+    return () => {
+      cancelled = true
+    }
+  }, [leadId])
+
+  if (!config) {
+    return (
+      <PageShell
+        title="Tool Not Found"
+        subtitle="The requested acquisition tool does not exist."
+      >
+        <SectionCard title="Unknown Tool">
+          <Link href="/tools">
+            <ActionButton tone="gold">
+              Back to Tools
+            </ActionButton>
+          </Link>
+        </SectionCard>
+      </PageShell>
+    )
+  }
+
+  if (loadingLead) {
+    return (
+      <PageShell
+        title={config.name}
+        subtitle="Loading property workspace..."
+      >
+        <SectionCard title="Loading">
+          <div style={loadingStyle}>
+            Loading property intelligence...
+          </div>
+        </SectionCard>
+      </PageShell>
+    )
+  }
+
+  const ToolComponent =
+    TOOL_COMPONENTS[slug]
+
+  if (!ToolComponent) {
+    return (
+      <PageShell
+        title="Tool Error"
+        subtitle="This tool is not registered correctly."
+      >
+        <SectionCard title="Configuration Error">
+          <p style={errorTextStyle}>
+            The tool exists in the
+            configuration but does not
+            have a workspace component.
+          </p>
+
+          <Link href="/tools">
+            <ActionButton tone="gold">
+              Back to Tools
+            </ActionButton>
+          </Link>
+        </SectionCard>
+      </PageShell>
+    )
+  }
+
+  return (
+    <PageShell
+      title={config.name}
+      subtitle={config.description}
+      actions={
+        <>
+          <Link href="/tools">
+            <ActionButton
+              compact
+              tone="ghost"
+            >
+              Tools
+            </ActionButton>
+          </Link>
+
+          {leadId && (
+            <Link
+              href={`/leads/${leadId}`}
+            >
+              <ActionButton
+                compact
+                tone="gold"
+              >
+                Lead Workspace
+              </ActionButton>
+            </Link>
+          )}
+        </>
+      }
+    >
+      <div style={pageStyle}>
+        <ToolHeader
+          title={config.name}
+          description={
+            config.longDescription
+          }
+        />
+
+        {leadError && (
+          <div style={warningBoxStyle}>
+            {leadError}
+          </div>
+        )}
+
+        {lead && (
+          <PropertySnapshot
+            lead={lead}
+          />
+        )}
+
+        <ToolComponent
+          lead={lead}
+        />
+
+        {leadId && (
+          <div
+            style={
+              workspaceSectionStyle
+            }
+          >
+            <WorkspaceCanvas
+              leadId={leadId}
+              leadTitle={
+                lead?.property_address_1 ||
+                config.name
+              }
+            />
+          </div>
+        )}
+      </div>
+    </PageShell>
+  )
+}
+
+/* =========================================================
+   SUSPENSE WRAPPER
+========================================================= */
+
+export default function ToolWorkspace({
+  slug,
+}: {
+  slug: ToolSlug
+}) {
+  return (
+    <Suspense
+      fallback={
+        <PageShell
+          title="Loading Tool"
+          subtitle="Preparing your acquisition workspace..."
+        >
+          <SectionCard title="Loading">
+            <div
+              style={loadingStyle}
+            >
+              Loading tool workspace...
+            </div>
+          </SectionCard>
+        </PageShell>
+      }
+    >
+      <ToolWorkspaceContent
+        slug={slug}
+      />
+    </Suspense>
+  )
+}
+
+/* =========================================================
+   STYLES
 ========================================================= */
 
 const pageStyle: CSSProperties = {
   display: 'grid',
   gap: 18,
+  width: '100%',
+  minWidth: 0,
 }
 
 const toolGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
-    'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
+    'minmax(0, 1.2fr) minmax(300px, 0.8fr)',
   gap: 18,
   alignItems: 'start',
+  width: '100%',
+  minWidth: 0,
 }
 
 const toolHeaderStyle: CSSProperties = {
@@ -1847,24 +2391,10 @@ const toolDescriptionStyle: CSSProperties = {
   maxWidth: 720,
 }
 
-const leadBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '5px 9px',
-  borderRadius: 8,
-  border:
-    '1px solid rgba(214,166,75,0.25)',
-  background: 'rgba(214,166,75,0.08)',
-  color: '#d6a64b',
-  fontSize: 9,
-  fontWeight: 800,
-  textTransform: 'uppercase',
-}
-
 const leadGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
-    'repeat(auto-fit, minmax(150px, 1fr))',
+    'repeat(auto-fit, minmax(140px, 1fr))',
   gap: 10,
 }
 
@@ -1896,7 +2426,8 @@ const inputWrapStyle: CSSProperties = {
   borderRadius: 10,
   border:
     '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.025)',
+  background:
+    'rgba(255,255,255,0.025)',
   overflow: 'hidden',
 }
 
@@ -1913,7 +2444,8 @@ const inputStyle: CSSProperties = {
   borderRadius: 10,
   border:
     '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.025)',
+  background:
+    'rgba(255,255,255,0.025)',
   color: '#fff',
   padding: '0 11px',
   outline: 'none',
@@ -1923,7 +2455,7 @@ const inputStyle: CSSProperties = {
 const resultGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
-    'repeat(auto-fit, minmax(150px, 1fr))',
+    'repeat(auto-fit, minmax(145px, 1fr))',
   gap: 10,
 }
 
@@ -1948,14 +2480,9 @@ const outputBoxStyle: CSSProperties = {
   borderRadius: 12,
   border:
     '1px solid rgba(255,255,255,0.07)',
-  background: 'rgba(0,0,0,0.25)',
+  background:
+    'rgba(0,0,0,0.25)',
   padding: 14,
-  color: 'rgba(255,255,255,0.62)',
-  fontSize: 12,
-  lineHeight: 1.55,
-}
-
-const outputTextStyle: CSSProperties = {
   color: 'rgba(255,255,255,0.62)',
   fontSize: 12,
   lineHeight: 1.55,
@@ -1969,7 +2496,8 @@ const textareaStyle: CSSProperties = {
   borderRadius: 12,
   border:
     '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(0,0,0,0.25)',
+  background:
+    'rgba(0,0,0,0.25)',
   color: '#fff',
   padding: 13,
   outline: 'none',
@@ -2017,7 +2545,8 @@ const tableInputStyle: CSSProperties = {
   borderRadius: 7,
   border:
     '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.025)',
+  background:
+    'rgba(255,255,255,0.025)',
   color: '#fff',
   padding: '0 8px',
   outline: 'none',
@@ -2035,4 +2564,22 @@ const loadingStyle: CSSProperties = {
   justifyContent: 'center',
   color: 'rgba(255,255,255,0.45)',
   fontSize: 13,
+}
+
+const warningBoxStyle: CSSProperties = {
+  borderRadius: 12,
+  border:
+    '1px solid rgba(214,166,75,0.25)',
+  background:
+    'rgba(214,166,75,0.06)',
+  color: 'rgba(255,255,255,0.65)',
+  padding: 12,
+  fontSize: 12,
+  lineHeight: 1.5,
+}
+
+const errorTextStyle: CSSProperties = {
+  color: 'rgba(255,255,255,0.6)',
+  fontSize: 13,
+  lineHeight: 1.5,
 }
