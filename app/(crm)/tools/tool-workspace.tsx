@@ -936,50 +936,173 @@ type Comp = {
   id: number
   salePrice: number
   sqft: number
-  distance: number
+  bedrooms: number
+  bathrooms: number
   ageMonths: number
 }
 
 function CompsAnalyzerTool({
   lead,
-}: ToolProps) {
-  const subjectSqft =
-    lead?.square_feet ?? 0
+}: {
+  lead: Lead | null
+}) {
+  const subjectSqft = lead?.square_feet ?? 0
+  const subjectBedrooms = lead?.bedrooms ?? 0
+  const subjectBathrooms = lead?.bathrooms ?? 0
 
-  const [comps, setComps] =
-    useState<Comp[]>([
-      {
-        id: 1,
-        salePrice: 0,
-        sqft: subjectSqft,
-        distance: 0,
-        ageMonths: 0,
-      },
-      {
-        id: 2,
-        salePrice: 0,
-        sqft: subjectSqft,
-        distance: 0,
-        ageMonths: 0,
-      },
-      {
-        id: 3,
-        salePrice: 0,
-        sqft: subjectSqft,
-        distance: 0,
-        ageMonths: 0,
-      },
-    ])
+  const [comps, setComps] = useState<Comp[]>([
+    {
+      id: 1,
+      salePrice: 0,
+      sqft: subjectSqft,
+      bedrooms: subjectBedrooms,
+      bathrooms: subjectBathrooms,
+      ageMonths: 0,
+    },
+    {
+      id: 2,
+      salePrice: 0,
+      sqft: subjectSqft,
+      bedrooms: subjectBedrooms,
+      bathrooms: subjectBathrooms,
+      ageMonths: 0,
+    },
+    {
+      id: 3,
+      salePrice: 0,
+      sqft: subjectSqft,
+      bedrooms: subjectBedrooms,
+      bathrooms: subjectBathrooms,
+      ageMonths: 0,
+    },
+  ])
 
-  const calculated =
-    comps.filter(
-      (comp) =>
-        comp.salePrice > 0 &&
-        comp.sqft > 0
-    )
+  /*
+    Only comps with a sale price and square footage
+    can be used in the ARV calculation.
+  */
+  const calculated = comps.filter(
+    (comp) =>
+      comp.salePrice > 0 &&
+      comp.sqft > 0
+  )
 
+  /*
+    Calculate price per square foot for each comp.
+  */
+  const compsWithPsf = calculated.map((comp) => ({
+    ...comp,
+    pricePerSqft:
+      comp.salePrice / comp.sqft,
+  }))
+
+  /*
+    Calculate a similarity score for each comp.
+
+    Sq Ft = 40%
+    Bedrooms = 20%
+    Bathrooms = 20%
+    Recency = 20%
+
+    The score is used to weight more similar
+    properties more heavily in the ARV.
+  */
+  function getSimilarityScore(comp: Comp) {
+    let score = 0
+
+    // Square footage similarity
+    if (subjectSqft > 0 && comp.sqft > 0) {
+      const sqftDifference =
+        Math.abs(comp.sqft - subjectSqft) /
+        subjectSqft
+
+      const sqftScore = Math.max(
+        0,
+        1 - sqftDifference
+      )
+
+      score += sqftScore * 40
+    } else {
+      score += 20
+    }
+
+    // Bedroom similarity
+    if (
+      subjectBedrooms > 0 &&
+      comp.bedrooms > 0
+    ) {
+      const bedroomDifference =
+        Math.abs(
+          comp.bedrooms - subjectBedrooms
+        )
+
+      const bedroomScore =
+        bedroomDifference === 0
+          ? 1
+          : bedroomDifference === 1
+            ? 0.5
+            : 0
+
+      score += bedroomScore * 20
+    } else {
+      score += 10
+    }
+
+    // Bathroom similarity
+    if (
+      subjectBathrooms > 0 &&
+      comp.bathrooms > 0
+    ) {
+      const bathroomDifference =
+        Math.abs(
+          comp.bathrooms -
+            subjectBathrooms
+        )
+
+      const bathroomScore =
+        bathroomDifference === 0
+          ? 1
+          : bathroomDifference <= 0.5
+            ? 0.5
+            : 0
+
+      score += bathroomScore * 20
+    } else {
+      score += 10
+    }
+
+    // Sale recency
+    if (comp.ageMonths >= 0) {
+      const recencyScore =
+        comp.ageMonths <= 3
+          ? 1
+          : comp.ageMonths <= 6
+            ? 0.85
+            : comp.ageMonths <= 12
+              ? 0.7
+              : comp.ageMonths <= 18
+                ? 0.5
+                : 0.25
+
+      score += recencyScore * 20
+    }
+
+    return Math.max(1, score)
+  }
+
+  const scoredComps = compsWithPsf.map(
+    (comp) => ({
+      ...comp,
+      similarityScore:
+        getSimilarityScore(comp),
+    })
+  )
+
+  /*
+    Average sale price.
+  */
   const averagePrice =
-    calculated.length
+    calculated.length > 0
       ? calculated.reduce(
           (sum, comp) =>
             sum + comp.salePrice,
@@ -987,8 +1110,11 @@ function CompsAnalyzerTool({
         ) / calculated.length
       : 0
 
+  /*
+    Average price per square foot.
+  */
   const averagePricePerSqft =
-    calculated.length
+    calculated.length > 0
       ? calculated.reduce(
           (sum, comp) =>
             sum +
@@ -998,20 +1124,99 @@ function CompsAnalyzerTool({
         ) / calculated.length
       : 0
 
-  const estimatedArv =
+  /*
+    Simple ARV based on average $/SF.
+  */
+  const psfArv =
     subjectSqft > 0
       ? subjectSqft *
         averagePricePerSqft
       : averagePrice
 
-  const confidence =
-    calculated.length >= 3
-      ? 'High'
-      : calculated.length === 2
+  /*
+    Weighted ARV.
+
+    More similar comps receive more influence.
+  */
+  const totalWeight =
+    scoredComps.reduce(
+      (sum, comp) =>
+        sum + comp.similarityScore,
+      0
+    )
+
+  const weightedPricePerSqft =
+    totalWeight > 0
+      ? scoredComps.reduce(
+          (sum, comp) =>
+            sum +
+            comp.pricePerSqft *
+              comp.similarityScore,
+          0
+        ) / totalWeight
+      : 0
+
+  const weightedArv =
+    subjectSqft > 0
+      ? subjectSqft *
+        weightedPricePerSqft
+      : averagePrice
+
+  /*
+    ARV range.
+
+    We use the weighted ARV as the center
+    and create a reasonable analytical range
+    rather than pretending the estimate is exact.
+  */
+  const lowArv =
+    weightedArv > 0
+      ? weightedArv * 0.9
+      : 0
+
+  const highArv =
+    weightedArv > 0
+      ? weightedArv * 1.1
+      : 0
+
+  /*
+    Confidence is based on:
+    - Number of comps
+    - Subject property data
+    - Comp similarity
+  */
+  const averageSimilarity =
+    scoredComps.length > 0
+      ? scoredComps.reduce(
+          (sum, comp) =>
+            sum + comp.similarityScore,
+          0
+        ) / scoredComps.length
+      : 0
+
+  let confidence =
+    'Insufficient'
+
+  if (calculated.length >= 3) {
+    if (
+      averageSimilarity >= 80
+    ) {
+      confidence = 'High'
+    } else if (
+      averageSimilarity >= 60
+    ) {
+      confidence = 'Moderate'
+    } else {
+      confidence = 'Low'
+    }
+  } else if (calculated.length === 2) {
+    confidence =
+      averageSimilarity >= 70
         ? 'Moderate'
-        : calculated.length === 1
-          ? 'Low'
-          : 'Insufficient'
+        : 'Low'
+  } else if (calculated.length === 1) {
+    confidence = 'Low'
+  }
 
   function updateComp(
     id: number,
@@ -1030,184 +1235,355 @@ function CompsAnalyzerTool({
     )
   }
 
+  function addComp() {
+    setComps((current) => [
+      ...current,
+      {
+        id:
+          current.length > 0
+            ? Math.max(
+                ...current.map(
+                  (comp) => comp.id
+                )
+              ) + 1
+            : 1,
+        salePrice: 0,
+        sqft: subjectSqft,
+        bedrooms:
+          subjectBedrooms,
+        bathrooms:
+          subjectBathrooms,
+        ageMonths: 0,
+      },
+    ])
+  }
+
+  function removeComp(id: number) {
+    setComps((current) =>
+      current.filter(
+        (comp) => comp.id !== id
+      )
+    )
+  }
+
   return (
     <div style={toolGridStyle}>
+      {/* SUBJECT PROPERTY */}
       <SectionCard
         title="Subject Property"
-        subtitle="Use the current lead as the ARV subject."
+        subtitle="Property characteristics used to compare the comps."
       >
-        <div style={leadGridStyle}>
+        <div style={resultGridStyle}>
           <ResultCard
-            label="Subject Value"
-            value={money(
-              leadValue(lead)
-            )}
-          />
-
-          <ResultCard
-            label="Subject Sq Ft"
-            value={number(
-              subjectSqft
-            )}
+            label="Bedrooms"
+            value={
+              subjectBedrooms
+                ? String(
+                    subjectBedrooms
+                  )
+                : '—'
+            }
             tone="blue"
           />
 
           <ResultCard
-            label="Bedrooms"
-            value={String(
-              lead?.bedrooms ?? 0
-            )}
+            label="Bathrooms"
+            value={
+              subjectBathrooms
+                ? String(
+                    subjectBathrooms
+                  )
+                : '—'
+            }
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Square Feet"
+            value={
+              subjectSqft
+                ? number(subjectSqft)
+                : '—'
+            }
             tone="gold"
           />
 
           <ResultCard
-            label="Bathrooms"
-            value={String(
-              lead?.bathrooms ?? 0
+            label="Current Value"
+            value={money(
+              lead?.estimated_value ??
+                lead?.house_value ??
+                lead?.market_value ??
+                0
             )}
-            tone="gold"
+            tone="green"
           />
         </div>
       </SectionCard>
 
+      {/* COMPS */}
       <SectionCard
         title="Comparable Sales"
-        subtitle="Enter nearby comparable sales."
+        subtitle="Enter the characteristics of nearby sold properties."
       >
-        <div
-          style={{
-            overflowX: 'auto',
-          }}
-        >
+        <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={thStyle}>
                   Comp
                 </th>
+
                 <th style={thStyle}>
                   Sale Price
                 </th>
+
                 <th style={thStyle}>
                   Sq Ft
                 </th>
+
                 <th style={thStyle}>
-                  Miles
+                  Beds
                 </th>
+
                 <th style={thStyle}>
-                  Age
+                  Baths
                 </th>
+
+                <th style={thStyle}>
+                  Sale Age
+                </th>
+
                 <th style={thStyle}>
                   $/SF
+                </th>
+
+                <th style={thStyle}>
+                  Similarity
+                </th>
+
+                <th style={thStyle}>
+                  Action
                 </th>
               </tr>
             </thead>
 
             <tbody>
-              {comps.map((comp) => (
-                <tr key={comp.id}>
-                  <td style={tdStyle}>
-                    Comp {comp.id}
-                  </td>
+              {comps.map((comp) => {
+                const pricePerSqft =
+                  comp.salePrice > 0 &&
+                  comp.sqft > 0
+                    ? comp.salePrice /
+                      comp.sqft
+                    : 0
 
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      value={
-                        comp.salePrice
-                      }
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'salePrice',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
+                const similarity =
+                  comp.salePrice > 0 &&
+                  comp.sqft > 0
+                    ? getSimilarityScore(
+                        comp
+                      )
+                    : 0
 
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      value={comp.sqft}
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'sqft',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
+                return (
+                  <tr key={comp.id}>
+                    <td
+                      style={tdStyle}
+                    >
+                      Comp {comp.id}
+                    </td>
 
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={
-                        comp.distance
-                      }
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'distance',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
+                    <td
+                      style={tdStyle}
+                    >
+                      <input
+                        type="number"
+                        value={
+                          comp.salePrice
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          updateComp(
+                            comp.id,
+                            'salePrice',
+                            Number(
+                              event.target
+                                .value
+                            ) || 0
+                          )
+                        }
+                        style={
+                          tableInputStyle
+                        }
+                        placeholder="0"
+                      />
+                    </td>
 
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      value={
-                        comp.ageMonths
-                      }
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'ageMonths',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
+                    <td
+                      style={tdStyle}
+                    >
+                      <input
+                        type="number"
+                        value={
+                          comp.sqft
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          updateComp(
+                            comp.id,
+                            'sqft',
+                            Number(
+                              event.target
+                                .value
+                            ) || 0
+                          )
+                        }
+                        style={
+                          tableInputStyle
+                        }
+                        placeholder="0"
+                      />
+                    </td>
 
-                  <td style={tdStyle}>
-                    {comp.salePrice > 0 &&
-                    comp.sqft > 0
-                      ? money(
-                          comp.salePrice /
-                            comp.sqft
-                        )
-                      : '—'}
-                  </td>
-                </tr>
-              ))}
+                    <td
+                      style={tdStyle}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={
+                          comp.bedrooms
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          updateComp(
+                            comp.id,
+                            'bedrooms',
+                            Number(
+                              event.target
+                                .value
+                            ) || 0
+                          )
+                        }
+                        style={
+                          tableInputStyle
+                        }
+                        placeholder="0"
+                      />
+                    </td>
+
+                    <td
+                      style={tdStyle}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={
+                          comp.bathrooms
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          updateComp(
+                            comp.id,
+                            'bathrooms',
+                            Number(
+                              event.target
+                                .value
+                            ) || 0
+                          )
+                        }
+                        style={
+                          tableInputStyle
+                        }
+                        placeholder="0"
+                      />
+                    </td>
+
+                    <td
+                      style={tdStyle}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        value={
+                          comp.ageMonths
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          updateComp(
+                            comp.id,
+                            'ageMonths',
+                            Number(
+                              event.target
+                                .value
+                            ) || 0
+                          )
+                        }
+                        style={
+                          tableInputStyle
+                        }
+                        placeholder="0"
+                      />
+                    </td>
+
+                    <td
+                      style={tdStyle}
+                    >
+                      {pricePerSqft
+                        ? money(
+                            pricePerSqft
+                          )
+                        : '—'}
+                    </td>
+
+                    <td
+                      style={tdStyle}
+                    >
+                      {similarity
+                        ? `${similarity.toFixed(
+                            0
+                          )}/100`
+                        : '—'}
+                    </td>
+
+                    <td
+                      style={tdStyle}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeComp(
+                            comp.id
+                          )
+                        }
+                        style={{
+                          border:
+                            '1px solid rgba(255,255,255,0.08)',
+                          background:
+                            'rgba(255,255,255,0.03)',
+                          color:
+                            'rgba(255,255,255,0.55)',
+                          borderRadius: 7,
+                          padding:
+                            '6px 8px',
+                          cursor:
+                            'pointer',
+                          fontSize: 10,
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -1215,32 +1591,17 @@ function CompsAnalyzerTool({
         <div style={actionRowStyle}>
           <ActionButton
             tone="gold"
-            onClick={() =>
-              setComps(
-                (current) => [
-                  ...current,
-                  {
-                    id:
-                      current.length +
-                      1,
-                    salePrice: 0,
-                    sqft:
-                      subjectSqft,
-                    distance: 0,
-                    ageMonths: 0,
-                  },
-                ]
-              )
-            }
+            onClick={addComp}
           >
             + Add Comp
           </ActionButton>
         </div>
       </SectionCard>
 
+      {/* ARV ANALYSIS */}
       <SectionCard
         title="ARV Analysis"
-        subtitle="Estimated using comparable price per square foot."
+        subtitle="Weighted using size, bedrooms, bathrooms, and sale recency."
       >
         <div style={resultGridStyle}>
           <ResultCard
@@ -1260,17 +1621,39 @@ function CompsAnalyzerTool({
 
           <ResultCard
             label="Average $/SF"
-            value={`$${averagePricePerSqft.toFixed(
-              2
-            )}`}
+            value={
+              averagePricePerSqft
+                ? `$${averagePricePerSqft.toFixed(
+                    2
+                  )}`
+                : '$0'
+            }
             tone="blue"
           />
 
           <ResultCard
-            label="Estimated ARV"
+            label="$/SF ARV"
+            value={money(psfArv)}
+            tone="gold"
+          />
+
+          <ResultCard
+            label="Weighted ARV"
             value={money(
-              estimatedArv
+              weightedArv
             )}
+            tone="green"
+          />
+
+          <ResultCard
+            label="Low ARV"
+            value={money(lowArv)}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="High ARV"
+            value={money(highArv)}
             tone="green"
           />
 
@@ -1284,6 +1667,39 @@ function CompsAnalyzerTool({
             }
           />
         </div>
+
+        {calculated.length > 0 && (
+          <div
+            style={outputBoxStyle}
+          >
+            <strong>
+              ARV Methodology
+            </strong>
+
+            <p>
+              The estimated ARV is based
+              on comparable sale prices,
+              price per square foot,
+              square-footage similarity,
+              bedroom count, bathroom
+              count, and sale recency.
+            </p>
+
+            <p>
+              The weighted ARV gives more
+              influence to comps that are
+              more similar to the subject
+              property.
+            </p>
+
+            <p>
+              Estimated ARV:{' '}
+              <strong>
+                {money(weightedArv)}
+              </strong>
+            </p>
+          </div>
+        )}
       </SectionCard>
     </div>
   )
