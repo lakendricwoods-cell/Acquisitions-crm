@@ -2,8 +2,13 @@
 
 import type { CSSProperties } from 'react'
 import ActionButton from '@/components/ui/action-button'
-import type { CrmStage } from '@/lib/crm-stage'
-import { CRM_STAGE_META, getNextCrmStage } from '@/lib/crm-stage'
+import {
+  CRM_STAGE_META,
+  CRM_STAGES,
+  getNextCrmStage,
+  getPreviousCrmStage,
+  type CrmStage,
+} from '@/lib/crm-stage'
 
 export type PipelineLead = {
   id: string
@@ -25,8 +30,11 @@ export type PipelineLead = {
   stage?: string | null
 }
 
-function money(value: number | null | undefined) {
-  if (value == null || Number.isNaN(value)) return '—'
+function money(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return '—'
+  }
+
   return `$${Math.round(value).toLocaleString()}`
 }
 
@@ -37,12 +45,18 @@ export default function PipelineCard({
 }: {
   lead: PipelineLead
   stage: CrmStage
-  onMoveToStage: (lead: PipelineLead, nextStage: CrmStage) => void
+  onMoveToStage: (
+    lead: PipelineLead,
+    nextStage: CrmStage
+  ) => void | Promise<void>
 }) {
   const nextStage = getNextCrmStage(stage)
+  const previousStage = getPreviousCrmStage(stage)
   const accent = CRM_STAGE_META[stage].color || '#d6a64b'
 
-  function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
+  function handleDragStart(
+    event: React.DragEvent<HTMLDivElement>
+  ) {
     event.dataTransfer.setData('text/plain', lead.id)
     event.dataTransfer.effectAllowed = 'move'
   }
@@ -58,7 +72,10 @@ export default function PipelineCard({
       }}
     >
       <div style={topRowStyle}>
-        <div style={titleStyle}>{lead.property_address_1 || 'Unknown property'}</div>
+        <div style={titleStyle}>
+          {lead.property_address_1 || 'Unknown property'}
+        </div>
+
         <span
           style={{
             ...typeBadgeStyle,
@@ -72,34 +89,109 @@ export default function PipelineCard({
       </div>
 
       <div style={subStyle}>
-        {[lead.city, lead.state, lead.zip].filter(Boolean).join(', ') || 'Location pending'}
+        {[lead.city, lead.state, lead.zip]
+          .filter(Boolean)
+          .join(', ') || 'Location pending'}
       </div>
 
       <div style={metaGridStyle}>
-        <Meta label="Owner" value={lead.owner_name || '—'} />
+        <Meta
+          label="Owner"
+          value={lead.owner_name || '—'}
+        />
+
         <Meta
           label="Value"
-          value={money(lead.house_value ?? lead.estimated_value ?? lead.market_value)}
+          value={money(
+            lead.house_value ??
+              lead.estimated_value ??
+              lead.market_value
+          )}
         />
-        <Meta label="Equity" value={money(lead.equity_amount)} />
-        <Meta label="Mortgage" value={money(lead.mortgage_balance)} />
+
+        <Meta
+          label="Equity"
+          value={money(lead.equity_amount)}
+        />
+
+        <Meta
+          label="Mortgage"
+          value={money(lead.mortgage_balance)}
+        />
+      </div>
+
+      <div style={stageControlStyle}>
+        <select
+          data-no-pan="true"
+          value={stage}
+          onChange={(event) => {
+            const next = event.target.value as CrmStage
+
+            if (next !== stage) {
+              void onMoveToStage(lead, next)
+            }
+          }}
+          style={{
+            ...stageSelectStyle,
+            borderColor: `${accent}35`,
+            color: accent,
+          }}
+          aria-label={`Move ${lead.property_address_1 || 'lead'} to stage`}
+        >
+          {CRM_STAGES.map((crmStage) => (
+            <option
+              key={crmStage}
+              value={crmStage}
+            >
+              {CRM_STAGE_META[crmStage].label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div style={actionRowStyle}>
-        <span style={{ ...dragHintStyle, color: 'rgba(255,255,255,0.35)' }}>
-          <span style={{ color: accent }}>⋮⋮</span> Drag to move
+        <span style={dragHintStyle}>
+          <span style={{ color: accent }}>⋮⋮</span>
+          Drag to move
         </span>
-        {nextStage ? (
-          <ActionButton compact tone="gold" onClick={() => onMoveToStage(lead, nextStage)}>
-            Next Stage
-          </ActionButton>
-        ) : null}
+
+        <div style={buttonGroupStyle}>
+          {previousStage ? (
+            <ActionButton
+              compact
+              tone="ghost"
+              onClick={() =>
+                void onMoveToStage(lead, previousStage)
+              }
+            >
+              ←
+            </ActionButton>
+          ) : null}
+
+          {nextStage ? (
+            <ActionButton
+              compact
+              tone="gold"
+              onClick={() =>
+                void onMoveToStage(lead, nextStage)
+              }
+            >
+              Next
+            </ActionButton>
+          ) : null}
+        </div>
       </div>
     </article>
   )
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
   return (
     <div style={metaStyle}>
       <div style={metaLabelStyle}>{label}</div>
@@ -111,7 +203,8 @@ function Meta({ label, value }: { label: string; value: string }) {
 const cardStyle: CSSProperties = {
   borderRadius: 16,
   border: '1px solid rgba(255,255,255,0.08)',
-  background: 'linear-gradient(180deg, rgba(16,14,10,0.92), rgba(6,6,6,0.98))',
+  background:
+    'linear-gradient(180deg, rgba(16,14,10,0.92), rgba(6,6,6,0.98))',
   backdropFilter: 'blur(16px)',
   WebkitBackdropFilter: 'blur(16px)',
   padding: 13,
@@ -119,7 +212,6 @@ const cardStyle: CSSProperties = {
   gap: 10,
   cursor: 'grab',
   userSelect: 'none',
-  transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
 }
 
 const topRowStyle: CSSProperties = {
@@ -164,7 +256,8 @@ const metaGridStyle: CSSProperties = {
 const metaStyle: CSSProperties = {
   borderRadius: 10,
   border: '1px solid rgba(255,255,255,0.05)',
-  background: 'linear-gradient(180deg, rgba(22,20,16,0.7), rgba(10,10,10,0.9))',
+  background:
+    'linear-gradient(180deg, rgba(22,20,16,0.7), rgba(10,10,10,0.9))',
   padding: '7px 8px',
 }
 
@@ -182,6 +275,26 @@ const metaValueStyle: CSSProperties = {
   fontWeight: 700,
   color: '#ffffff',
   lineHeight: 1.2,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const stageControlStyle: CSSProperties = {
+  width: '100%',
+}
+
+const stageSelectStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 34,
+  padding: '0 10px',
+  borderRadius: 9,
+  border: '1px solid',
+  background: 'rgba(0,0,0,0.55)',
+  fontSize: 11,
+  fontWeight: 700,
+  outline: 'none',
+  cursor: 'pointer',
 }
 
 const actionRowStyle: CSSProperties = {
@@ -192,10 +305,17 @@ const actionRowStyle: CSSProperties = {
   paddingTop: 2,
 }
 
+const buttonGroupStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+}
+
 const dragHintStyle: CSSProperties = {
   fontSize: 10.5,
   fontWeight: 600,
   display: 'flex',
   alignItems: 'center',
   gap: 4,
+  color: 'rgba(255,255,255,0.35)',
 }
