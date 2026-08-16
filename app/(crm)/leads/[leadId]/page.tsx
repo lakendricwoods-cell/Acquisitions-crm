@@ -1,159 +1,64 @@
 'use client'
 
 import Link from 'next/link'
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-} from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import type { CSSProperties, ComponentType } from 'react'
+import { useSearchParams } from 'next/navigation'
 
-import ActionButton from '@/components/ui/action-button'
 import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
-import StatPill from '@/components/ui/stat-pill'
+import ActionButton from '@/components/ui/action-button'
 import WorkspaceCanvas from '@/components/workspace-canvas'
 
 import { supabase } from '@/lib/supabase'
-import { computeLeadScores } from '@/lib/intelligence/lead-score-v2'
-import {
-  resolveField,
-  resolveNumericField,
-} from '@/lib/resolve-field'
-import { FIELD_ALIASES } from '@/lib/field-aliases'
-import { computeOwnershipYears } from '@/lib/compute-fields'
+import { getToolConfig, type ToolSlug } from './tool-config'
 
-type LeadRecord = {
+/* =========================================================
+   TYPES
+========================================================= */
+
+type Lead = {
   id: string
-
   property_address_1?: string | null
   city?: string | null
   state?: string | null
   zip?: string | null
   county?: string | null
-
   owner_name?: string | null
-  owner_phone?: string | null
-  owner_email?: string | null
-
-  phone?: string | null
-  email?: string | null
-
-  owner_mailing_address?: string | null
-  owner_mailing_city?: string | null
-  owner_mailing_state?: string | null
-  owner_mailing_zip?: string | null
-
   property_type?: string | null
-  property_use?: string | null
-
   bedrooms?: number | null
   bathrooms?: number | null
   square_feet?: number | null
   year_built?: number | null
-
   apn?: string | null
-
-  status?: string | null
-  stage?: string | null
-  lead_status?: string | null
-  pipeline_stage?: string | null
-
-  /*
-   * IMPORTANT:
-   *
-   * deal_status intentionally removed.
-   *
-   * Your Supabase error confirms that the leads table
-   * does NOT contain a deal_status column.
-   */
-
   lead_type?: string | null
-
   house_value?: number | null
   estimated_value?: number | null
   market_value?: number | null
-
   equity_amount?: number | null
-  equity_percent?: number | null
   mortgage_balance?: number | null
-
   last_sale_amount?: number | null
-  last_sale_date?: string | null
-
   default_amount?: number | null
-  auction_date?: string | null
-  lender_name?: string | null
-
-  ownership_length?: number | null
-
-  owner_occupied?: boolean | null
-  vacant?: boolean | null
-
-  lead_intelligence?: Record<string, unknown> | null
-  raw_import_data?: Record<string, unknown> | null
-  source_columns?: Record<string, unknown> | null
-
-  [key: string]: unknown
 }
 
-const STAGE_OPTIONS = [
-  {
-    value: 'new_lead',
-    label: 'New Lead',
-  },
-  {
-    value: 'contacted',
-    label: 'Contacted',
-  },
-  {
-    value: 'appointment_set',
-    label: 'Appointment Set',
-  },
-  {
-    value: 'offer_sent',
-    label: 'Offer Sent',
-  },
-  {
-    value: 'negotiation',
-    label: 'Negotiation',
-  },
-  {
-    value: 'under_contract',
-    label: 'Under Contract',
-  },
-  {
-    value: 'closed',
-    label: 'Closed',
-  },
-  {
-    value: 'dead_lead',
-    label: 'Dead / Archive',
-  },
-]
+type NumberInputProps = {
+  label: string
+  value: number
+  onChange: (value: number) => void
+  prefix?: string
+  suffix?: string
+}
 
-type StageColumn =
-  | 'status'
-  | 'stage'
-  | 'lead_status'
-  | 'pipeline_stage'
+type ToolProps = {
+  lead: Lead | null
+}
 
-const STAGE_COLUMNS: StageColumn[] = [
-  'status',
-  'stage',
-  'lead_status',
-  'pipeline_stage',
-]
+/* =========================================================
+   HELPERS
+========================================================= */
 
-function money(value: number | null | undefined) {
-  if (
-    value === null ||
-    value === undefined ||
-    Number.isNaN(value)
-  ) {
-    return '—'
-  }
+function money(value: number) {
+  if (!Number.isFinite(value)) return '$0'
 
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -162,181 +67,2074 @@ function money(value: number | null | undefined) {
   }).format(value)
 }
 
-function yn(
-  value: boolean | null | undefined,
-  positive = 'Yes',
-  negative = 'No'
-) {
-  if (value === null || value === undefined) {
-    return '—'
-  }
-
-  return value ? positive : negative
+function number(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 2,
+  }).format(value)
 }
 
-function toNumber(value: unknown) {
+function leadValue(lead: Lead | null) {
+  return (
+    lead?.estimated_value ??
+    lead?.house_value ??
+    lead?.market_value ??
+    0
+  )
+}
+
+function copyText(text: string) {
   if (
-    value === null ||
-    value === undefined ||
-    value === ''
+    typeof navigator !== 'undefined' &&
+    navigator.clipboard
   ) {
-    return null
+    void navigator.clipboard.writeText(text)
+  }
+}
+
+/* =========================================================
+   BASIC INPUTS
+========================================================= */
+
+function NumberInput({
+  label,
+  value,
+  onChange,
+  prefix,
+  suffix,
+}: NumberInputProps) {
+  return (
+    <label style={fieldStyle}>
+      <span style={fieldLabelStyle}>{label}</span>
+
+      <div style={inputWrapStyle}>
+        {prefix && (
+          <span style={prefixStyle}>{prefix}</span>
+        )}
+
+        <input
+          type="number"
+          value={Number.isFinite(value) ? value : 0}
+          onChange={(event) => {
+            const parsed = Number(event.target.value)
+
+            onChange(
+              Number.isFinite(parsed) ? parsed : 0
+            )
+          }}
+          style={inputStyle}
+        />
+
+        {suffix && (
+          <span style={prefixStyle}>{suffix}</span>
+        )}
+      </div>
+    </label>
+  )
+}
+
+function TextInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+}) {
+  return (
+    <label style={fieldStyle}>
+      <span style={fieldLabelStyle}>{label}</span>
+
+      <input
+        value={value}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+        placeholder={placeholder}
+        style={inputStyle}
+      />
+    </label>
+  )
+}
+
+function SelectInput({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: string[]
+}) {
+  return (
+    <label style={fieldStyle}>
+      <span style={fieldLabelStyle}>{label}</span>
+
+      <select
+        value={value}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+        style={inputStyle}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/* =========================================================
+   RESULT CARD
+========================================================= */
+
+function ResultCard({
+  label,
+  value,
+  tone = 'gold',
+}: {
+  label: string
+  value: string
+  tone?: 'gold' | 'green' | 'blue'
+}) {
+  const palette =
+    tone === 'gold'
+      ? {
+          border: 'rgba(214,166,75,0.24)',
+          bg: 'rgba(214,166,75,0.06)',
+          text: '#d6a64b',
+        }
+      : tone === 'green'
+        ? {
+            border: 'rgba(74,222,128,0.22)',
+            bg: 'rgba(74,222,128,0.05)',
+            text: '#4ade80',
+          }
+        : {
+            border: 'rgba(147,197,253,0.22)',
+            bg: 'rgba(147,197,253,0.05)',
+            text: '#93c5fd',
+          }
+
+  return (
+    <div
+      style={{
+        ...resultCardStyle,
+        borderColor: palette.border,
+        background: palette.bg,
+      }}
+    >
+      <div style={fieldLabelStyle}>{label}</div>
+
+      <div
+        style={{
+          ...resultValueStyle,
+          color: palette.text,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+/* =========================================================
+   PROPERTY SNAPSHOT
+========================================================= */
+
+function PropertySnapshot({
+  lead,
+}: {
+  lead: Lead
+}) {
+  const value = leadValue(lead)
+
+  return (
+    <SectionCard
+      title={
+        lead.property_address_1 ||
+        'Subject Property'
+      }
+      subtitle={[
+        lead.city,
+        lead.state,
+        lead.zip,
+      ]
+        .filter(Boolean)
+        .join(', ')}
+    >
+      <div style={leadGridStyle}>
+        <ResultCard
+          label="Estimated Value"
+          value={money(value)}
+          tone="gold"
+        />
+
+        <ResultCard
+          label="Equity"
+          value={money(
+            lead.equity_amount ?? 0
+          )}
+          tone="green"
+        />
+
+        <ResultCard
+          label="Mortgage"
+          value={money(
+            lead.mortgage_balance ?? 0
+          )}
+          tone="blue"
+        />
+
+        <ResultCard
+          label="Square Feet"
+          value={number(
+            lead.square_feet ?? 0
+          )}
+          tone="blue"
+        />
+
+        <ResultCard
+          label="Bedrooms"
+          value={String(
+            lead.bedrooms ?? 0
+          )}
+          tone="gold"
+        />
+
+        <ResultCard
+          label="Bathrooms"
+          value={String(
+            lead.bathrooms ?? 0
+          )}
+          tone="gold"
+        />
+      </div>
+    </SectionCard>
+  )
+}
+
+/* =========================================================
+   TOOL HEADER
+========================================================= */
+
+function ToolHeader({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <div style={toolHeaderStyle}>
+      <div style={eyebrowStyle}>
+        FOUNDATION ACQUISITIONS LLC
+      </div>
+
+      <h1 style={toolTitleStyle}>{title}</h1>
+
+      <p style={toolDescriptionStyle}>
+        {description}
+      </p>
+    </div>
+  )
+}
+
+/* =========================================================
+   ASSIGNMENT CONTRACT
+========================================================= */
+
+function AssignmentContractTool({
+  lead,
+}: ToolProps) {
+  const [assignor, setAssignor] = useState('')
+  const [assignee, setAssignee] = useState('')
+
+  const [purchasePrice, setPurchasePrice] =
+    useState(
+      lead?.last_sale_amount ??
+        leadValue(lead)
+    )
+
+  const [assignmentFee, setAssignmentFee] =
+    useState(20000)
+
+  const [earnestMoney, setEarnestMoney] =
+    useState(5000)
+
+  const [closingDate, setClosingDate] =
+    useState('')
+
+  const assignmentPrice =
+    purchasePrice + assignmentFee
+
+  const totalConsideration =
+    assignmentPrice + earnestMoney
+
+  const summary = [
+    'ASSIGNMENT DEAL SUMMARY',
+    '',
+    `Property: ${
+      lead?.property_address_1 || '—'
+    }`,
+    `Assignor: ${assignor || '—'}`,
+    `Assignee: ${assignee || '—'}`,
+    `Original Purchase Price: ${money(
+      purchasePrice
+    )}`,
+    `Assignment Fee: ${money(
+      assignmentFee
+    )}`,
+    `Assignment Price: ${money(
+      assignmentPrice
+    )}`,
+    `Earnest Money: ${money(
+      earnestMoney
+    )}`,
+    `Closing Date: ${
+      closingDate || '—'
+    }`,
+  ].join('\n')
+
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Assignment Terms"
+        subtitle="Enter the parties and financial terms."
+      >
+        <div style={formGridStyle}>
+          <TextInput
+            label="Assignor"
+            value={assignor}
+            onChange={setAssignor}
+            placeholder="Assignor name"
+          />
+
+          <TextInput
+            label="Assignee"
+            value={assignee}
+            onChange={setAssignee}
+            placeholder="Buyer / assignee"
+          />
+
+          <NumberInput
+            label="Original Purchase Price"
+            value={purchasePrice}
+            onChange={setPurchasePrice}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Assignment Fee"
+            value={assignmentFee}
+            onChange={setAssignmentFee}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Earnest Money"
+            value={earnestMoney}
+            onChange={setEarnestMoney}
+            prefix="$"
+          />
+
+          <TextInput
+            label="Closing Date"
+            value={closingDate}
+            onChange={setClosingDate}
+            placeholder="MM/DD/YYYY"
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Assignment Analysis"
+        subtitle="Calculated deal economics."
+      >
+        <div style={resultGridStyle}>
+          <ResultCard
+            label="Original Contract"
+            value={money(purchasePrice)}
+          />
+
+          <ResultCard
+            label="Assignment Fee"
+            value={money(assignmentFee)}
+            tone="green"
+          />
+
+          <ResultCard
+            label="Assignment Price"
+            value={money(
+              assignmentPrice
+            )}
+            tone="gold"
+          />
+
+          <ResultCard
+            label="Earnest Money"
+            value={money(earnestMoney)}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Total Consideration"
+            value={money(
+              totalConsideration
+            )}
+            tone="green"
+          />
+        </div>
+
+        <div style={outputBoxStyle}>
+          <strong>Deal Summary</strong>
+
+          <p>
+            {assignor || 'Assignor'} intends
+            to assign the purchase agreement to{' '}
+            {assignee || 'Assignee'}.
+          </p>
+
+          <p>
+            Assignment fee:{' '}
+            {money(assignmentFee)}.
+          </p>
+
+          <p>
+            Assignment price:{' '}
+            {money(assignmentPrice)}.
+          </p>
+        </div>
+
+        <div style={actionRowStyle}>
+          <ActionButton
+            tone="gold"
+            onClick={() =>
+              copyText(summary)
+            }
+          >
+            Copy Deal Summary
+          </ActionButton>
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   BUYER BLAST
+========================================================= */
+
+function BuyerBlastTool({
+  lead,
+}: ToolProps) {
+  const [buyerName, setBuyerName] =
+    useState('')
+
+  const [buyerEmail, setBuyerEmail] =
+    useState('')
+
+  const [buyerPhone, setBuyerPhone] =
+    useState('')
+
+  const [strategy, setStrategy] =
+    useState('Fix & Flip')
+
+  const [minPrice, setMinPrice] =
+    useState(0)
+
+  const [maxPrice, setMaxPrice] =
+    useState(leadValue(lead))
+
+  const [area, setArea] =
+    useState(lead?.city ?? '')
+
+  const [propertyType, setPropertyType] =
+    useState(
+      lead?.property_type ??
+        'Single Family'
+    )
+
+  const [message, setMessage] =
+    useState('')
+
+  const propertyValue =
+    leadValue(lead)
+
+  const matchScore = useMemo(() => {
+    let score = 50
+
+    if (
+      maxPrice >= propertyValue &&
+      maxPrice > 0
+    ) {
+      score += 20
+    }
+
+    if (
+      minPrice <= propertyValue
+    ) {
+      score += 10
+    }
+
+    if (
+      area &&
+      lead?.city?.toLowerCase() ===
+        area.toLowerCase()
+    ) {
+      score += 10
+    }
+
+    if (strategy) {
+      score += 10
+    }
+
+    return Math.min(score, 100)
+  }, [
+    maxPrice,
+    minPrice,
+    area,
+    propertyValue,
+    strategy,
+    lead,
+  ])
+
+  function generateBlast() {
+    const address =
+      lead?.property_address_1 ||
+      'off-market property'
+
+    const city =
+      lead?.city ||
+      area ||
+      'the target market'
+
+    setMessage(
+      [
+        `OFF-MARKET OPPORTUNITY — ${address}`,
+        '',
+        `Location: ${city}`,
+        `Property Type: ${propertyType}`,
+        `Estimated Value: ${
+          propertyValue
+            ? money(propertyValue)
+            : 'Available upon request'
+        }`,
+        `Strategy: ${strategy}`,
+        '',
+        `Looking for a buyer interested in ${strategy.toLowerCase()} opportunities in ${city}.`,
+        '',
+        `If this fits your buy box, reply with your interest and I can provide additional deal information.`,
+        '',
+        'Foundation Acquisitions LLC',
+      ].join('\n')
+    )
   }
 
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Buyer Buy Box"
+        subtitle="Enter the buyer's acquisition criteria."
+      >
+        <div style={formGridStyle}>
+          <TextInput
+            label="Buyer Name"
+            value={buyerName}
+            onChange={setBuyerName}
+          />
+
+          <TextInput
+            label="Buyer Email"
+            value={buyerEmail}
+            onChange={setBuyerEmail}
+          />
+
+          <TextInput
+            label="Buyer Phone"
+            value={buyerPhone}
+            onChange={setBuyerPhone}
+          />
+
+          <SelectInput
+            label="Property Type"
+            value={propertyType}
+            onChange={setPropertyType}
+            options={[
+              'Single Family',
+              'Multi Family',
+              'Townhouse',
+              'Condo',
+              'Land',
+              'Other',
+            ]}
+          />
+
+          <SelectInput
+            label="Strategy"
+            value={strategy}
+            onChange={setStrategy}
+            options={[
+              'Fix & Flip',
+              'Buy & Hold',
+              'BRRRR',
+              'Cash Buyer',
+              'Rental',
+              'New Construction',
+              'Land',
+            ]}
+          />
+
+          <NumberInput
+            label="Minimum Price"
+            value={minPrice}
+            onChange={setMinPrice}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Maximum Price"
+            value={maxPrice}
+            onChange={setMaxPrice}
+            prefix="$"
+          />
+
+          <TextInput
+            label="Target Area"
+            value={area}
+            onChange={setArea}
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Buyer Match"
+        subtitle="Estimated fit between the buyer and current deal."
+      >
+        <div style={resultGridStyle}>
+          <ResultCard
+            label="Match Score"
+            value={`${matchScore}/100`}
+            tone={
+              matchScore >= 80
+                ? 'green'
+                : 'gold'
+            }
+          />
+
+          <ResultCard
+            label="Deal Value"
+            value={money(propertyValue)}
+          />
+
+          <ResultCard
+            label="Buyer Max"
+            value={money(maxPrice)}
+            tone="blue"
+          />
+        </div>
+
+        <div style={actionRowStyle}>
+          <ActionButton
+            tone="gold"
+            onClick={generateBlast}
+          >
+            Generate Buyer Blast
+          </ActionButton>
+        </div>
+
+        <textarea
+          value={message}
+          onChange={(event) =>
+            setMessage(event.target.value)
+          }
+          placeholder="Generated buyer outreach will appear here..."
+          style={textareaStyle}
+        />
+
+        {message && (
+          <div style={actionRowStyle}>
+            <ActionButton
+              tone="ghost"
+              onClick={() =>
+                copyText(message)
+              }
+            >
+              Copy Outreach
+            </ActionButton>
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   CLOSING COST
+========================================================= */
+
+function ClosingCostTool({
+  lead,
+}: ToolProps) {
+  const [purchasePrice, setPurchasePrice] =
+    useState(leadValue(lead))
+
+  const [title, setTitle] =
+    useState(1500)
+
+  const [recording, setRecording] =
+    useState(100)
+
+  const [transferTax, setTransferTax] =
+    useState(0)
+
+  const [propertyTax, setPropertyTax] =
+    useState(0)
+
+  const [insurance, setInsurance] =
+    useState(0)
+
+  const [inspection, setInspection] =
+    useState(500)
+
+  const [other, setOther] =
+    useState(0)
+
+  const total =
+    title +
+    recording +
+    transferTax +
+    propertyTax +
+    insurance +
+    inspection +
+    other
+
+  const cashRequired =
+    purchasePrice + total
+
+  const costPercent =
+    purchasePrice > 0
+      ? (total / purchasePrice) * 100
+      : 0
+
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Transaction Inputs"
+        subtitle="Estimate acquisition-side closing expenses."
+      >
+        <div style={formGridStyle}>
+          <NumberInput
+            label="Purchase Price"
+            value={purchasePrice}
+            onChange={setPurchasePrice}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Title / Settlement"
+            value={title}
+            onChange={setTitle}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Recording"
+            value={recording}
+            onChange={setRecording}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Transfer Tax"
+            value={transferTax}
+            onChange={setTransferTax}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Property Tax / Proration"
+            value={propertyTax}
+            onChange={setPropertyTax}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Insurance"
+            value={insurance}
+            onChange={setInsurance}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Inspection"
+            value={inspection}
+            onChange={setInspection}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Other Costs"
+            value={other}
+            onChange={setOther}
+            prefix="$"
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Closing Analysis"
+        subtitle="Projected transaction economics."
+      >
+        <div style={resultGridStyle}>
+          <ResultCard
+            label="Purchase Price"
+            value={money(
+              purchasePrice
+            )}
+          />
+
+          <ResultCard
+            label="Closing Costs"
+            value={money(total)}
+            tone="gold"
+          />
+
+          <ResultCard
+            label="Cash Required"
+            value={money(
+              cashRequired
+            )}
+            tone="green"
+          />
+
+          <ResultCard
+            label="Cost %"
+            value={`${costPercent.toFixed(
+              2
+            )}%`}
+            tone="blue"
+          />
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   COMPS ANALYZER
+========================================================= */
+
+type Comp = {
+  id: number
+  salePrice: number
+  sqft: number
+  distance: number
+  ageMonths: number
+}
+
+function CompsAnalyzerTool({
+  lead,
+}: ToolProps) {
+  const subjectSqft =
+    lead?.square_feet ?? 0
+
+  const [comps, setComps] =
+    useState<Comp[]>([
+      {
+        id: 1,
+        salePrice: 0,
+        sqft: subjectSqft,
+        distance: 0,
+        ageMonths: 0,
+      },
+      {
+        id: 2,
+        salePrice: 0,
+        sqft: subjectSqft,
+        distance: 0,
+        ageMonths: 0,
+      },
+      {
+        id: 3,
+        salePrice: 0,
+        sqft: subjectSqft,
+        distance: 0,
+        ageMonths: 0,
+      },
+    ])
+
+  const calculated =
+    comps.filter(
+      (comp) =>
+        comp.salePrice > 0 &&
+        comp.sqft > 0
+    )
+
+  const averagePrice =
+    calculated.length
+      ? calculated.reduce(
+          (sum, comp) =>
+            sum + comp.salePrice,
+          0
+        ) / calculated.length
+      : 0
+
+  const averagePricePerSqft =
+    calculated.length
+      ? calculated.reduce(
+          (sum, comp) =>
+            sum +
+            comp.salePrice /
+              comp.sqft,
+          0
+        ) / calculated.length
+      : 0
+
+  const estimatedArv =
+    subjectSqft > 0
+      ? subjectSqft *
+        averagePricePerSqft
+      : averagePrice
+
+  const confidence =
+    calculated.length >= 3
+      ? 'High'
+      : calculated.length === 2
+        ? 'Moderate'
+        : calculated.length === 1
+          ? 'Low'
+          : 'Insufficient'
+
+  function updateComp(
+    id: number,
+    key: keyof Comp,
+    value: number
+  ) {
+    setComps((current) =>
+      current.map((comp) =>
+        comp.id === id
+          ? {
+              ...comp,
+              [key]: value,
+            }
+          : comp
+      )
+    )
   }
 
-  const parsed = Number(
-    String(value).replace(/[$,%\s,]/g, '')
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Subject Property"
+        subtitle="Use the current lead as the ARV subject."
+      >
+        <div style={leadGridStyle}>
+          <ResultCard
+            label="Subject Value"
+            value={money(
+              leadValue(lead)
+            )}
+          />
+
+          <ResultCard
+            label="Subject Sq Ft"
+            value={number(
+              subjectSqft
+            )}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Bedrooms"
+            value={String(
+              lead?.bedrooms ?? 0
+            )}
+            tone="gold"
+          />
+
+          <ResultCard
+            label="Bathrooms"
+            value={String(
+              lead?.bathrooms ?? 0
+            )}
+            tone="gold"
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Comparable Sales"
+        subtitle="Enter nearby comparable sales."
+      >
+        <div
+          style={{
+            overflowX: 'auto',
+          }}
+        >
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>
+                  Comp
+                </th>
+                <th style={thStyle}>
+                  Sale Price
+                </th>
+                <th style={thStyle}>
+                  Sq Ft
+                </th>
+                <th style={thStyle}>
+                  Miles
+                </th>
+                <th style={thStyle}>
+                  Age
+                </th>
+                <th style={thStyle}>
+                  $/SF
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {comps.map((comp) => (
+                <tr key={comp.id}>
+                  <td style={tdStyle}>
+                    Comp {comp.id}
+                  </td>
+
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      value={
+                        comp.salePrice
+                      }
+                      onChange={(event) =>
+                        updateComp(
+                          comp.id,
+                          'salePrice',
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
+                        )
+                      }
+                      style={
+                        tableInputStyle
+                      }
+                    />
+                  </td>
+
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      value={comp.sqft}
+                      onChange={(event) =>
+                        updateComp(
+                          comp.id,
+                          'sqft',
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
+                        )
+                      }
+                      style={
+                        tableInputStyle
+                      }
+                    />
+                  </td>
+
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={
+                        comp.distance
+                      }
+                      onChange={(event) =>
+                        updateComp(
+                          comp.id,
+                          'distance',
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
+                        )
+                      }
+                      style={
+                        tableInputStyle
+                      }
+                    />
+                  </td>
+
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      value={
+                        comp.ageMonths
+                      }
+                      onChange={(event) =>
+                        updateComp(
+                          comp.id,
+                          'ageMonths',
+                          Number(
+                            event.target
+                              .value
+                          ) || 0
+                        )
+                      }
+                      style={
+                        tableInputStyle
+                      }
+                    />
+                  </td>
+
+                  <td style={tdStyle}>
+                    {comp.salePrice > 0 &&
+                    comp.sqft > 0
+                      ? money(
+                          comp.salePrice /
+                            comp.sqft
+                        )
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={actionRowStyle}>
+          <ActionButton
+            tone="gold"
+            onClick={() =>
+              setComps(
+                (current) => [
+                  ...current,
+                  {
+                    id:
+                      current.length +
+                      1,
+                    salePrice: 0,
+                    sqft:
+                      subjectSqft,
+                    distance: 0,
+                    ageMonths: 0,
+                  },
+                ]
+              )
+            }
+          >
+            + Add Comp
+          </ActionButton>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="ARV Analysis"
+        subtitle="Estimated using comparable price per square foot."
+      >
+        <div style={resultGridStyle}>
+          <ResultCard
+            label="Valid Comps"
+            value={String(
+              calculated.length
+            )}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Average Sale Price"
+            value={money(
+              averagePrice
+            )}
+          />
+
+          <ResultCard
+            label="Average $/SF"
+            value={`$${averagePricePerSqft.toFixed(
+              2
+            )}`}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Estimated ARV"
+            value={money(
+              estimatedArv
+            )}
+            tone="green"
+          />
+
+          <ResultCard
+            label="Confidence"
+            value={confidence}
+            tone={
+              confidence === 'High'
+                ? 'green'
+                : 'gold'
+            }
+          />
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   CONTRACT GENERATOR
+========================================================= */
+
+function ContractGeneratorTool({
+  lead,
+}: ToolProps) {
+  const [buyer, setBuyer] =
+    useState('')
+
+  const [seller, setSeller] =
+    useState(
+      lead?.owner_name ?? ''
+    )
+
+  const [purchasePrice, setPurchasePrice] =
+    useState(leadValue(lead))
+
+  const [earnestMoney, setEarnestMoney] =
+    useState(5000)
+
+  const [closingDate, setClosingDate] =
+    useState('')
+
+  const [financing, setFinancing] =
+    useState('Cash')
+
+  const [contingencies, setContingencies] =
+    useState(
+      'Inspection and due diligence'
+    )
+
+  const [generated, setGenerated] =
+    useState('')
+
+  function generate() {
+    setGenerated(
+      [
+        'PURCHASE AGREEMENT TERM SUMMARY',
+        '',
+        `Buyer: ${buyer || '—'}`,
+        `Seller: ${seller || '—'}`,
+        `Property: ${
+          lead?.property_address_1 ||
+          '—'
+        }`,
+        `Purchase Price: ${money(
+          purchasePrice
+        )}`,
+        `Earnest Money: ${money(
+          earnestMoney
+        )}`,
+        `Closing Date: ${
+          closingDate || '—'
+        }`,
+        `Financing: ${financing}`,
+        `Contingencies: ${contingencies}`,
+        '',
+        'This generated output is a deal-term summary and should be reviewed against the applicable contract form and legal requirements before execution.',
+      ].join('\n')
+    )
+  }
+
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Contract Terms"
+        subtitle="Build the purchase agreement data set."
+      >
+        <div style={formGridStyle}>
+          <TextInput
+            label="Buyer"
+            value={buyer}
+            onChange={setBuyer}
+          />
+
+          <TextInput
+            label="Seller"
+            value={seller}
+            onChange={setSeller}
+          />
+
+          <NumberInput
+            label="Purchase Price"
+            value={purchasePrice}
+            onChange={setPurchasePrice}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Earnest Money"
+            value={earnestMoney}
+            onChange={setEarnestMoney}
+            prefix="$"
+          />
+
+          <TextInput
+            label="Closing Date"
+            value={closingDate}
+            onChange={setClosingDate}
+          />
+
+          <SelectInput
+            label="Financing"
+            value={financing}
+            onChange={setFinancing}
+            options={[
+              'Cash',
+              'Conventional',
+              'Hard Money',
+              'Private Money',
+              'Seller Financing',
+              'Other',
+            ]}
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
+          <label style={fieldStyle}>
+            <span style={fieldLabelStyle}>
+              Contingencies
+            </span>
+
+            <textarea
+              value={contingencies}
+              onChange={(event) =>
+                setContingencies(
+                  event.target.value
+                )
+              }
+              style={textareaStyle}
+            />
+          </label>
+        </div>
+
+        <div style={actionRowStyle}>
+          <ActionButton
+            tone="gold"
+            onClick={generate}
+          >
+            Generate Term Summary
+          </ActionButton>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Generated Contract Data"
+        subtitle="Structured deal information."
+      >
+        <textarea
+          value={generated}
+          onChange={(event) =>
+            setGenerated(
+              event.target.value
+            )
+          }
+          placeholder="Your generated contract terms will appear here..."
+          style={{
+            ...textareaStyle,
+            minHeight: 330,
+          }}
+        />
+
+        {generated && (
+          <div style={actionRowStyle}>
+            <ActionButton
+              tone="ghost"
+              onClick={() =>
+                copyText(generated)
+              }
+            >
+              Copy Contract Data
+            </ActionButton>
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   MARKETING ROI
+========================================================= */
+
+function MarketingROITool({
+  lead: _lead,
+}: ToolProps) {
+  const [spend, setSpend] =
+    useState(0)
+
+  const [leads, setLeads] =
+    useState(0)
+
+  const [contacts, setContacts] =
+    useState(0)
+
+  const [appointments, setAppointments] =
+    useState(0)
+
+  const [offers, setOffers] =
+    useState(0)
+
+  const [contracts, setContracts] =
+    useState(0)
+
+  const [closings, setClosings] =
+    useState(0)
+
+  const [revenue, setRevenue] =
+    useState(0)
+
+  const costPerLead =
+    leads > 0
+      ? spend / leads
+      : 0
+
+  const costPerContract =
+    contracts > 0
+      ? spend / contracts
+      : 0
+
+  const conversionRate =
+    leads > 0
+      ? (closings / leads) * 100
+      : 0
+
+  const roi =
+    spend > 0
+      ? ((revenue - spend) /
+          spend) *
+        100
+      : 0
+
+  const roas =
+    spend > 0
+      ? revenue / spend
+      : 0
+
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Marketing Funnel"
+        subtitle="Enter campaign performance."
+      >
+        <div style={formGridStyle}>
+          <NumberInput
+            label="Marketing Spend"
+            value={spend}
+            onChange={setSpend}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Leads"
+            value={leads}
+            onChange={setLeads}
+          />
+
+          <NumberInput
+            label="Contacts"
+            value={contacts}
+            onChange={setContacts}
+          />
+
+          <NumberInput
+            label="Appointments"
+            value={appointments}
+            onChange={setAppointments}
+          />
+
+          <NumberInput
+            label="Offers"
+            value={offers}
+            onChange={setOffers}
+          />
+
+          <NumberInput
+            label="Contracts"
+            value={contracts}
+            onChange={setContracts}
+          />
+
+          <NumberInput
+            label="Closings"
+            value={closings}
+            onChange={setClosings}
+          />
+
+          <NumberInput
+            label="Revenue"
+            value={revenue}
+            onChange={setRevenue}
+            prefix="$"
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Marketing Performance"
+        subtitle="Calculated campaign economics."
+      >
+        <div style={resultGridStyle}>
+          <ResultCard
+            label="Cost Per Lead"
+            value={money(
+              costPerLead
+            )}
+            tone="gold"
+          />
+
+          <ResultCard
+            label="Cost Per Contract"
+            value={money(
+              costPerContract
+            )}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Lead → Close"
+            value={`${conversionRate.toFixed(
+              2
+            )}%`}
+            tone="green"
+          />
+
+          <ResultCard
+            label="ROI"
+            value={`${roi.toFixed(
+              2
+            )}%`}
+            tone={
+              roi >= 0
+                ? 'green'
+                : 'gold'
+            }
+          />
+
+          <ResultCard
+            label="ROAS"
+            value={`${roas.toFixed(
+              2
+            )}x`}
+            tone="green"
+          />
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   REPAIR ESTIMATOR
+========================================================= */
+
+function RepairEstimatorTool({
+  lead,
+}: ToolProps) {
+  const [roof, setRoof] =
+    useState(0)
+
+  const [hvac, setHvac] =
+    useState(0)
+
+  const [plumbing, setPlumbing] =
+    useState(0)
+
+  const [electrical, setElectrical] =
+    useState(0)
+
+  const [kitchen, setKitchen] =
+    useState(0)
+
+  const [bathrooms, setBathrooms] =
+    useState(0)
+
+  const [flooring, setFlooring] =
+    useState(0)
+
+  const [paint, setPaint] =
+    useState(0)
+
+  const [landscaping, setLandscaping] =
+    useState(0)
+
+  const [other, setOther] =
+    useState(0)
+
+  const [contingency, setContingency] =
+    useState(10)
+
+  const base =
+    roof +
+    hvac +
+    plumbing +
+    electrical +
+    kitchen +
+    bathrooms +
+    flooring +
+    paint +
+    landscaping +
+    other
+
+  const contingencyAmount =
+    base *
+    (contingency / 100)
+
+  const total =
+    base +
+    contingencyAmount
+
+  const repairLevel =
+    total === 0
+      ? 'Not Estimated'
+      : total < 25000
+        ? 'Light'
+        : total < 60000
+          ? 'Moderate'
+          : total < 100000
+            ? 'Heavy'
+            : 'Major Rehab'
+
+  const summary = [
+    'REPAIR ESTIMATE',
+    '',
+    `Property: ${
+      lead?.property_address_1 ||
+      'Standalone Estimate'
+    }`,
+    `Base Repairs: ${money(base)}`,
+    `Contingency: ${money(
+      contingencyAmount
+    )}`,
+    `Total Repairs: ${money(total)}`,
+    `Repair Level: ${repairLevel}`,
+  ].join('\n')
+
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Repair Budget"
+        subtitle="Enter estimated costs by category."
+      >
+        <div style={formGridStyle}>
+          <NumberInput
+            label="Roof"
+            value={roof}
+            onChange={setRoof}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="HVAC"
+            value={hvac}
+            onChange={setHvac}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Plumbing"
+            value={plumbing}
+            onChange={setPlumbing}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Electrical"
+            value={electrical}
+            onChange={setElectrical}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Kitchen"
+            value={kitchen}
+            onChange={setKitchen}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Bathrooms"
+            value={bathrooms}
+            onChange={setBathrooms}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Flooring"
+            value={flooring}
+            onChange={setFlooring}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Paint"
+            value={paint}
+            onChange={setPaint}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Landscaping"
+            value={landscaping}
+            onChange={setLandscaping}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Other"
+            value={other}
+            onChange={setOther}
+            prefix="$"
+          />
+
+          <NumberInput
+            label="Contingency"
+            value={contingency}
+            onChange={setContingency}
+            suffix="%"
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Repair Analysis"
+        subtitle="Projected renovation budget."
+      >
+        <div style={resultGridStyle}>
+          <ResultCard
+            label="Base Repairs"
+            value={money(base)}
+            tone="gold"
+          />
+
+          <ResultCard
+            label="Contingency"
+            value={money(
+              contingencyAmount
+            )}
+            tone="blue"
+          />
+
+          <ResultCard
+            label="Total Repairs"
+            value={money(total)}
+            tone="green"
+          />
+
+          <ResultCard
+            label="Repair Level"
+            value={repairLevel}
+            tone="gold"
+          />
+        </div>
+
+        <div style={actionRowStyle}>
+          <ActionButton
+            tone="ghost"
+            onClick={() =>
+              copyText(summary)
+            }
+          >
+            Copy Repair Summary
+          </ActionButton>
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   SCRIPT GENERATOR
+========================================================= */
+
+function ScriptGeneratorTool({
+  lead,
+}: ToolProps) {
+  const [leadType, setLeadType] =
+    useState(
+      lead?.lead_type ||
+        'Distressed Seller'
+    )
+
+  const [motivation, setMotivation] =
+    useState(
+      'Needs a simple and convenient sale'
+    )
+
+  const [condition, setCondition] =
+    useState('Unknown')
+
+  const [objective, setObjective] =
+    useState(
+      'Qualify the seller and determine whether an offer makes sense'
+    )
+
+  const [objection, setObjection] =
+    useState(
+      'I need to think about it'
+    )
+
+  const [script, setScript] =
+    useState('')
+
+  function generateScript() {
+    setScript(
+      [
+        'SELLER CONVERSATION SCRIPT',
+        '',
+        `Lead Type: ${leadType}`,
+        `Motivation: ${motivation}`,
+        `Property Condition: ${condition}`,
+        '',
+        'OPENING',
+        '“Hi, this is Foundation Acquisitions. I’m reaching out about the property. I wanted to see if you had a few minutes to talk about it.”',
+        '',
+        'DISCOVERY',
+        '1. What are you looking to do with the property?',
+        '2. What has you considering selling?',
+        '3. How quickly would you ideally like to move?',
+        '4. What condition is the property currently in?',
+        '5. Is there a mortgage or other obligation on the property?',
+        '6. What would make the sale worthwhile for you?',
+        '',
+        'OBJECTIVE',
+        objective,
+        '',
+        'OBJECTION',
+        `Seller: “${objection}.”`,
+        '',
+        'RESPONSE',
+        '“Absolutely. I understand. My goal is not to pressure you. I just want to understand what would make sense for you and determine whether we can put together an option worth considering.”',
+        '',
+        'OFFER TRANSITION',
+        '“Based on what you have told me, would you be open to hearing what we could potentially offer?”',
+        '',
+        'FOLLOW UP',
+        'Confirm the next step, preferred contact method, and specific follow-up date/time.',
+      ].join('\n')
+    )
+  }
+
+  return (
+    <div style={toolGridStyle}>
+      <SectionCard
+        title="Conversation Inputs"
+        subtitle="Customize the script to the seller situation."
+      >
+        <div style={formGridStyle}>
+          <SelectInput
+            label="Lead Type"
+            value={leadType}
+            onChange={setLeadType}
+            options={[
+              'Distressed Seller',
+              'Absentee Owner',
+              'Tax Delinquent',
+              'Foreclosure',
+              'Probate',
+              'Vacant',
+              'High Equity',
+              'Unknown',
+            ]}
+          />
+
+          <SelectInput
+            label="Property Condition"
+            value={condition}
+            onChange={setCondition}
+            options={[
+              'Unknown',
+              'Excellent',
+              'Good',
+              'Average',
+              'Needs Repairs',
+              'Major Rehab',
+            ]}
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
+          <TextInput
+            label="Motivation"
+            value={motivation}
+            onChange={setMotivation}
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
+          <TextInput
+            label="Call Objective"
+            value={objective}
+            onChange={setObjective}
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+          }}
+        >
+          <TextInput
+            label="Likely Objection"
+            value={objection}
+            onChange={setObjection}
+          />
+        </div>
+
+        <div style={actionRowStyle}>
+          <ActionButton
+            tone="gold"
+            onClick={generateScript}
+          >
+            Generate Script
+          </ActionButton>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Generated Script"
+        subtitle="Editable conversation framework."
+      >
+        <textarea
+          value={script}
+          onChange={(event) =>
+            setScript(
+              event.target.value
+            )
+          }
+          placeholder="Your script will appear here..."
+          style={{
+            ...textareaStyle,
+            minHeight: 500,
+          }}
+        />
+
+        {script && (
+          <div style={actionRowStyle}>
+            <ActionButton
+              tone="ghost"
+              onClick={() =>
+                copyText(script)
+              }
+            >
+              Copy Script
+            </ActionButton>
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  )
+}
+
+/* =========================================================
+   TOOL REGISTRY
+========================================================= */
+
+const TOOL_COMPONENTS: Record<
+  ToolSlug,
+  ComponentType<ToolProps>
+> = {
+  'assignment-contract':
+    AssignmentContractTool,
+
+  'buyer-blast':
+    BuyerBlastTool,
+
+  'closing-cost':
+    ClosingCostTool,
+
+  'comps-analyzer':
+    CompsAnalyzerTool,
+
+  'contract-generator':
+    ContractGeneratorTool,
+
+  'marketing-roi':
+    MarketingROITool,
+
+  'repair-estimator':
+    RepairEstimatorTool,
+
+  'script-generator':
+    ScriptGeneratorTool,
+}
+
+/* =========================================================
+   TOOL WORKSPACE CONTENT
+========================================================= */
+
+function ToolWorkspaceContent({
+  slug,
+}: {
+  slug: ToolSlug
+}) {
+  const searchParams =
+    useSearchParams()
+
+  const leadId =
+    searchParams.get('leadId')
+
+  const config =
+    getToolConfig(slug)
+
+  const [
+    lead,
+    setLead,
+  ] = useState<Lead | null>(null)
+
+  const [
+    loadingLead,
+    setLoadingLead,
+  ] = useState(
+    Boolean(leadId)
   )
 
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function toText(value: unknown) {
-  if (value === null || value === undefined) {
-    return null
-  }
-
-  const text = String(value).trim()
-
-  return text.length ? text : null
-}
-
-function toBoolean(value: unknown) {
-  if (value === null || value === undefined) {
-    return null
-  }
-
-  if (typeof value === 'boolean') {
-    return value
-  }
-
-  const text = String(value)
-    .trim()
-    .toLowerCase()
-
-  if (
-    [
-      '1',
-      'true',
-      'yes',
-      'y',
-      'occupied',
-      'owner occupied',
-      'homestead',
-      'primary',
-    ].includes(text)
-  ) {
-    return true
-  }
-
-  if (
-    [
-      '0',
-      'false',
-      'no',
-      'n',
-      'vacant',
-      'non owner occupied',
-      'not owner occupied',
-    ].includes(text)
-  ) {
-    return false
-  }
-
-  return null
-}
-
-function firstText(...values: unknown[]) {
-  for (const value of values) {
-    const text = toText(value)
-
-    if (text) {
-      return text
-    }
-  }
-
-  return null
-}
-
-function firstNumber(...values: unknown[]) {
-  for (const value of values) {
-    const number = toNumber(value)
-
-    if (number !== null) {
-      return number
-    }
-  }
-
-  return null
-}
-
-/*
- * Determines which stage/status column is actually present
- * on the loaded lead record.
- *
- * This prevents the app from assuming that every possible
- * status column exists in the database.
- */
-function getStageColumn(
-  lead: LeadRecord
-): StageColumn | null {
-  for (const column of STAGE_COLUMNS) {
-    if (
-      Object.prototype.hasOwnProperty.call(
-        lead,
-        column
-      )
-    ) {
-      return column
-    }
-  }
-
-  return null
-}
-
-/*
- * Gets the current stage from the first usable stage column.
- */
-function getCurrentStage(
-  lead: LeadRecord
-): string {
-  for (const column of STAGE_COLUMNS) {
-    const value = toText(lead[column])
-
-    if (value) {
-      return value
-    }
-  }
-
-  return 'new_lead'
-}
-
-export default function LeadWorkspacePage() {
-  const params = useParams()
-  const router = useRouter()
-
-  const leadId = String(params?.leadId || '')
-
-  const [lead, setLead] =
-    useState<LeadRecord | null>(null)
-
-  const [loading, setLoading] =
-    useState(true)
-
-  const [savingStage, setSavingStage] =
-    useState(false)
+  const [
+    leadError,
+    setLeadError,
+  ] = useState<string | null>(
+    null
+  )
 
   useEffect(() => {
+    let cancelled = false
+
     async function loadLead() {
       if (!leadId) {
-        setLoading(false)
+        setLoadingLead(false)
         return
       }
 
-      setLoading(true)
+      setLoadingLead(true)
+      setLeadError(null)
 
       const {
         data,
@@ -347,460 +2145,44 @@ export default function LeadWorkspacePage() {
         .eq('id', leadId)
         .single()
 
+      if (cancelled) return
+
       if (error) {
         console.error(
-          'Failed to load lead:',
+          'Tool lead load error:',
           error
         )
 
         setLead(null)
-        setLoading(false)
-        return
+        setLeadError(
+          'The property information could not be loaded. The tool can still be used manually.'
+        )
+      } else {
+        setLead(
+          data as Lead
+        )
       }
 
-      setLead(data as LeadRecord)
-      setLoading(false)
+      setLoadingLead(false)
     }
 
     void loadLead()
+
+    return () => {
+      cancelled = true
+    }
   }, [leadId])
 
-  const normalizedLead = useMemo(() => {
-    if (!lead) {
-      return null
-    }
-
-    const raw =
-      lead.raw_import_data as Record<
-        string,
-        any
-      > | null
-
-    const source =
-      lead.source_columns as Record<
-        string,
-        any
-      > | null
-
-    const intelligence =
-      lead.lead_intelligence as Record<
-        string,
-        any
-      > | null
-
-    /*
-     * BEDROOMS
-     */
-    const beds =
-      resolveNumericField(
-        lead as any,
-        FIELD_ALIASES.beds,
-        null,
-        {
-          treatZeroAsMissing: true,
-          min: 1,
-        }
-      ) ??
-      firstNumber(
-        lead.bedrooms,
-        raw?.bedrooms,
-        raw?.beds,
-        raw?.bedroom_count,
-        raw?.nbr_beds,
-        source?.bedrooms,
-        source?.beds,
-        source?.bedroom_count,
-        source?.nbr_beds,
-        intelligence?.bedrooms,
-        intelligence?.beds
-      )
-
-    /*
-     * BATHROOMS
-     */
-    const baths =
-      resolveNumericField(
-        lead as any,
-        FIELD_ALIASES.baths,
-        null,
-        {
-          treatZeroAsMissing: false,
-          min: 0,
-        }
-      ) ??
-      firstNumber(
-        lead.bathrooms,
-        raw?.bathrooms,
-        raw?.baths,
-        raw?.bathroom_count,
-        raw?.nbr_baths,
-        source?.bathrooms,
-        source?.baths,
-        source?.bathroom_count,
-        source?.nbr_baths,
-        intelligence?.bathrooms,
-        intelligence?.baths
-      )
-
-    /*
-     * SQUARE FEET
-     */
-    const sqft =
-      resolveNumericField(
-        lead as any,
-        FIELD_ALIASES.sqft,
-        null,
-        {
-          treatZeroAsMissing: true,
-          min: 1,
-        }
-      ) ??
-      firstNumber(
-        lead.square_feet,
-        raw?.square_feet,
-        raw?.sqft,
-        raw?.living_area,
-        source?.square_feet,
-        source?.sqft,
-        intelligence?.square_feet,
-        intelligence?.sqft
-      )
-
-    /*
-     * OWNER NAME
-     */
-    const ownerName =
-      firstText(
-        resolveField(
-          lead as any,
-          FIELD_ALIASES.ownerName
-        ),
-        intelligence?.owner_name,
-        lead.owner_name
-      ) || null
-
-    /*
-     * OWNER PHONE
-     */
-    const ownerPhone = firstText(
-      intelligence?.owner_phone,
-      intelligence?.phone,
-      raw?.owner_phone,
-      raw?.phone,
-      raw?.phone_number,
-      raw?.primary_phone,
-      source?.owner_phone,
-      source?.phone,
-      source?.phone_number,
-      source?.primary_phone,
-      lead.owner_phone,
-      lead.phone
-    )
-
-    /*
-     * OWNER EMAIL
-     */
-    const ownerEmail = firstText(
-      intelligence?.owner_email,
-      intelligence?.email,
-      raw?.owner_email,
-      raw?.email,
-      raw?.email_address,
-      raw?.primary_email,
-      source?.owner_email,
-      source?.email,
-      source?.email_address,
-      source?.primary_email,
-      lead.owner_email,
-      lead.email
-    )
-
-    /*
-     * OWNER OCCUPIED
-     */
-    const ownerOccupied =
-      toBoolean(
-        resolveField(
-          lead as any,
-          FIELD_ALIASES.ownerOccupied
-        )
-      ) ??
-      toBoolean(
-        intelligence?.owner_occupied
-      ) ??
-      lead.owner_occupied
-
-    /*
-     * LAST SALE DATE
-     */
-    const lastSaleDate =
-      firstText(
-        resolveField(
-          lead as any,
-          FIELD_ALIASES.lastSaleDate
-        ),
-        intelligence?.last_sale_date,
-        lead.last_sale_date
-      ) || null
-
-    /*
-     * ESTIMATED / HOUSE VALUE
-     */
-    const estimatedValue =
-      firstNumber(
-        resolveField(
-          lead as any,
-          FIELD_ALIASES.estimatedValue
-        ),
-        intelligence?.house_value,
-        intelligence?.estimated_value,
-        intelligence?.market_value,
-        lead.house_value,
-        lead.estimated_value,
-        lead.market_value
-      )
-
-    /*
-     * OWNERSHIP YEARS
-     */
-    const ownershipYears =
-      computeOwnershipYears({
-        ...lead,
-        last_sale_date: lastSaleDate,
-      })
-
-    /*
-     * CURRENT STAGE
-     *
-     * We intentionally do NOT reference deal_status.
-     */
-    const currentStage =
-      getCurrentStage(lead)
-
-    /*
-     * Determine the actual writable database
-     * column for stage updates.
-     */
-    const stageColumn =
-      getStageColumn(lead)
-
-    return {
-      ...lead,
-
-      stage: currentStage,
-
-      stage_column: stageColumn,
-
-      bedrooms: beds ?? null,
-      bathrooms: baths ?? null,
-      square_feet: sqft ?? null,
-
-      owner_name: ownerName,
-      owner_phone: ownerPhone,
-      owner_email: ownerEmail,
-
-      owner_occupied: ownerOccupied,
-
-      last_sale_date: lastSaleDate,
-
-      ownership_length:
-        ownershipYears ??
-        lead.ownership_length ??
-        null,
-
-      resolved_value:
-        estimatedValue ?? null,
-    }
-  }, [lead])
-
-  const scores = useMemo(() => {
-    if (!normalizedLead) {
-      return null
-    }
-
-    return computeLeadScores(
-      normalizedLead as any
-    )
-  }, [normalizedLead])
-
-  /*
-   * FIXED STAGE UPDATE
-   *
-   * The old version attempted to update:
-   *
-   * status
-   * stage
-   * lead_status
-   * deal_status   <-- DOES NOT EXIST
-   * pipeline_stage
-   *
-   * Supabase rejects the entire update when one column
-   * doesn't exist.
-   *
-   * This version detects the actual stage column and
-   * updates ONLY that column.
-   */
-  async function handleUpdateStage(
-    nextStage: string
-  ) {
-    if (!leadId || !lead) {
-      return
-    }
-
-    if (savingStage) {
-      return
-    }
-
-    const stageColumn =
-      getStageColumn(lead)
-
-    if (!stageColumn) {
-      alert(
-        'Could not update stage because no supported stage column was found on the leads table. Expected one of: status, stage, lead_status, or pipeline_stage.'
-      )
-
-      return
-    }
-
-    setSavingStage(true)
-
-    try {
-      const payload: Record<
-        string,
-        string
-      > = {
-        [stageColumn]: nextStage,
-      }
-
-      console.log(
-        'Updating lead stage:',
-        {
-          leadId,
-          stageColumn,
-          nextStage,
-          payload,
-        }
-      )
-
-      const {
-        error,
-      } = await supabase
-        .from('leads')
-        .update(payload)
-        .eq('id', leadId)
-
-      if (error) {
-        console.error(
-          'Failed to update lead stage:',
-          {
-            error,
-            leadId,
-            stageColumn,
-            nextStage,
-          }
-        )
-
-        alert(
-          `Failed to update stage: ${error.message}`
-        )
-
-        return
-      }
-
-      /*
-       * Update local state using the SAME column
-       * that was successfully written to Supabase.
-       */
-      setLead((current) => {
-        if (!current) {
-          return current
-        }
-
-        return {
-          ...current,
-          [stageColumn]: nextStage,
-        }
-      })
-    } finally {
-      setSavingStage(false)
-    }
-  }
-
-  async function handleDeleteLead() {
-    if (!leadId) {
-      return
-    }
-
-    if (
-      !confirm(
-        'Are you sure you want to permanently delete this lead?'
-      )
-    ) {
-      return
-    }
-
-    const {
-      error,
-    } = await supabase
-      .from('leads')
-      .delete()
-      .eq('id', leadId)
-
-    if (error) {
-      alert(
-        `Failed to delete lead: ${error.message}`
-      )
-
-      return
-    }
-
-    router.push('/leads')
-  }
-
-  if (loading) {
+  if (!config) {
     return (
       <PageShell
-        title="Lead Workspace"
-        subtitle="Loading lead workspace..."
+        title="Tool Not Found"
+        subtitle="The requested acquisition tool does not exist."
       >
-        <SectionCard
-          title="Loading"
-          subtitle="Pulling uploaded lead intelligence."
-        >
-          <div style={loadingBoxStyle}>
-            <div style={spinnerStyle} />
-
-            <span
-              style={{
-                color:
-                  'rgba(255,255,255,0.5)',
-                fontSize: 13,
-              }}
-            >
-              Retrieving property intelligence...
-            </span>
-          </div>
-        </SectionCard>
-      </PageShell>
-    )
-  }
-
-  if (
-    !normalizedLead ||
-    !scores
-  ) {
-    return (
-      <PageShell
-        title="Lead Workspace"
-        subtitle="Lead could not be found."
-      >
-        <SectionCard
-          title="Lead not found"
-          subtitle="This record could not be loaded."
-        >
-          <Link href="/leads">
+        <SectionCard title="Unknown Tool">
+          <Link href="/tools">
             <ActionButton tone="gold">
-              Back to Leads
+              Back to Tools
             </ActionButton>
           </Link>
         </SectionCard>
@@ -808,1289 +2190,396 @@ export default function LeadWorkspacePage() {
     )
   }
 
-  const topValue =
-    normalizedLead.resolved_value ??
-    normalizedLead.house_value ??
-    normalizedLead.estimated_value ??
-    normalizedLead.market_value ??
-    null
+  if (loadingLead) {
+    return (
+      <PageShell
+        title={config.name}
+        subtitle="Loading property workspace..."
+      >
+        <SectionCard title="Loading">
+          <div style={loadingStyle}>
+            Loading property intelligence...
+          </div>
+        </SectionCard>
+      </PageShell>
+    )
+  }
 
-  const addressLine =
-    [
-      normalizedLead.city,
-      normalizedLead.state,
-      normalizedLead.zip,
-    ]
-      .filter(Boolean)
-      .join(', ') ||
-    'No city/state/zip'
+  const ToolComponent =
+    TOOL_COMPONENTS[slug]
 
-  const propertyAddress =
-    normalizedLead.property_address_1 ||
-    'Lead'
+  if (!ToolComponent) {
+    return (
+      <PageShell
+        title="Tool Error"
+        subtitle="This tool is not registered correctly."
+      >
+        <SectionCard title="Configuration Error">
+          <p style={errorTextStyle}>
+            The tool exists in the
+            configuration but does not
+            have a workspace component.
+          </p>
 
-  const compsHref =
-    `/tools/comps-analyzer?leadId=${encodeURIComponent(
-      normalizedLead.id
-    )}&address=${encodeURIComponent(
-      propertyAddress
-    )}`
-
-  const contractHref =
-    `/tools/contract-generator?leadId=${encodeURIComponent(
-      normalizedLead.id
-    )}`
-
-  const assignmentHref =
-    `/tools/assignment-contract?leadId=${encodeURIComponent(
-      normalizedLead.id
-    )}`
-
-  const repairHref =
-    `/tools/repair-estimator?leadId=${encodeURIComponent(
-      normalizedLead.id
-    )}`
-
-  const closingHref =
-    `/tools/closing-cost?leadId=${encodeURIComponent(
-      normalizedLead.id
-    )}`
+          <Link href="/tools">
+            <ActionButton tone="gold">
+              Back to Tools
+            </ActionButton>
+          </Link>
+        </SectionCard>
+      </PageShell>
+    )
+  }
 
   return (
     <PageShell
-      title="Lead Workspace"
-      subtitle="Imported property intelligence and deal thinking surface."
+      title={config.name}
+      subtitle={config.description}
       actions={
         <>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <select
-              value={normalizedLead.stage}
-              disabled={savingStage}
-              onChange={(e) =>
-                handleUpdateStage(
-                  e.target.value
-                )
-              }
-              style={{
-                ...workspaceSelectStyle,
-                opacity: savingStage
-                  ? 0.6
-                  : 1,
-              }}
-            >
-              {STAGE_OPTIONS.map(
-                (opt) => (
-                  <option
-                    key={opt.value}
-                    value={opt.value}
-                    style={optionStyle}
-                  >
-                    Stage: {opt.label}
-                  </option>
-                )
-              )}
-            </select>
-
+          <Link href="/tools">
             <ActionButton
               compact
-              tone="danger"
-              onClick={
-                handleDeleteLead
-              }
+              tone="ghost"
             >
-              Delete Lead
+              Tools
             </ActionButton>
-          </div>
+          </Link>
 
-          <StatPill
-            label="Strength"
-            value={
-              scores.overall.score
-            }
-          />
-
-          <StatPill
-            label="Motivation"
-            value={
-              scores.motivation.score
-            }
-          />
-
-          <StatPill
-            label="Contact"
-            value={
-              scores.contactability
-                .score
-            }
-          />
-
-          <StatPill
-            label="Market"
-            value={
-              scores.marketability.score
-            }
-          />
+          {leadId && (
+            <Link
+              href={`/leads/${leadId}`}
+            >
+              <ActionButton
+                compact
+                tone="gold"
+              >
+                Lead Workspace
+              </ActionButton>
+            </Link>
+          )}
         </>
       }
     >
-      <div style={pageGridStyle}>
-        <div style={leftRailStyle}>
-          <SectionCard
-            title={propertyAddress}
-            subtitle={addressLine}
-            actions={
-              <span
-                style={
-                  typeBadgeStyle
-                }
-              >
-                {normalizedLead.lead_type ||
-                  'standard'}
-              </span>
-            }
-          >
-            <div
-              style={
-                heroSignalGridStyle
-              }
-            >
-              <HeroSignal
-                label="House Value"
-                value={money(
-                  topValue
-                )}
-                tone="gold"
-              />
+      <div style={pageStyle}>
+        <ToolHeader
+          title={config.name}
+          description={
+            config.longDescription
+          }
+        />
 
-              <HeroSignal
-                label="Equity"
-                value={money(
-                  normalizedLead.equity_amount
-                )}
-                tone="green"
-              />
+        {leadError && (
+          <div style={warningBoxStyle}>
+            {leadError}
+          </div>
+        )}
 
-              <HeroSignal
-                label="Mortgage Balance"
-                value={money(
-                  normalizedLead.mortgage_balance
-                )}
-                tone="ice"
-              />
-
-              <HeroSignal
-                label="Last Money In"
-                value={money(
-                  normalizedLead.last_sale_amount
-                )}
-                tone="gold"
-              />
-
-              <HeroSignal
-                label="Last Sale Date"
-                value={
-                  normalizedLead.last_sale_date ||
-                  '—'
-                }
-                tone="ice"
-              />
-
-              <HeroSignal
-                label="Owner"
-                value={
-                  normalizedLead.owner_name ||
-                  '—'
-                }
-                tone="green"
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Owner Contact"
-            subtitle="Contact information available from the imported lead data."
-          >
-            <div
-              style={
-                contactGridStyle
-              }
-            >
-              <ContactCard
-                label="Owner"
-                value={
-                  normalizedLead.owner_name ||
-                  'Not available'
-                }
-                tone="green"
-              />
-
-              <ContactCard
-                label="Phone"
-                value={
-                  normalizedLead.owner_phone ||
-                  'Not available'
-                }
-                tone="gold"
-                href={
-                  normalizedLead.owner_phone
-                    ? `tel:${normalizedLead.owner_phone}`
-                    : undefined
-                }
-              />
-
-              <ContactCard
-                label="Email"
-                value={
-                  normalizedLead.owner_email ||
-                  'Not available'
-                }
-                tone="ice"
-                href={
-                  normalizedLead.owner_email
-                    ? `mailto:${normalizedLead.owner_email}`
-                    : undefined
-                }
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Property Signals"
-            subtitle="Promoted from uploaded data and used for scoring."
-          >
-            <div
-              style={
-                propertyGridStyle
-              }
-            >
-              <InfoTile
-                label="Lead Type"
-                value={
-                  normalizedLead.lead_type ||
-                  'standard'
-                }
-                tone="gold"
-              />
-
-              <InfoTile
-                label="APN"
-                value={
-                  normalizedLead.apn ||
-                  '—'
-                }
-                tone="ice"
-              />
-
-              <InfoTile
-                label="County"
-                value={
-                  normalizedLead.county ||
-                  '—'
-                }
-                tone="green"
-              />
-
-              <InfoTile
-                label="Bedrooms"
-                value={
-                  normalizedLead.bedrooms !==
-                    null &&
-                  normalizedLead.bedrooms !==
-                    undefined
-                    ? String(
-                        normalizedLead.bedrooms
-                      )
-                    : '—'
-                }
-                tone="gold"
-              />
-
-              <InfoTile
-                label="Bathrooms"
-                value={
-                  normalizedLead.bathrooms !==
-                    null &&
-                  normalizedLead.bathrooms !==
-                    undefined
-                    ? String(
-                        normalizedLead.bathrooms
-                      )
-                    : '—'
-                }
-                tone="green"
-              />
-
-              <InfoTile
-                label="Beds / Baths"
-                value={`${normalizedLead.bedrooms ?? '—'} / ${
-                  normalizedLead.bathrooms ??
-                  '—'
-                }`}
-                tone="gold"
-              />
-
-              <InfoTile
-                label="Square Feet"
-                value={
-                  normalizedLead.square_feet
-                    ? String(
-                        normalizedLead.square_feet
-                      )
-                    : '—'
-                }
-                tone="ice"
-              />
-
-              <InfoTile
-                label="Year Built"
-                value={
-                  normalizedLead.year_built
-                    ? String(
-                        normalizedLead.year_built
-                      )
-                    : '—'
-                }
-                tone="green"
-              />
-
-              <InfoTile
-                label="Ownership Length"
-                value={
-                  normalizedLead.ownership_length
-                    ? `${normalizedLead.ownership_length} yrs`
-                    : '—'
-                }
-                tone="gold"
-              />
-
-              <InfoTile
-                label="Occupied / Vacant"
-                value={`${yn(
-                  normalizedLead.owner_occupied,
-                  'Owner Occupied',
-                  'Not Owner Occupied'
-                )}${
-                  normalizedLead.vacant ===
-                  true
-                    ? ' · Vacant'
-                    : ''
-                }`}
-                tone="ice"
-              />
-
-              <InfoTile
-                label="Default Amount"
-                value={money(
-                  normalizedLead.default_amount
-                )}
-                tone="green"
-              />
-
-              <InfoTile
-                label="Auction Date"
-                value={
-                  normalizedLead.auction_date ||
-                  '—'
-                }
-                tone="gold"
-              />
-
-              <InfoTile
-                label="Lender"
-                value={
-                  normalizedLead.lender_name ||
-                  '—'
-                }
-                tone="ice"
-              />
-
-              <InfoTile
-                label="Mailing Address"
-                value={
-                  [
-                    normalizedLead.owner_mailing_address,
-                    normalizedLead.owner_mailing_city,
-                    normalizedLead.owner_mailing_state,
-                    normalizedLead.owner_mailing_zip,
-                  ]
-                    .filter(Boolean)
-                    .join(', ') ||
-                  '—'
-                }
-                tone="green"
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Lead Strength"
-            subtitle="Quick view of the signals that make this lead worth pursuing."
-          >
-            <div
-              style={
-                strengthSummaryStyle
-              }
-            >
-              <div
-                style={
-                  strengthHeroStyle
-                }
-              >
-                <div
-                  style={
-                    strengthHeroLabelStyle
-                  }
-                >
-                  Overall Lead Strength
-                </div>
-
-                <div
-                  style={
-                    strengthHeroScoreStyle
-                  }
-                >
-                  {
-                    scores.overall.score
-                  }
-                </div>
-
-                <div
-                  style={
-                    strengthHeroDescriptionStyle
-                  }
-                >
-                  {getStrengthDescription(
-                    scores.overall.score
-                  )}
-                </div>
-              </div>
-
-              <div
-                style={
-                  strengthRowsStyle
-                }
-              >
-                <StrengthRow
-                  label="Motivation"
-                  score={
-                    scores.motivation
-                      .score
-                  }
-                />
-
-                <StrengthRow
-                  label="Contactability"
-                  score={
-                    scores.contactability
-                      .score
-                  }
-                />
-
-                <StrengthRow
-                  label="Marketability"
-                  score={
-                    scores.marketability
-                      .score
-                  }
-                />
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Deal Tools"
-            subtitle="Run analysis and create deal documents directly from this property."
-          >
-            <div
-              style={
-                toolGridStyle
-              }
-            >
-              <LeadTool
-                href={compsHref}
-                title="Comps Analyzer"
-                description="Analyze comparable sales and estimate ARV."
-                icon="⌁"
-                tone="gold"
-              />
-
-              <LeadTool
-                href={repairHref}
-                title="Repair Estimator"
-                description="Build a renovation budget and repair estimate."
-                icon="⌂"
-                tone="gold"
-              />
-
-              <LeadTool
-                href={closingHref}
-                title="Closing Costs"
-                description="Estimate transaction and closing expenses."
-                icon="$"
-                tone="ice"
-              />
-
-              <LeadTool
-                href={contractHref}
-                title="Contract Generator"
-                description="Prepare purchase agreement deal terms."
-                icon="▤"
-                tone="gold"
-              />
-
-              <LeadTool
-                href={assignmentHref}
-                title="Assignment Contract"
-                description="Structure the assignment and assignment fee."
-                icon="▣"
-                tone="green"
-              />
-
-              <LeadTool
-                href={`/tools/script-generator?leadId=${encodeURIComponent(
-                  normalizedLead.id
-                )}`}
-                title="Script Generator"
-                description="Create a seller call script for this lead."
-                icon="✎"
-                tone="ice"
-              />
-            </div>
-          </SectionCard>
-        </div>
-
-        <div style={rightRailStyle}>
-          <WorkspaceCanvas
-            leadId={
-              normalizedLead.id
-            }
-            leadTitle={
-              normalizedLead.property_address_1 ||
-              'Lead'
-            }
+        {lead && (
+          <PropertySnapshot
+            lead={lead}
           />
-        </div>
+        )}
+
+        <ToolComponent
+          lead={lead}
+        />
+
+        {leadId && (
+          <div
+            style={
+              workspaceSectionStyle
+            }
+          >
+            <WorkspaceCanvas
+              leadId={leadId}
+              leadTitle={
+                lead?.property_address_1 ||
+                config.name
+              }
+            />
+          </div>
+        )}
       </div>
     </PageShell>
   )
 }
 
-function getStrengthDescription(
-  score: number
-) {
-  if (score >= 90) {
-    return 'Excellent lead. Multiple strong signals suggest this property deserves immediate attention.'
-  }
+/* =========================================================
+   SUSPENSE WRAPPER
+========================================================= */
 
-  if (score >= 80) {
-    return 'Strong lead. The available property and market signals support active follow-up.'
-  }
-
-  if (score >= 70) {
-    return 'Promising lead. There are enough positive signals to justify further qualification.'
-  }
-
-  if (score >= 60) {
-    return 'Moderate lead. Additional owner and property information could materially improve the opportunity.'
-  }
-
-  return 'Needs qualification. Contact information, motivation, or property data may be limiting the opportunity.'
-}
-
-function StrengthRow({
-  label,
-  score,
+export default function ToolWorkspace({
+  slug,
 }: {
-  label: string
-  score: number
+  slug: ToolSlug
 }) {
-  const tone =
-    score >= 80
-      ? '#4ade80'
-      : score >= 60
-        ? '#d6a64b'
-        : '#93c5fd'
-
   return (
-    <div
-      style={
-        strengthRowStyle
+    <Suspense
+      fallback={
+        <PageShell
+          title="Loading Tool"
+          subtitle="Preparing your acquisition workspace..."
+        >
+          <SectionCard title="Loading">
+            <div
+              style={loadingStyle}
+            >
+              Loading tool workspace...
+            </div>
+          </SectionCard>
+        </PageShell>
       }
     >
-      <div>
-        <div
-          style={
-            strengthRowLabelStyle
-          }
-        >
-          {label}
-        </div>
-
-        <div
-          style={
-            strengthRowStatusStyle
-          }
-        >
-          {score >= 80
-            ? 'Strong'
-            : score >= 60
-              ? 'Moderate'
-              : 'Needs Attention'}
-        </div>
-      </div>
-
-      <div
-        style={{
-          ...strengthRowScoreStyle,
-          color: tone,
-        }}
-      >
-        {score}
-      </div>
-    </div>
+      <ToolWorkspaceContent
+        slug={slug}
+      />
+    </Suspense>
   )
 }
 
-function LeadTool({
-  href,
-  title,
-  description,
-  icon,
-  tone,
-}: {
-  href: string
-  title: string
-  description: string
-  icon: string
-  tone: 'gold' | 'green' | 'ice'
-}) {
-  const palette =
-    tone === 'gold'
-      ? {
-          border:
-            'rgba(214,166,75,0.22)',
-          background:
-            'linear-gradient(180deg, rgba(31,25,14,0.82), rgba(8,7,4,0.96))',
-          icon: '#d6a64b',
-        }
-      : tone === 'green'
-        ? {
-            border:
-              'rgba(74,222,128,0.22)',
-            background:
-              'linear-gradient(180deg, rgba(13,28,18,0.82), rgba(5,10,7,0.96))',
-            icon: '#4ade80',
-          }
-        : {
-            border:
-              'rgba(147,197,253,0.22)',
-            background:
-              'linear-gradient(180deg, rgba(15,22,31,0.82), rgba(5,8,12,0.96))',
-            icon: '#93c5fd',
-          }
+/* =========================================================
+   STYLES
+========================================================= */
 
-  return (
-    <Link
-      href={href}
-      style={{
-        ...leadToolLinkStyle,
-        borderColor:
-          palette.border,
-        background:
-          palette.background,
-      }}
-    >
-      <div
-        style={{
-          ...leadToolIconStyle,
-          borderColor:
-            palette.border,
-          color: palette.icon,
-        }}
-      >
-        {icon}
-      </div>
-
-      <div
-        style={
-          leadToolContentStyle
-        }
-      >
-        <div
-          style={
-            leadToolTitleStyle
-          }
-        >
-          {title}
-        </div>
-
-        <div
-          style={
-            leadToolDescriptionStyle
-          }
-        >
-          {description}
-        </div>
-
-        <div
-          style={{
-            ...leadToolOpenStyle,
-            color: palette.icon,
-          }}
-        >
-          Open Tool →
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-function HeroSignal({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: 'gold' | 'ice' | 'green'
-}) {
-  const palette =
-    tone === 'gold'
-      ? {
-          border:
-            'rgba(214,166,75,0.25)',
-          bg:
-            'linear-gradient(180deg, rgba(30,24,14,0.8), rgba(12,10,6,0.9))',
-          text: '#d6a64b',
-        }
-      : tone === 'ice'
-        ? {
-            border:
-              'rgba(147,197,253,0.22)',
-            bg:
-              'linear-gradient(180deg, rgba(16,22,30,0.8), rgba(6,10,14,0.9))',
-            text: '#93c5fd',
-          }
-        : {
-            border:
-              'rgba(74,222,128,0.22)',
-            bg:
-              'linear-gradient(180deg, rgba(14,28,18,0.8), rgba(6,12,8,0.9))',
-            text: '#4ade80',
-          }
-
-  return (
-    <div
-      style={{
-        ...heroSignalStyle,
-        borderColor:
-          palette.border,
-        background:
-          palette.bg,
-      }}
-    >
-      <div
-        style={
-          infoLabelStyle
-        }
-      >
-        {label}
-      </div>
-
-      <div
-        style={{
-          ...heroValueStyle,
-          color: palette.text,
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  )
-}
-
-function InfoTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: 'gold' | 'ice' | 'green'
-}) {
-  const palette =
-    tone === 'gold'
-      ? {
-          border:
-            'rgba(214,166,75,0.18)',
-          bg:
-            'rgba(214,166,75,0.05)',
-          text: '#f0ca7e',
-        }
-      : tone === 'ice'
-        ? {
-            border:
-              'rgba(147,197,253,0.18)',
-            bg:
-              'rgba(147,197,253,0.05)',
-            text: '#dcecff',
-          }
-        : {
-            border:
-              'rgba(74,222,128,0.18)',
-            bg:
-              'rgba(74,222,128,0.05)',
-            text: '#bbf7d0',
-          }
-
-  return (
-    <div
-      style={{
-        ...infoTileStyle,
-        borderColor:
-          palette.border,
-        background:
-          palette.bg,
-      }}
-    >
-      <div
-        style={
-          infoLabelStyle
-        }
-      >
-        {label}
-      </div>
-
-      <div
-        style={{
-          ...infoValueStyle,
-          color: palette.text,
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  )
-}
-
-function ContactCard({
-  label,
-  value,
-  tone,
-  href,
-}: {
-  label: string
-  value: string
-  tone: 'gold' | 'ice' | 'green'
-  href?: string
-}) {
-  const palette =
-    tone === 'gold'
-      ? {
-          border:
-            'rgba(214,166,75,0.2)',
-          bg:
-            'rgba(214,166,75,0.05)',
-          text: '#f0ca7e',
-        }
-      : tone === 'ice'
-        ? {
-            border:
-              'rgba(147,197,253,0.2)',
-            bg:
-              'rgba(147,197,253,0.05)',
-            text: '#dcecff',
-          }
-        : {
-            border:
-              'rgba(74,222,128,0.2)',
-            bg:
-              'rgba(74,222,128,0.05)',
-            text: '#bbf7d0',
-          }
-
-  const content = (
-    <>
-      <div
-        style={
-          infoLabelStyle
-        }
-      >
-        {label}
-      </div>
-
-      <div
-        style={{
-          ...contactValueStyle,
-          color: palette.text,
-        }}
-      >
-        {value}
-      </div>
-    </>
-  )
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        style={{
-          ...contactCardStyle,
-          borderColor:
-            palette.border,
-          background:
-            palette.bg,
-        }}
-      >
-        {content}
-      </a>
-    )
-  }
-
-  return (
-    <div
-      style={{
-        ...contactCardStyle,
-        borderColor:
-          palette.border,
-        background:
-          palette.bg,
-      }}
-    >
-      {content}
-    </div>
-  )
-}
-
-const workspaceSelectStyle: CSSProperties =
-  {
-    minHeight: 32,
-    padding: '0 10px',
-    borderRadius: 8,
-    fontSize: 12,
-    fontWeight: 700,
-    outline: 'none',
-    cursor: 'pointer',
-    border:
-      '1px solid rgba(214,166,75,0.4)',
-    background:
-      'rgba(214,166,75,0.12)',
-    color: '#e0b84f',
-  }
-
-const optionStyle: CSSProperties = {
-  background: '#121212',
-  color: '#ffffff',
-}
-
-const pageGridStyle: CSSProperties =
-  {
-    display: 'grid',
-    gridTemplateColumns:
-      'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
-    gap: 18,
-    alignItems: 'start',
-  }
-
-const leftRailStyle: CSSProperties = {
+const pageStyle: CSSProperties = {
   display: 'grid',
   gap: 18,
+  width: '100%',
   minWidth: 0,
 }
 
-const rightRailStyle: CSSProperties =
-  {
-    minWidth: 0,
-  }
+const toolGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'minmax(0, 1.2fr) minmax(300px, 0.8fr)',
+  gap: 18,
+  alignItems: 'start',
+  width: '100%',
+  minWidth: 0,
+}
 
-const heroSignalGridStyle: CSSProperties =
-  {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: 10,
-  }
+const toolHeaderStyle: CSSProperties = {
+  borderRadius: 16,
+  border:
+    '1px solid rgba(214,166,75,0.15)',
+  background:
+    'linear-gradient(180deg, rgba(24,20,12,0.72), rgba(7,7,6,0.92))',
+  padding: 18,
+}
 
-const propertyGridStyle: CSSProperties =
-  {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: 10,
-  }
+const eyebrowStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'rgba(214,166,75,0.72)',
+}
 
-const contactGridStyle: CSSProperties =
-  {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 10,
-  }
+const toolTitleStyle: CSSProperties = {
+  margin: '5px 0 4px',
+  fontSize: 24,
+  fontWeight: 850,
+  color: '#fff',
+}
 
-const toolGridStyle: CSSProperties =
-  {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 10,
-  }
+const toolDescriptionStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  lineHeight: 1.55,
+  color: 'rgba(255,255,255,0.48)',
+  maxWidth: 720,
+}
 
-const strengthSummaryStyle: CSSProperties =
-  {
-    display: 'grid',
-    gap: 12,
-  }
+const leadGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(140px, 1fr))',
+  gap: 10,
+}
 
-const strengthHeroStyle: CSSProperties =
-  {
-    borderRadius: 16,
-    border:
-      '1px solid rgba(214,166,75,0.24)',
-    background:
-      'linear-gradient(135deg, rgba(31,25,14,0.9), rgba(8,7,4,0.98))',
-    padding: 18,
-    display: 'grid',
-    gap: 7,
-  }
+const formGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 12,
+}
 
-const strengthHeroLabelStyle: CSSProperties =
-  {
-    fontSize: 10,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-    color:
-      'rgba(255,255,255,0.45)',
-  }
+const fieldStyle: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  minWidth: 0,
+}
 
-const strengthHeroScoreStyle: CSSProperties =
-  {
-    fontSize: 42,
-    lineHeight: 1,
-    fontWeight: 900,
-    color: '#d6a64b',
-  }
+const fieldLabelStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'rgba(255,255,255,0.4)',
+}
 
-const strengthHeroDescriptionStyle: CSSProperties =
-  {
-    fontSize: 12,
-    lineHeight: 1.5,
-    color:
-      'rgba(255,255,255,0.58)',
-    maxWidth: 620,
-  }
+const inputWrapStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  minHeight: 40,
+  borderRadius: 10,
+  border:
+    '1px solid rgba(255,255,255,0.08)',
+  background:
+    'rgba(255,255,255,0.025)',
+  overflow: 'hidden',
+}
 
-const strengthRowsStyle: CSSProperties =
-  {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(170px, 1fr))',
-    gap: 10,
-  }
+const prefixStyle: CSSProperties = {
+  padding: '0 8px',
+  color: 'rgba(255,255,255,0.38)',
+  fontSize: 12,
+}
 
-const strengthRowStyle: CSSProperties =
-  {
-    borderRadius: 12,
-    border:
-      '1px solid rgba(255,255,255,0.07)',
-    background:
-      'rgba(255,255,255,0.025)',
-    padding: '12px 14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  }
+const inputStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 40,
+  boxSizing: 'border-box',
+  borderRadius: 10,
+  border:
+    '1px solid rgba(255,255,255,0.08)',
+  background:
+    'rgba(255,255,255,0.025)',
+  color: '#fff',
+  padding: '0 11px',
+  outline: 'none',
+  fontSize: 12,
+}
 
-const strengthRowLabelStyle: CSSProperties =
-  {
-    fontSize: 12,
-    fontWeight: 750,
-    color: '#ffffff',
-  }
+const resultGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit, minmax(145px, 1fr))',
+  gap: 10,
+}
 
-const strengthRowStatusStyle: CSSProperties =
-  {
-    marginTop: 3,
-    fontSize: 10,
-    color:
-      'rgba(255,255,255,0.4)',
-  }
+const resultCardStyle: CSSProperties = {
+  minHeight: 74,
+  borderRadius: 12,
+  border: '1px solid transparent',
+  padding: '12px 13px',
+  display: 'grid',
+  alignContent: 'center',
+  gap: 5,
+}
 
-const strengthRowScoreStyle: CSSProperties =
-  {
-    fontSize: 24,
-    fontWeight: 900,
-  }
+const resultValueStyle: CSSProperties = {
+  fontSize: 20,
+  fontWeight: 850,
+  lineHeight: 1.1,
+}
 
-const leadToolLinkStyle: CSSProperties =
-  {
-    textDecoration: 'none',
-    color: 'inherit',
-    borderRadius: 14,
-    border:
-      '1px solid transparent',
-    padding: 13,
-    display: 'grid',
-    gridTemplateColumns:
-      '38px minmax(0,1fr)',
-    gap: 11,
-    minWidth: 0,
-  }
+const outputBoxStyle: CSSProperties = {
+  marginTop: 14,
+  borderRadius: 12,
+  border:
+    '1px solid rgba(255,255,255,0.07)',
+  background:
+    'rgba(0,0,0,0.25)',
+  padding: 14,
+  color: 'rgba(255,255,255,0.62)',
+  fontSize: 12,
+  lineHeight: 1.55,
+}
 
-const leadToolIconStyle: CSSProperties =
-  {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    border:
-      '1px solid transparent',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 17,
-    fontWeight: 900,
-  }
+const textareaStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 220,
+  boxSizing: 'border-box',
+  resize: 'vertical',
+  borderRadius: 12,
+  border:
+    '1px solid rgba(255,255,255,0.08)',
+  background:
+    'rgba(0,0,0,0.25)',
+  color: '#fff',
+  padding: 13,
+  outline: 'none',
+  fontFamily: 'inherit',
+  fontSize: 12,
+  lineHeight: 1.55,
+}
 
-const leadToolContentStyle: CSSProperties =
-  {
-    minWidth: 0,
-    display: 'grid',
-    gap: 5,
-  }
+const actionRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 14,
+}
 
-const leadToolTitleStyle: CSSProperties =
-  {
-    fontSize: 13,
-    fontWeight: 800,
-    color: '#ffffff',
-  }
+const tableStyle: CSSProperties = {
+  width: '100%',
+  minWidth: 680,
+  borderCollapse: 'collapse',
+}
 
-const leadToolDescriptionStyle: CSSProperties =
-  {
-    fontSize: 10.5,
-    lineHeight: 1.45,
-    color:
-      'rgba(255,255,255,0.48)',
-  }
+const thStyle: CSSProperties = {
+  textAlign: 'left',
+  padding: '9px 10px',
+  borderBottom:
+    '1px solid rgba(255,255,255,0.08)',
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 9,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+}
 
-const leadToolOpenStyle: CSSProperties =
-  {
-    fontSize: 10,
-    fontWeight: 800,
-    marginTop: 3,
-  }
+const tdStyle: CSSProperties = {
+  padding: '9px 10px',
+  borderBottom:
+    '1px solid rgba(255,255,255,0.05)',
+  color: 'rgba(255,255,255,0.7)',
+  fontSize: 11,
+}
 
-const contactCardStyle: CSSProperties =
-  {
-    textDecoration: 'none',
-    color: 'inherit',
-    borderRadius: 12,
-    border:
-      '1px solid transparent',
-    padding: '12px 13px',
-    display: 'grid',
-    gap: 5,
-  }
+const tableInputStyle: CSSProperties = {
+  width: 100,
+  minHeight: 34,
+  boxSizing: 'border-box',
+  borderRadius: 7,
+  border:
+    '1px solid rgba(255,255,255,0.08)',
+  background:
+    'rgba(255,255,255,0.025)',
+  color: '#fff',
+  padding: '0 8px',
+  outline: 'none',
+  fontSize: 11,
+}
 
-const contactValueStyle: CSSProperties =
-  {
-    fontSize: 13,
-    fontWeight: 700,
-    lineHeight: 1.35,
-    overflowWrap: 'anywhere',
-  }
+const workspaceSectionStyle: CSSProperties = {
+  minWidth: 0,
+}
 
-const heroSignalStyle: CSSProperties =
-  {
-    borderRadius: 14,
-    border:
-      '1px solid transparent',
-    padding: '12px 14px',
-    display: 'grid',
-    gap: 4,
-    backdropFilter:
-      'blur(12px)',
-    WebkitBackdropFilter:
-      'blur(12px)',
-  }
+const loadingStyle: CSSProperties = {
+  minHeight: 180,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: 'rgba(255,255,255,0.45)',
+  fontSize: 13,
+}
 
-const infoTileStyle: CSSProperties =
-  {
-    borderRadius: 12,
-    border:
-      '1px solid transparent',
-    padding: '10px 12px',
-    display: 'grid',
-    gap: 4,
-  }
+const warningBoxStyle: CSSProperties = {
+  borderRadius: 12,
+  border:
+    '1px solid rgba(214,166,75,0.25)',
+  background:
+    'rgba(214,166,75,0.06)',
+  color: 'rgba(255,255,255,0.65)',
+  padding: 12,
+  fontSize: 12,
+  lineHeight: 1.5,
+}
 
-const infoLabelStyle: CSSProperties =
-  {
-    fontSize: 9.5,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    color:
-      'rgba(255,255,255,0.42)',
-  }
-
-const heroValueStyle: CSSProperties =
-  {
-    fontSize: 18,
-    fontWeight: 800,
-    lineHeight: 1.15,
-    letterSpacing: '-0.01em',
-  }
-
-const infoValueStyle: CSSProperties =
-  {
-    fontSize: 13,
-    fontWeight: 650,
-    lineHeight: 1.35,
-  }
-
-const loadingBoxStyle: CSSProperties =
-  {
-    minHeight: 180,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  }
-
-const spinnerStyle: CSSProperties =
-  {
-    width: 22,
-    height: 22,
-    borderRadius: '50%',
-    border:
-      '2px solid rgba(214, 166, 75, 0.2)',
-    borderTopColor: '#d6a64b',
-    animation:
-      'spin 0.8s linear infinite',
-  }
-
-const typeBadgeStyle: CSSProperties =
-  {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '4px 10px',
-    borderRadius: 8,
-    border:
-      '1px solid rgba(214,166,75,0.3)',
-    background:
-      'rgba(214,166,75,0.1)',
-    color: '#d6a64b',
-    fontSize: 11,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  }
+const errorTextStyle: CSSProperties = {
+  color: 'rgba(255,255,255,0.6)',
+  fontSize: 13,
+  lineHeight: 1.5,
+}
