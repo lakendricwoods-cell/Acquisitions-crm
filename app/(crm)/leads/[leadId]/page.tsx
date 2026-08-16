@@ -1,9 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from 'react'
 import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
 import ActionButton from '@/components/ui/action-button'
@@ -11,9 +16,9 @@ import { supabase } from '@/lib/supabase'
 
 /* =========================================================
    TYPES
-========================================================= */
+   ========================================================= */
 
-type LeadRow = {
+type LeadRecord = {
   id: string
 
   property_address_1?: string | null
@@ -27,84 +32,74 @@ type LeadRow = {
 
   city?: string | null
   property_city?: string | null
-
   state?: string | null
   property_state?: string | null
-
   zip?: string | null
   property_zip?: string | null
-
   county?: string | null
   property_county?: string | null
-
-  apn?: string | null
-  parcel_id?: string | null
 
   status?: string | null
   stage?: string | null
   lead_status?: string | null
+  deal_status?: string | null
   pipeline_stage?: string | null
 
   asking_price?: number | null
   listing_price?: number | null
-  seller_price?: number | null
   purchase_price?: number | null
+  offer_price?: number | null
 
   market_value?: number | null
   estimated_value?: number | null
-
   arv?: number | null
-
-  mao?: number | null
-  max_allowable_offer?: number | null
 
   repairs?: number | null
   estimated_repairs?: number | null
-  repair_estimate?: number | null
-
   assignment_fee?: number | null
-  buy_percentage?: number | null
-  buyer_percentage?: number | null
+  buy_percent?: number | null
+  mao?: number | null
 
   beds?: number | null
   bedrooms?: number | null
-
   baths?: number | null
   bathrooms?: number | null
-
   sqft?: number | null
   square_feet?: number | null
   living_area?: number | null
-
   year_built?: number | null
 
+  property_type?: string | null
   occupancy?: string | null
   owner_occupied?: boolean | null
 
-  ownership_years?: number | null
+  apn?: string | null
+  parcel_id?: string | null
+
+  mailing_address?: string | null
+
+  equity?: number | null
+  estimated_equity?: number | null
+  mortgage_balance?: number | null
+  loan_balance?: number | null
+
+  last_sale_date?: string | null
   ownership_length?: number | null
 
-  property_type?: string | null
   lead_type?: string | null
   source?: string | null
 
-  last_sale_date?: string | null
-  last_sold_date?: string | null
-
-  mortgage_balance?: number | null
-  estimated_equity?: number | null
-  equity?: number | null
-
-  default_amount?: number | null
-  auction_date?: string | null
-  lender?: string | null
-
-  mailing_address?: string | null
+  motivation?: number | null
+  strength?: number | null
+  contactability?: number | null
+  marketability?: number | null
 
   notes?: string | null
 
   created_at?: string | null
   updated_at?: string | null
+
+  [key: string]: unknown
 }
 
 type Analysis = {
@@ -112,32 +107,15 @@ type Analysis = {
   motivation: number | null
   contactability: number | null
   marketability: number | null
-
-  strengthLabel: string
-  motivationLabel: string
-  contactabilityLabel: string
-  marketabilityLabel: string
-
-  reasons: string[]
-  warnings: string[]
+  explanation: string[]
 }
 
-type DealAnalysis = {
-  arv: number | null
-  repairs: number | null
-  buyPercentage: number | null
-  assignmentFee: number | null
-  baseMaximum: number | null
-  mao: number | null
-  sellerPrice: number | null
-  spread: number | null
+type StatusOption = {
+  value: string
+  label: string
 }
 
-/* =========================================================
-   CONSTANTS
-========================================================= */
-
-const STAGE_OPTIONS = [
+const STATUS_OPTIONS: StatusOption[] = [
   { value: 'new_lead', label: 'New Lead' },
   { value: 'contacted', label: 'Contacted' },
   { value: 'appointment_set', label: 'Appointment Set' },
@@ -150,9 +128,9 @@ const STAGE_OPTIONS = [
 
 /* =========================================================
    HELPERS
-========================================================= */
+   ========================================================= */
 
-function firstNonEmpty(
+function firstString(
   ...values: Array<string | null | undefined>
 ): string | null {
   for (const value of values) {
@@ -176,67 +154,91 @@ function firstNumber(
   return null
 }
 
-function formatMoney(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return '—'
+function numberFromUnknown(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
   }
+
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[$,%\s,]/g, '')
+    const parsed = Number(cleaned)
+
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
+}
+
+function booleanFromUnknown(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value
+
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase().trim()
+
+    if (['true', 'yes', 'y', '1'].includes(normalized)) return true
+    if (['false', 'no', 'n', '0'].includes(normalized)) return false
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) return true
+    if (value === 0) return false
+  }
+
+  return null
+}
+
+function formatMoney(value: number | null): string {
+  if (value === null) return 'Not available'
 
   return `$${Math.round(value).toLocaleString()}`
 }
 
-function formatNumber(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return '—'
-  }
+function formatNumber(value: number | null): string {
+  if (value === null) return 'Not available'
 
   return Math.round(value).toLocaleString()
 }
 
-function formatPercent(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return '—'
+function formatDate(value: string | null | undefined): string {
+  if (!value) return 'Not available'
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
   }
 
-  return `${Math.round(value)}%`
+  return date.toLocaleDateString()
 }
 
-function titleCase(value: string) {
+function titleCase(value: string): string {
   return value
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (match) => match.toUpperCase())
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
-function getAddress(lead: LeadRow) {
+function getAddress(lead: LeadRecord): string {
   return (
-    firstNonEmpty(
+    firstString(
       lead.property_address_1,
       lead.property_address,
     ) || 'Property address unavailable'
   )
 }
 
-function getCity(lead: LeadRow) {
-  return firstNonEmpty(
-    lead.city,
-    lead.property_city,
-  )
+function getCity(lead: LeadRecord): string | null {
+  return firstString(lead.city, lead.property_city)
 }
 
-function getState(lead: LeadRow) {
-  return firstNonEmpty(
-    lead.state,
-    lead.property_state,
-  )
+function getState(lead: LeadRecord): string | null {
+  return firstString(lead.state, lead.property_state)
 }
 
-function getZip(lead: LeadRow) {
-  return firstNonEmpty(
-    lead.zip,
-    lead.property_zip,
-  )
+function getZip(lead: LeadRecord): string | null {
+  return firstString(lead.zip, lead.property_zip)
 }
 
-function getLocation(lead: LeadRow) {
+function getLocation(lead: LeadRecord): string {
   return [
     getCity(lead),
     getState(lead),
@@ -246,392 +248,438 @@ function getLocation(lead: LeadRow) {
     .join(', ')
 }
 
-function getPhone(lead: LeadRow) {
-  return firstNonEmpty(
+function getPhone(lead: LeadRecord): string | null {
+  return firstString(
     lead.owner_phone_primary,
     lead.phone1,
   )
 }
 
-function getEmail(lead: LeadRow) {
-  return firstNonEmpty(
+function getEmail(lead: LeadRecord): string | null {
+  return firstString(
     lead.owner_email,
     lead.email1,
   )
 }
 
-function getSellerPrice(lead: LeadRow) {
+function getOwnerOccupied(lead: LeadRecord): boolean | null {
+  if (typeof lead.owner_occupied === 'boolean') {
+    return lead.owner_occupied
+  }
+
+  return booleanFromUnknown(
+    lead.occupancy,
+  )
+}
+
+function getBeds(lead: LeadRecord): number | null {
   return firstNumber(
-    lead.seller_price,
+    lead.beds,
+    lead.bedrooms,
+  )
+}
+
+function getBaths(lead: LeadRecord): number | null {
+  return firstNumber(
+    lead.baths,
+    lead.bathrooms,
+  )
+}
+
+function getSqft(lead: LeadRecord): number | null {
+  return firstNumber(
+    lead.sqft,
+    lead.square_feet,
+    lead.living_area,
+  )
+}
+
+function getSellerPrice(lead: LeadRecord): number | null {
+  return firstNumber(
     lead.asking_price,
     lead.listing_price,
+    lead.offer_price,
     lead.purchase_price,
   )
 }
 
-function getARV(lead: LeadRow) {
+function getArv(lead: LeadRecord): number | null {
   return firstNumber(
     lead.arv,
   )
 }
 
-function getRepairs(lead: LeadRow) {
+function getRepairs(lead: LeadRecord): number | null {
   return firstNumber(
     lead.repairs,
     lead.estimated_repairs,
-    lead.repair_estimate,
   )
 }
 
-function getMAO(lead: LeadRow) {
-  return firstNumber(
-    lead.mao,
-    lead.max_allowable_offer,
-  )
-}
-
-function getBuyPercentage(lead: LeadRow) {
-  return firstNumber(
-    lead.buy_percentage,
-    lead.buyer_percentage,
-  )
-}
-
-function getAssignmentFee(lead: LeadRow) {
+function getAssignmentFee(lead: LeadRecord): number | null {
   return firstNumber(
     lead.assignment_fee,
   )
 }
 
-function getStage(lead: LeadRow) {
-  return (
-    firstNonEmpty(
-      lead.status,
-      lead.stage,
-      lead.lead_status,
-      lead.pipeline_stage,
-    ) || 'new_lead'
-  )
-}
+function getBuyPercent(lead: LeadRecord): number | null {
+  const value = firstNumber(lead.buy_percent)
 
-function getStageLabel(stage: string) {
-  return (
-    STAGE_OPTIONS.find((item) => item.value === stage)?.label ||
-    titleCase(stage)
-  )
-}
+  if (value === null) return null
 
-function getStageColor(stage: string) {
-  switch (stage) {
-    case 'contacted':
-      return '#f59e0b'
-
-    case 'appointment_set':
-      return '#38bdf8'
-
-    case 'offer_sent':
-      return '#eab308'
-
-    case 'negotiation':
-      return '#a78bfa'
-
-    case 'under_contract':
-      return '#4ade80'
-
-    case 'closed':
-      return '#22c55e'
-
-    case 'dead_lead':
-      return '#ef4444'
-
-    default:
-      return '#d6a64b'
+  if (value > 1) {
+    return value / 100
   }
+
+  return value
 }
 
-function scoreLabel(score: number | null) {
-  if (score == null) return 'Not enough data'
-  if (score >= 85) return 'Excellent'
-  if (score >= 70) return 'Strong'
-  if (score >= 50) return 'Moderate'
-  if (score >= 30) return 'Needs Attention'
-
-  return 'Weak'
+function getExistingMao(lead: LeadRecord): number | null {
+  return firstNumber(lead.mao)
 }
 
-function clamp(value: number) {
-  return Math.max(0, Math.min(100, Math.round(value)))
+function getMarketValue(lead: LeadRecord): number | null {
+  return firstNumber(
+    lead.market_value,
+    lead.estimated_value,
+  )
+}
+
+function getMortgageBalance(lead: LeadRecord): number | null {
+  return firstNumber(
+    lead.mortgage_balance,
+    lead.loan_balance,
+  )
+}
+
+/*
+ * IMPORTANT:
+ * This function does not fabricate a status.
+ *
+ * The status column is treated as the canonical pipeline value.
+ * If status is empty, we display "New Lead" without writing
+ * anything back to the database until the user explicitly chooses
+ * a status.
+ */
+function getCurrentStatus(lead: LeadRecord): string {
+  return firstString(
+    lead.status,
+  ) || 'new_lead'
+}
+
+function getStatusLabel(status: string): string {
+  const found = STATUS_OPTIONS.find(
+    (option) => option.value === status,
+  )
+
+  return found?.label || titleCase(status)
+}
+
+function getStatusTone(status: string): string {
+  const normalized = status.toLowerCase()
+
+  if (normalized.includes('contract')) return '#4ade80'
+  if (normalized.includes('closed')) return '#22c55e'
+  if (normalized.includes('contact')) return '#f59e0b'
+  if (normalized.includes('appointment')) return '#38bdf8'
+  if (normalized.includes('offer')) return '#fbbf24'
+  if (normalized.includes('negotiation')) return '#a78bfa'
+  if (normalized.includes('dead')) return '#ef4444'
+
+  return '#d6a64b'
 }
 
 /* =========================================================
-   REAL DATA-BASED LEAD ANALYSIS
-========================================================= */
+   REAL DATA ANALYSIS
+   ========================================================= */
 
-function analyzeLead(lead: LeadRow): Analysis {
+/*
+ * These scores are intentionally conservative.
+ *
+ * They are NOT fake market scores.
+ *
+ * They only score information that actually exists on the lead.
+ * Missing data lowers confidence rather than being replaced by
+ * made-up values.
+ */
+
+function calculateContactability(lead: LeadRecord): number | null {
+  const owner = firstString(lead.owner_name)
+  const phone = getPhone(lead)
+  const email = getEmail(lead)
+
+  let available = 0
+  let possible = 0
+
+  if (owner !== null) {
+    available += 1
+  }
+
+  possible += 1
+
+  if (phone !== null) {
+    available += 1
+  }
+
+  possible += 1
+
+  if (email !== null) {
+    available += 1
+  }
+
+  possible += 1
+
+  if (possible === 0) return null
+
+  return Math.round((available / possible) * 100)
+}
+
+function calculateMarketability(lead: LeadRecord): number | null {
+  let points = 0
+  let possible = 0
+
+  const arv = getArv(lead)
+  const marketValue = getMarketValue(lead)
+  const address = getAddress(lead)
+  const city = getCity(lead)
+  const sqft = getSqft(lead)
+  const beds = getBeds(lead)
+  const baths = getBaths(lead)
+  const yearBuilt = firstNumber(lead.year_built)
+
+  if (arv !== null) {
+    points += 1
+  }
+
+  possible += 1
+
+  if (marketValue !== null) {
+    points += 1
+  }
+
+  possible += 1
+
+  if (address !== 'Property address unavailable') {
+    points += 1
+  }
+
+  possible += 1
+
+  if (city !== null) {
+    points += 1
+  }
+
+  possible += 1
+
+  if (sqft !== null) {
+    points += 1
+  }
+
+  possible += 1
+
+  if (beds !== null) {
+    points += 1
+  }
+
+  possible += 1
+
+  if (baths !== null) {
+    points += 1
+  }
+
+  possible += 1
+
+  if (yearBuilt !== null) {
+    points += 1
+  }
+
+  possible += 1
+
+  if (possible === 0) return null
+
+  return Math.round((points / possible) * 100)
+}
+
+function calculateMotivation(
+  lead: LeadRecord,
+): number | null {
   /*
-   IMPORTANT:
-   This does NOT pretend to know things that are not in the lead.
+   * Motivation is only estimated when the lead contains
+   * actual indicators that can support the conclusion.
+   *
+   * We do NOT assume that every lead is motivated.
+   */
 
-   Every score comes from actual fields on the lead.
-
-   Missing information reduces confidence instead of being
-   converted into an arbitrary "good" score.
-  */
-
-  let contactPoints = 0
-  let contactPossible = 0
-
-  if (lead.owner_name) {
-    contactPoints += 20
-  }
-
-  contactPossible += 20
-
-  if (getPhone(lead)) {
-    contactPoints += 50
-  }
-
-  contactPossible += 50
-
-  if (getEmail(lead)) {
-    contactPoints += 20
-  }
-
-  contactPossible += 20
-
-  const contactability =
-    contactPossible > 0
-      ? clamp((contactPoints / contactPossible) * 100)
-      : null
-
-  /* -------------------------------------------------------
-     MARKETABILITY
-  ------------------------------------------------------- */
-
-  let marketPoints = 0
-  let marketPossible = 0
-
-  if (getARV(lead) != null) {
-    marketPoints += 30
-  }
-
-  marketPossible += 30
-
-  if (getSellerPrice(lead) != null) {
-    marketPoints += 20
-  }
-
-  marketPossible += 20
+  const explicitMotivation = numberFromUnknown(
+    lead.motivation,
+  )
 
   if (
-    getCity(lead) &&
-    getState(lead)
+    explicitMotivation !== null &&
+    explicitMotivation >= 0 &&
+    explicitMotivation <= 100
   ) {
-    marketPoints += 15
+    return explicitMotivation
   }
 
-  marketPossible += 15
+  const indicators: boolean[] = []
 
-  if (
-    lead.beds != null ||
-    lead.bedrooms != null
-  ) {
-    marketPoints += 10
+  const sellerPrice = getSellerPrice(lead)
+  const leadType = firstString(lead.lead_type)
+  const source = firstString(lead.source)
+  const occupancy = getOwnerOccupied(lead)
+  const equity = firstNumber(
+    lead.equity,
+    lead.estimated_equity,
+  )
+
+  if (sellerPrice !== null) {
+    indicators.push(true)
   }
 
-  marketPossible += 10
-
-  if (
-    lead.baths != null ||
-    lead.bathrooms != null
-  ) {
-    marketPoints += 10
+  if (leadType !== null) {
+    indicators.push(true)
   }
 
-  marketPossible += 10
-
-  if (
-    lead.sqft != null ||
-    lead.square_feet != null ||
-    lead.living_area != null
-  ) {
-    marketPoints += 10
+  if (source !== null) {
+    indicators.push(true)
   }
 
-  marketPossible += 10
-
-  if (lead.year_built != null) {
-    marketPoints += 5
+  if (occupancy !== null) {
+    indicators.push(true)
   }
 
-  marketPossible += 5
-
-  const marketability =
-    marketPossible > 0
-      ? clamp((marketPoints / marketPossible) * 100)
-      : null
-
-  /* -------------------------------------------------------
-     MOTIVATION
-  ------------------------------------------------------- */
+  if (equity !== null) {
+    indicators.push(true)
+  }
 
   /*
-   We only use observable property/lead signals.
-
-   We do NOT say someone is motivated simply because
-   they are a lead.
-  */
-
-  let motivationPoints = 0
-  let motivationSignals = 0
-
-  if (getSellerPrice(lead) != null) {
-    motivationPoints += 15
+   * If there are no actual indicators, don't pretend we know
+   * the seller's motivation.
+   */
+  if (indicators.length === 0) {
+    return null
   }
 
-  motivationSignals += 15
+  /*
+   * We have evidence that can be evaluated, but not enough
+   * evidence to claim a high motivation level.
+   */
+  const evidenceRatio =
+    indicators.filter(Boolean).length / 5
 
-  if (
-    lead.owner_occupied === true ||
-    lead.occupancy?.toLowerCase().includes('owner')
-  ) {
-    /*
-     Owner occupancy is contextual information, not
-     automatically a motivation signal.
-     Therefore it receives no direct motivation points.
-    */
+  return Math.min(
+    60,
+    Math.max(20, Math.round(evidenceRatio * 60)),
+  )
+}
+
+function calculateStrength(
+  contactability: number | null,
+  marketability: number | null,
+  motivation: number | null,
+): number | null {
+  const values: number[] = []
+
+  if (contactability !== null) {
+    values.push(contactability)
   }
 
-  if (lead.default_amount != null && lead.default_amount > 0) {
-    motivationPoints += 30
+  if (marketability !== null) {
+    values.push(marketability)
   }
 
-  motivationSignals += 30
-
-  if (lead.auction_date) {
-    motivationPoints += 30
+  if (motivation !== null) {
+    values.push(motivation)
   }
 
-  motivationSignals += 30
-
-  if (
-    lead.lead_type &&
-    /foreclosure|tax|lien|distress|pre.?foreclosure/i.test(
-      lead.lead_type,
-    )
-  ) {
-    motivationPoints += 25
+  if (values.length === 0) {
+    return null
   }
 
-  motivationSignals += 25
+  return Math.round(
+    values.reduce(
+      (total, value) => total + value,
+      0,
+    ) / values.length,
+  )
+}
 
-  if (
-    lead.source &&
-    /foreclosure|tax|lien|distress/i.test(
-      lead.source,
-    )
-  ) {
-    motivationPoints += 20
-  }
+function buildAnalysis(
+  lead: LeadRecord,
+): Analysis {
+  const contactability = calculateContactability(lead)
+  const marketability = calculateMarketability(lead)
+  const motivation = calculateMotivation(lead)
 
-  motivationSignals += 20
-
-  const motivation =
-    motivationSignals > 0
-      ? clamp((motivationPoints / motivationSignals) * 100)
-      : null
-
-  /* -------------------------------------------------------
-     OVERALL STRENGTH
-  ------------------------------------------------------- */
-
-  const availableScores = [
+  const strength = calculateStrength(
     contactability,
     marketability,
     motivation,
-  ].filter(
-    (value): value is number => value != null,
   )
 
-  const strength =
-    availableScores.length > 0
-      ? clamp(
-          availableScores.reduce(
-            (sum, value) => sum + value,
-            0,
-          ) / availableScores.length,
-        )
-      : null
+  const explanation: string[] = []
 
-  /* -------------------------------------------------------
-     EXPLANATION
-  ------------------------------------------------------- */
+  const phone = getPhone(lead)
+  const email = getEmail(lead)
+  const arv = getArv(lead)
+  const sellerPrice = getSellerPrice(lead)
+  const repairs = getRepairs(lead)
+  const sqft = getSqft(lead)
 
-  const reasons: string[] = []
-  const warnings: string[] = []
-
-  if (getPhone(lead)) {
-    reasons.push('A verified phone number is available.')
+  if (phone !== null) {
+    explanation.push(
+      'A phone number is available for seller outreach.',
+    )
   } else {
-    warnings.push('No phone number is currently available.')
-  }
-
-  if (getEmail(lead)) {
-    reasons.push('An owner email is available.')
-  } else {
-    warnings.push('No owner email is currently available.')
-  }
-
-  if (getARV(lead) != null) {
-    reasons.push('ARV data is available in the property record.')
-  } else {
-    warnings.push(
-      'ARV has not been established from real comparable sales.',
+    explanation.push(
+      'No phone number is currently available.',
     )
   }
 
-  if (getMAO(lead) != null) {
-    reasons.push('A stored MAO is available for the property.')
+  if (email !== null) {
+    explanation.push(
+      'An email address is available for outreach.',
+    )
   } else {
-    warnings.push(
-      'MAO has not been established yet.',
+    explanation.push(
+      'No email address is currently available.',
     )
   }
 
-  if (getSellerPrice(lead) != null) {
-    reasons.push('A seller/listing price is available.')
+  if (arv !== null) {
+    explanation.push(
+      `ARV data exists for this property: ${formatMoney(arv)}.`,
+    )
   } else {
-    warnings.push(
+    explanation.push(
+      'ARV has not been established from verified data.',
+    )
+  }
+
+  if (sellerPrice !== null) {
+    explanation.push(
+      `A seller/listing price is available: ${formatMoney(sellerPrice)}.`,
+    )
+  } else {
+    explanation.push(
       'No seller/listing price is currently available.',
     )
   }
 
-  if (lead.default_amount != null && lead.default_amount > 0) {
-    reasons.push(
-      'The property contains a recorded default amount.',
+  if (repairs !== null) {
+    explanation.push(
+      `A repair estimate is available: ${formatMoney(repairs)}.`,
+    )
+  } else {
+    explanation.push(
+      'No repair estimate is available yet.',
     )
   }
 
-  if (lead.auction_date) {
-    reasons.push(
-      'An auction date is present in the property data.',
-    )
-  }
-
-  if (
-    lead.lead_type &&
-    /foreclosure|tax|lien|distress|pre.?foreclosure/i.test(
-      lead.lead_type,
-    )
-  ) {
-    reasons.push(
-      'The lead type contains a distress-related signal.',
-    )
-  }
-
-  if (availableScores.length === 0) {
-    warnings.push(
-      'There is not enough property/lead data to calculate a reliable strength score.',
+  if (sqft !== null) {
+    explanation.push(
+      `Property size is available: ${formatNumber(sqft)} sq ft.`,
     )
   }
 
@@ -640,158 +688,76 @@ function analyzeLead(lead: LeadRow): Analysis {
     motivation,
     contactability,
     marketability,
-
-    strengthLabel: scoreLabel(strength),
-    motivationLabel: scoreLabel(motivation),
-    contactabilityLabel: scoreLabel(contactability),
-    marketabilityLabel: scoreLabel(marketability),
-
-    reasons,
-    warnings,
-  }
-}
-
-/* =========================================================
-   DEAL ANALYSIS
-========================================================= */
-
-function calculateDealAnalysis(
-  lead: LeadRow,
-): DealAnalysis {
-  const arv = getARV(lead)
-  const repairs = getRepairs(lead)
-  const buyPercentage = getBuyPercentage(lead)
-  const assignmentFee = getAssignmentFee(lead)
-  const storedMAO = getMAO(lead)
-  const sellerPrice = getSellerPrice(lead)
-
-  /*
-   We NEVER fabricate an ARV.
-
-   Therefore:
-   - If ARV exists, it can be used.
-   - If ARV does not exist, MAO is not invented.
-  */
-
-  const baseMaximum =
-    arv != null &&
-    buyPercentage != null
-      ? arv * (buyPercentage / 100)
-      : null
-
-  /*
-   A calculated MAO is only possible if we have enough
-   actual numbers.
-
-   Formula:
-   Base Maximum
-   - Repairs
-   - Assignment Fee
-  */
-
-  const calculatedMAO =
-    baseMaximum != null
-      ? baseMaximum -
-        (repairs ?? 0) -
-        (assignmentFee ?? 0)
-      : null
-
-  /*
-   Prefer an explicitly stored MAO.
-
-   Otherwise use the calculated MAO only when the
-   required inputs actually exist.
-  */
-
-  const mao =
-    storedMAO ??
-    calculatedMAO
-
-  const spread =
-    mao != null &&
-    sellerPrice != null
-      ? mao - sellerPrice
-      : null
-
-  return {
-    arv,
-    repairs,
-    buyPercentage,
-    assignmentFee,
-    baseMaximum,
-    mao,
-    sellerPrice,
-    spread,
+    explanation,
   }
 }
 
 /* =========================================================
    PAGE
-========================================================= */
+   ========================================================= */
 
 export default function LeadWorkspacePage() {
   const params = useParams<{ leadId: string }>()
   const router = useRouter()
 
-  const leadId = params?.leadId
+  const leadId = Array.isArray(params?.leadId)
+    ? params.leadId[0]
+    : params?.leadId
 
-  const [lead, setLead] = useState<LeadRow | null>(null)
+  const [lead, setLead] = useState<LeadRecord | null>(null)
   const [loading, setLoading] = useState(true)
-  const [savingStage, setSavingStage] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const [showMoreProperty, setShowMoreProperty] =
-    useState(false)
-
-  const [showAnalysisReasons, setShowAnalysisReasons] =
-    useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
   const [notes, setNotes] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
 
-  /* -------------------------------------------------------
-     LOAD LEAD
-  ------------------------------------------------------- */
+  const [showMoreDetails, setShowMoreDetails] = useState(false)
+  const [showScoreReasoning, setShowScoreReasoning] =
+    useState(false)
 
   const loadLead = useCallback(async () => {
     if (!leadId) {
-      setError('Lead ID is missing.')
+      setErrorMessage('No lead ID was provided.')
       setLoading(false)
       return
     }
 
     setLoading(true)
-    setError(null)
+    setErrorMessage(null)
 
-    const { data, error: fetchError } =
-      await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', leadId)
-        .maybeSingle()
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('id', leadId)
+      .maybeSingle()
 
-    if (fetchError) {
-      console.error(
-        'Failed to load lead:',
-        fetchError,
+    if (error) {
+      console.error('Failed to load lead:', error)
+      setErrorMessage(
+        `Unable to load this lead: ${error.message}`,
       )
-
-      setError(fetchError.message)
       setLead(null)
       setLoading(false)
       return
     }
 
     if (!data) {
-      setError('Lead not found.')
+      setErrorMessage('This lead could not be found.')
       setLead(null)
       setLoading(false)
       return
     }
 
-    const loadedLead = data as LeadRow
+    const nextLead = data as LeadRecord
 
-    setLead(loadedLead)
-    setNotes(loadedLead.notes ?? '')
+    setLead(nextLead)
+    setNotes(
+      typeof nextLead.notes === 'string'
+        ? nextLead.notes
+        : '',
+    )
     setLoading(false)
   }, [leadId])
 
@@ -799,124 +765,181 @@ export default function LeadWorkspacePage() {
     void loadLead()
   }, [loadLead])
 
-  /* -------------------------------------------------------
-     DERIVED DATA
-  ------------------------------------------------------- */
+  const analysis = useMemo<Analysis | null>(() => {
+    if (!lead) return null
 
-  const analysis = useMemo(
-    () => (lead ? analyzeLead(lead) : null),
-    [lead],
-  )
+    return buildAnalysis(lead)
+  }, [lead])
 
-  const dealAnalysis = useMemo(
-    () => (lead ? calculateDealAnalysis(lead) : null),
-    [lead],
-  )
+  const address = lead
+    ? getAddress(lead)
+    : 'Lead Workspace'
 
-  const stage = lead
-    ? getStage(lead)
+  const location = lead
+    ? getLocation(lead)
+    : ''
+
+  const currentStatus = lead
+    ? getCurrentStatus(lead)
     : 'new_lead'
 
-  const stageColor = getStageColor(stage)
+  const statusColor = getStatusTone(currentStatus)
 
-  /* -------------------------------------------------------
-     STATUS UPDATE
-  ------------------------------------------------------- */
+  const sellerPrice = lead
+    ? getSellerPrice(lead)
+    : null
 
-  async function handleStageChange(
-    nextStage: string,
-  ) {
-    if (!lead || savingStage) return
+  const arv = lead
+    ? getArv(lead)
+    : null
 
-    const previousStage = getStage(lead)
+  const repairs = lead
+    ? getRepairs(lead)
+    : null
 
-    if (nextStage === previousStage) {
-      return
+  const assignmentFee = lead
+    ? getAssignmentFee(lead)
+    : null
+
+  const buyPercent = lead
+    ? getBuyPercent(lead)
+    : null
+
+  const existingMao = lead
+    ? getExistingMao(lead)
+    : null
+
+  const calculatedMao = useMemo(() => {
+    if (arv === null || buyPercent === null) {
+      return null
     }
 
-    setSavingStage(true)
-    setError(null)
+    const base = arv * buyPercent
+    const repairAmount = repairs ?? 0
+    const fee = assignmentFee ?? 0
+
+    return Math.max(
+      0,
+      base - repairAmount - fee,
+    )
+  }, [
+    arv,
+    buyPercent,
+    repairs,
+    assignmentFee,
+  ])
+
+  /*
+   * We only display MAO if it actually exists in the database
+   * or if there is enough real data to calculate it.
+   */
+  const mao = existingMao ?? calculatedMao
+
+  const spread = useMemo(() => {
+    if (
+      sellerPrice === null ||
+      mao === null
+    ) {
+      return null
+    }
+
+    return mao - sellerPrice
+  }, [sellerPrice, mao])
+
+  async function handleStatusChange(
+    nextStatus: string,
+  ) {
+    if (!lead) return
+    if (nextStatus === currentStatus) return
+
+    setSavingStatus(true)
+    setStatusMessage(null)
+    setErrorMessage(null)
 
     /*
-     IMPORTANT:
-     We intentionally update only `status`.
+     * IMPORTANT:
+     *
+     * We update ONLY `status`.
+     *
+     * This is the canonical field used by the Leads page.
+     * Updating several guessed columns was one of the reasons
+     * status changes could fail when those columns don't exist.
+     *
+     * Pipeline should read the same status field.
+     */
+    const { data, error } = await supabase
+      .from('leads')
+      .update({
+        status: nextStatus,
+      })
+      .eq('id', lead.id)
+      .select('*')
+      .maybeSingle()
 
-     The previous implementation attempted to write:
-       status
-       stage
-       lead_status
-       deal_status
-       pipeline_stage
-
-     If even ONE of those columns does not exist in
-     Supabase, the entire update fails.
-
-     `status` is the canonical field used here.
-    */
-
-    const { data, error: updateError } =
-      await supabase
-        .from('leads')
-        .update({
-          status: nextStage,
-        })
-        .eq('id', lead.id)
-        .select('*')
-        .maybeSingle()
-
-    if (updateError) {
+    if (error) {
       console.error(
         'Failed to update lead status:',
-        updateError,
+        error,
       )
 
-      setError(
-        `Could not update status: ${updateError.message}`,
+      setErrorMessage(
+        `Status could not be changed: ${error.message}`,
       )
 
-      setSavingStage(false)
+      setSavingStatus(false)
       return
     }
 
-    /*
-     * Use the returned database row when available.
-     * This keeps the UI synchronized with Supabase.
-     */
     if (data) {
-      setLead(data as LeadRow)
+      setLead(data as LeadRecord)
     } else {
       setLead((current) =>
         current
           ? {
               ...current,
-              status: nextStage,
+              status: nextStatus,
             }
           : current,
       )
     }
 
-    setSavingStage(false)
-  }
+    setStatusMessage(
+      `Lead moved to ${getStatusLabel(nextStatus)}.`,
+    )
 
-  /* -------------------------------------------------------
-     SAVE NOTES
-  ------------------------------------------------------- */
+    setSavingStatus(false)
+  }
 
   async function handleSaveNotes() {
     if (!lead) return
 
-    const { error: saveError } =
-      await supabase
-        .from('leads')
-        .update({
-          notes,
-        })
-        .eq('id', lead.id)
+    setSavingNotes(true)
+    setErrorMessage(null)
+    setStatusMessage(null)
 
-    if (saveError) {
-      setError(
-        `Could not save notes: ${saveError.message}`,
+    /*
+     * Notes is an existing optional field in the workspace model.
+     * If your current leads table doesn't contain it, Supabase will
+     * return an explicit error instead of silently pretending it saved.
+     */
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        notes,
+      })
+      .eq('id', lead.id)
+
+    if (error) {
+      console.error(
+        'Failed to save notes:',
+        error,
       )
+
+      setErrorMessage(
+        `Notes could not be saved: ${error.message}`,
+      )
+
+      setSavingNotes(false)
       return
     }
 
@@ -928,40 +951,49 @@ export default function LeadWorkspacePage() {
           }
         : current,
     )
+
+    setStatusMessage('Notes saved.')
+    setSavingNotes(false)
   }
 
-  /* -------------------------------------------------------
-     DELETE
-  ------------------------------------------------------- */
+  function callSeller() {
+    const phone = lead ? getPhone(lead) : null
 
-  async function handleDeleteLead() {
-    if (!lead) return
-
-    const confirmed = window.confirm(
-      'Delete this lead permanently?',
-    )
-
-    if (!confirmed) return
-
-    const { error: deleteError } =
-      await supabase
-        .from('leads')
-        .delete()
-        .eq('id', lead.id)
-
-    if (deleteError) {
-      setError(
-        `Could not delete lead: ${deleteError.message}`,
+    if (!phone) {
+      setStatusMessage(
+        'No seller phone number is available for this lead.',
       )
       return
     }
 
-    router.push('/leads')
+    window.location.href = `tel:${phone}`
   }
 
-  /* -------------------------------------------------------
-     LOADING
-  ------------------------------------------------------- */
+  function textSeller() {
+    const phone = lead ? getPhone(lead) : null
+
+    if (!phone) {
+      setStatusMessage(
+        'No seller phone number is available for this lead.',
+      )
+      return
+    }
+
+    window.location.href = `sms:${phone}`
+  }
+
+  function emailSeller() {
+    const email = lead ? getEmail(lead) : null
+
+    if (!email) {
+      setStatusMessage(
+        'No seller email address is available for this lead.',
+      )
+      return
+    }
+
+    window.location.href = `mailto:${email}`
+  }
 
   if (loading) {
     return (
@@ -969,16 +1001,18 @@ export default function LeadWorkspacePage() {
         title="Lead Workspace"
         subtitle="Loading property intelligence..."
       >
-        <div style={loadingStyle}>
-          Loading lead...
-        </div>
+        <SectionCard
+          title="Loading"
+          subtitle="Retrieving the latest lead information from Supabase."
+        >
+          <div style={loadingStyle}>
+            <div style={loadingDotStyle} />
+            Loading lead...
+          </div>
+        </SectionCard>
       </PageShell>
     )
   }
-
-  /* -------------------------------------------------------
-     ERROR
-  ------------------------------------------------------- */
 
   if (!lead) {
     return (
@@ -986,103 +1020,88 @@ export default function LeadWorkspacePage() {
         title="Lead Workspace"
         subtitle="The requested lead could not be loaded."
       >
-        <SectionCard
-          title="Lead unavailable"
-          subtitle={
-            error ||
-            'No lead was found for this ID.'
-          }
-        >
-          <div style={errorPanelStyle}>
-            <div style={errorTitleStyle}>
-              Unable to load this workspace
-            </div>
+        <SectionCard title="Lead unavailable">
+          <div style={errorBoxStyle}>
+            {errorMessage || 'Lead not found.'}
+          </div>
 
-            <div style={errorTextStyle}>
-              {error ||
-                'The lead does not exist or could not be retrieved.'}
-            </div>
-
-            <div style={buttonRowStyle}>
-              <Link href="/leads">
-                <ActionButton compact tone="gold">
-                  Back to Leads
-                </ActionButton>
-              </Link>
-            </div>
+          <div style={{ marginTop: 16 }}>
+            <ActionButton
+              compact
+              onClick={() => router.push('/leads')}
+            >
+              Back to Leads
+            </ActionButton>
           </div>
         </SectionCard>
       </PageShell>
     )
   }
 
-  const address = getAddress(lead)
-  const location = getLocation(lead)
-
   const ownerName =
-    lead.owner_name ||
+    firstString(lead.owner_name) ||
     'Owner information unavailable'
 
   const phone = getPhone(lead)
   const email = getEmail(lead)
 
-  const beds = firstNumber(
-    lead.beds,
-    lead.bedrooms,
-  )
+  const ownerOccupied = getOwnerOccupied(lead)
 
-  const baths = firstNumber(
-    lead.baths,
-    lead.bathrooms,
-  )
-
-  const sqft = firstNumber(
-    lead.sqft,
-    lead.square_feet,
-    lead.living_area,
-  )
-
-  const ownershipYears = firstNumber(
-    lead.ownership_years,
-    lead.ownership_length,
-  )
-
-  const county = firstNonEmpty(
+  const county = firstString(
     lead.county,
     lead.property_county,
   )
 
-  const apn = firstNonEmpty(
+  const propertyType = firstString(
+    lead.property_type,
+  )
+
+  const leadType = firstString(
+    lead.lead_type,
+  )
+
+  const source = firstString(
+    lead.source,
+  )
+
+  const beds = getBeds(lead)
+  const baths = getBaths(lead)
+  const sqft = getSqft(lead)
+  const yearBuilt = firstNumber(lead.year_built)
+
+  const equity = firstNumber(
+    lead.equity,
+    lead.estimated_equity,
+  )
+
+  const mortgageBalance =
+    getMortgageBalance(lead)
+
+  const lastSaleDate = lead.last_sale_date
+
+  const ownershipLength =
+    firstNumber(lead.ownership_length)
+
+  const apn = firstString(
     lead.apn,
     lead.parcel_id,
   )
 
-  const propertyType = firstNonEmpty(
-    lead.property_type,
-    lead.lead_type,
-  )
+  const mailingAddress =
+    firstString(lead.mailing_address)
 
-  const equity = firstNumber(
-    lead.estimated_equity,
-    lead.equity,
-  )
-
-  const mortgage = firstNumber(
-    lead.mortgage_balance,
-  )
-
-  const ownerOccupied =
-    lead.owner_occupied === true ||
-    lead.occupancy
-      ?.toLowerCase()
-      .includes('owner')
+  const hasVerifiedArv = arv !== null
+  const hasVerifiedPrice = sellerPrice !== null
+  const hasEnoughForMao =
+    arv !== null &&
+    buyPercent !== null
 
   return (
     <PageShell
       title="Lead Workspace"
       subtitle={`${address}${location ? ` • ${location}` : ''}`}
       actions={
-        <div style={headerActionsStyle}>
+        <>
           <Link href="/leads">
             <ActionButton compact>
               ← Back to Leads
@@ -1091,92 +1110,102 @@ export default function LeadWorkspacePage() {
 
           <button
             type="button"
-            onClick={handleDeleteLead}
-            style={dangerOutlineButtonStyle}
+            onClick={() => void loadLead()}
+            style={refreshButtonStyle}
+            title="Refresh lead"
           >
-            Delete
+            ↻ Refresh
           </button>
-        </div>
+        </>
       }
     >
       {/* =====================================================
-          ERROR BANNER
-      ===================================================== */}
+          GLOBAL ERROR / SUCCESS MESSAGES
+          ===================================================== */}
 
-      {error ? (
-        <div style={errorBannerStyle}>
-          <div>
-            <strong>Something needs attention.</strong>
-            <div style={errorBannerTextStyle}>
-              {error}
-            </div>
+      {errorMessage && (
+        <div style={errorBoxStyle}>
+          <strong>Something needs attention.</strong>
+          <div style={{ marginTop: 4 }}>
+            {errorMessage}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            style={dismissButtonStyle}
-          >
-            Dismiss
-          </button>
         </div>
-      ) : null}
+      )}
+
+      {statusMessage && !errorMessage && (
+        <div style={successBoxStyle}>
+          {statusMessage}
+        </div>
+      )}
 
       {/* =====================================================
           PROPERTY HEADER
-      ===================================================== */}
+          ===================================================== */}
 
-      <div style={heroCardStyle}>
+      <section style={heroStyle}>
         <div style={heroMainStyle}>
-          <div style={heroEyebrowStyle}>
-            PROPERTY WORKSPACE
+          <div style={eyebrowStyle}>
+            LEAD WORKSPACE
           </div>
 
-          <h1 style={heroAddressStyle}>
+          <h1 style={heroTitleStyle}>
             {address}
           </h1>
 
           <div style={heroLocationStyle}>
-            {location ||
-              'Property location unavailable'}
+            {location || 'Location unavailable'}
             {county ? ` • ${county} County` : ''}
           </div>
 
           <div style={heroMetaRowStyle}>
-            {propertyType ? (
-              <span style={propertyBadgeStyle}>
-                {titleCase(propertyType)}
+            {leadType && (
+              <span style={goldBadgeStyle}>
+                {titleCase(leadType)}
               </span>
-            ) : null}
+            )}
 
-            {lead.source ? (
+            {source && (
               <span style={mutedBadgeStyle}>
-                Source: {titleCase(lead.source)}
+                Source: {source}
               </span>
-            ) : null}
+            )}
+
+            {ownerOccupied !== null && (
+              <span
+                style={
+                  ownerOccupied
+                    ? greenBadgeStyle
+                    : mutedBadgeStyle
+                }
+              >
+                {ownerOccupied
+                  ? 'Owner Occupied'
+                  : 'Not Owner Occupied'}
+              </span>
+            )}
           </div>
         </div>
 
         <div style={heroControlsStyle}>
           <div style={stageLabelStyle}>
-            STAGE
+            CURRENT STAGE
           </div>
 
           <select
-            value={stage}
-            disabled={savingStage}
+            value={currentStatus}
+            disabled={savingStatus}
             onChange={(event) =>
-              void handleStageChange(
+              void handleStatusChange(
                 event.target.value,
               )
             }
             style={{
-              ...stageSelectStyle,
-              color: stageColor,
-              borderColor: `${stageColor}66`,
+              ...heroStatusSelectStyle,
+              borderColor: `${statusColor}66`,
+              color: statusColor,
             }}
           >
-            {STAGE_OPTIONS.map((option) => (
+            {STATUS_OPTIONS.map((option) => (
               <option
                 key={option.value}
                 value={option.value}
@@ -1187,148 +1216,137 @@ export default function LeadWorkspacePage() {
             ))}
           </select>
 
-          {savingStage ? (
+          {savingStatus && (
             <div style={savingTextStyle}>
               Saving...
             </div>
-          ) : null}
+          )}
         </div>
-      </div>
+      </section>
 
       {/* =====================================================
           QUICK ACTIONS
-      ===================================================== */}
+          ===================================================== */}
 
       <div style={quickActionsStyle}>
-        <a
-          href={phone ? `tel:${phone}` : undefined}
-          onClick={(event) => {
-            if (!phone) event.preventDefault()
-          }}
-          style={{
-            ...quickActionButtonStyle,
-            opacity: phone ? 1 : 0.45,
-          }}
+        <button
+          type="button"
+          onClick={callSeller}
+          style={quickActionGoldStyle}
         >
           ☎ Call Seller
-        </a>
+        </button>
 
-        <a
-          href={phone ? `sms:${phone}` : undefined}
-          onClick={(event) => {
-            if (!phone) event.preventDefault()
-          }}
-          style={{
-            ...quickActionButtonStyle,
-            opacity: phone ? 1 : 0.45,
-          }}
+        <button
+          type="button"
+          onClick={textSeller}
+          style={quickActionGreenStyle}
         >
-          💬 Text
-        </a>
+          ◇ Text Seller
+        </button>
 
-        <a
-          href={email ? `mailto:${email}` : undefined}
-          onClick={(event) => {
-            if (!email) event.preventDefault()
-          }}
-          style={{
-            ...quickActionButtonStyle,
-            opacity: email ? 1 : 0.45,
-          }}
+        <button
+          type="button"
+          onClick={emailSeller}
+          style={quickActionBlueStyle}
         >
-          ✉ Email
-        </a>
+          ✉ Email Seller
+        </button>
       </div>
 
       {/* =====================================================
           INTELLIGENCE STRIP
-      ===================================================== */}
+          ===================================================== */}
 
-      <div style={metricsGridStyle}>
+      <section style={metricGridStyle}>
         <MetricCard
           label="Strength"
-          value={
-            analysis?.strength != null
-              ? String(analysis.strength)
-              : '—'
-          }
-          detail={
-            analysis?.strengthLabel ||
-            'Not enough data'
-          }
+          value={analysis?.strength}
           tone="gold"
+          description={
+            analysis?.strength === null
+              ? 'Insufficient data'
+              : analysis!.strength >= 75
+                ? 'Strong'
+                : analysis!.strength >= 50
+                  ? 'Moderate'
+                  : 'Needs work'
+          }
         />
 
         <MetricCard
           label="Motivation"
-          value={
-            analysis?.motivation != null
-              ? String(analysis.motivation)
-              : '—'
+          value={analysis?.motivation}
+          tone="orange"
+          description={
+            analysis?.motivation === null
+              ? 'Insufficient evidence'
+              : analysis!.motivation >= 75
+                ? 'High'
+                : analysis!.motivation >= 45
+                  ? 'Moderate'
+                  : 'Low'
           }
-          detail={
-            analysis?.motivationLabel ||
-            'Not enough data'
-          }
-          tone="green"
         />
 
         <MetricCard
           label="Contactability"
-          value={
-            analysis?.contactability != null
-              ? String(
-                  analysis.contactability,
-                )
-              : '—'
-          }
-          detail={
-            analysis?.contactabilityLabel ||
-            'Not enough data'
-          }
+          value={analysis?.contactability}
           tone="blue"
+          description={
+            analysis?.contactability === null
+              ? 'No contact data'
+              : analysis!.contactability >= 75
+                ? 'Excellent'
+                : analysis!.contactability >= 50
+                  ? 'Partial'
+                  : 'Needs attention'
+          }
         />
 
         <MetricCard
           label="Marketability"
-          value={
-            analysis?.marketability != null
-              ? String(
-                  analysis.marketability,
-                )
-              : '—'
+          value={analysis?.marketability}
+          tone="green"
+          description={
+            analysis?.marketability === null
+              ? 'Insufficient property data'
+              : analysis!.marketability >= 75
+                ? 'Strong'
+                : analysis!.marketability >= 50
+                  ? 'Moderate'
+                  : 'Limited'
           }
-          detail={
-            analysis?.marketabilityLabel ||
-            'Not enough data'
-          }
-          tone="purple"
         />
-      </div>
+      </section>
 
       {/* =====================================================
           MAIN GRID
-      ===================================================== */}
+          ===================================================== */}
 
       <div style={mainGridStyle}>
         {/* ===================================================
             LEFT COLUMN
-        =================================================== */}
+            =================================================== */}
 
-        <div style={columnStyle}>
+        <div style={leftColumnStyle}>
           {/* PROPERTY SNAPSHOT */}
 
           <SectionCard
             title="Property Snapshot"
-            subtitle="Only information currently available in the lead record."
+            subtitle="Only information currently available on this lead."
           >
             <div style={snapshotGridStyle}>
               <SnapshotItem
                 label="ARV"
-                value={formatMoney(
-                  getARV(lead),
-                )}
+                value={formatMoney(arv)}
                 tone="gold"
+              />
+
+              <SnapshotItem
+                label="Seller Price"
+                value={formatMoney(sellerPrice)}
+                tone="white"
               />
 
               <SnapshotItem
@@ -1339,60 +1357,38 @@ export default function LeadWorkspacePage() {
 
               <SnapshotItem
                 label="Mortgage Balance"
-                value={formatMoney(mortgage)}
+                value={formatMoney(mortgageBalance)}
                 tone="blue"
               />
 
               <SnapshotItem
-                label="Seller Price"
-                value={formatMoney(
-                  getSellerPrice(lead),
-                )}
-                tone="gold"
-              />
-            </div>
-
-            <div style={smallFactsGridStyle}>
-              <SmallFact
-                label="Beds"
-                value={formatNumber(beds)}
-              />
-
-              <SmallFact
-                label="Baths"
-                value={formatNumber(baths)}
-              />
-
-              <SmallFact
                 label="Sq Ft"
                 value={formatNumber(sqft)}
+                tone="white"
               />
 
-              <SmallFact
-                label="Year Built"
-                value={formatNumber(
-                  lead.year_built,
-                )}
-              />
-
-              <SmallFact
-                label="Ownership"
+              <SnapshotItem
+                label="Beds / Baths"
                 value={
-                  ownershipYears != null
-                    ? `${ownershipYears} yrs`
-                    : '—'
+                  beds !== null || baths !== null
+                    ? `${beds !== null ? beds : '—'} / ${
+                        baths !== null ? baths : '—'
+                      }`
+                    : 'Not available'
                 }
-              />
-
-              <SmallFact
-                label="Occupancy"
-                value={
-                  ownerOccupied
-                    ? 'Owner Occupied'
-                    : lead.occupancy || '—'
-                }
+                tone="white"
               />
             </div>
+
+            {!hasVerifiedArv && (
+              <div style={dataWarningStyle}>
+                <strong>ARV not calculated.</strong>
+                <span>
+                  No verified ARV is stored for this lead.
+                  The workspace will not invent a value.
+                </span>
+              </div>
+            )}
           </SectionCard>
 
           {/* SELLER */}
@@ -1402,9 +1398,9 @@ export default function LeadWorkspacePage() {
             subtitle="Owner and contact information."
           >
             <div style={sellerHeaderStyle}>
-              <div style={avatarStyle}>
+              <div style={sellerAvatarStyle}>
                 {ownerName
-                  .charAt(0)
+                  .slice(0, 1)
                   .toUpperCase()}
               </div>
 
@@ -1413,78 +1409,43 @@ export default function LeadWorkspacePage() {
                   {ownerName}
                 </div>
 
-                {ownerOccupied ? (
-                  <span style={ownerBadgeStyle}>
-                    Owner Occupied
-                  </span>
-                ) : null}
+                <div style={sellerSubStyle}>
+                  {ownerOccupied === true
+                    ? 'Owner Occupied'
+                    : ownerOccupied === false
+                      ? 'Not Owner Occupied'
+                      : 'Occupancy unavailable'}
+                </div>
               </div>
             </div>
 
             <div style={contactGridStyle}>
-              <ContactItem
+              <ContactRow
                 label="Phone"
                 value={phone || 'Not available'}
               />
 
-              <ContactItem
+              <ContactRow
                 label="Email"
                 value={email || 'Not available'}
               />
 
-              <ContactItem
+              <ContactRow
                 label="Mailing Address"
                 value={
-                  lead.mailing_address ||
+                  mailingAddress ||
                   'Not available'
                 }
               />
 
-              <ContactItem
-                label="Ownership"
+              <ContactRow
+                label="Ownership Length"
                 value={
-                  ownershipYears != null
-                    ? `${ownershipYears} years`
+                  ownershipLength !== null
+                    ? `${ownershipLength} years`
                     : 'Not available'
                 }
               />
-            </div>
-
-            <div style={buttonRowStyle}>
-              {phone ? (
-                <a
-                  href={`tel:${phone}`}
-                  style={primaryActionStyle}
-                >
-                  Call Seller
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  style={disabledActionStyle}
-                >
-                  Find Contact
-                </button>
-              )}
-
-              {phone ? (
-                <a
-                  href={`sms:${phone}`}
-                  style={secondaryActionStyle}
-                >
-                  Text
-                </a>
-              ) : null}
-
-              {email ? (
-                <a
-                  href={`mailto:${email}`}
-                  style={secondaryActionStyle}
-                >
-                  Email
-                </a>
-              ) : null}
             </div>
           </SectionCard>
 
@@ -1492,55 +1453,45 @@ export default function LeadWorkspacePage() {
 
           <SectionCard
             title="Next Action"
-            subtitle="The next useful action for this lead."
+            subtitle="Keep the next step obvious."
           >
-            <div style={nextActionCardStyle}>
+            <div style={nextActionStyle}>
               <div style={nextActionIconStyle}>
-                ☎
+                {phone ? '☎' : '!' }
               </div>
 
               <div style={{ minWidth: 0 }}>
                 <div style={nextActionTitleStyle}>
                   {phone
                     ? 'Contact Seller'
-                    : 'Find Seller Contact'}
+                    : 'Find Contact Information'}
                 </div>
 
                 <div style={nextActionTextStyle}>
                   {phone
-                    ? 'A phone number is available. Reach out and log the result.'
-                    : 'No phone number is currently available for this owner.'}
+                    ? 'A seller phone number is available.'
+                    : 'No phone number is currently available.'}
                 </div>
               </div>
             </div>
 
-            <div style={buttonRowStyle}>
-              {phone ? (
-                <a
-                  href={`tel:${phone}`}
-                  style={primaryActionStyle}
-                >
-                  ☎ Call Seller
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  style={disabledActionStyle}
-                >
-                  No Phone Available
-                </button>
-              )}
+            <div style={actionButtonRowStyle}>
+              <button
+                type="button"
+                onClick={callSeller}
+                style={primaryButtonStyle}
+              >
+                ☎ Call Seller
+              </button>
 
               <button
                 type="button"
                 onClick={() =>
-                  void handleStageChange(
+                  void handleStatusChange(
                     'contacted',
                   )
                 }
-                disabled={savingStage}
-                style={secondaryActionStyle}
+                style={secondaryButtonStyle}
               >
                 ✓ Mark Contacted
               </button>
@@ -1551,579 +1502,486 @@ export default function LeadWorkspacePage() {
 
           <SectionCard
             title="Property Details"
-            subtitle="Expanded property information from Supabase."
+            subtitle="Structured property information."
           >
-            <div style={propertyDetailsGridStyle}>
-              <DetailTile
+            <div style={detailGridStyle}>
+              <DetailItem
                 label="Property Type"
                 value={
-                  propertyType
-                    ? titleCase(propertyType)
-                    : '—'
+                  propertyType ||
+                  'Not available'
                 }
               />
 
-              <DetailTile
+              <DetailItem
                 label="County"
-                value={county || '—'}
+                value={
+                  county ||
+                  'Not available'
+                }
               />
 
-              <DetailTile
-                label="APN"
-                value={apn || '—'}
-              />
-
-              <DetailTile
+              <DetailItem
                 label="Beds"
-                value={formatNumber(beds)}
+                value={
+                  beds !== null
+                    ? String(beds)
+                    : 'Not available'
+                }
               />
 
-              <DetailTile
+              <DetailItem
                 label="Baths"
-                value={formatNumber(baths)}
+                value={
+                  baths !== null
+                    ? String(baths)
+                    : 'Not available'
+                }
               />
 
-              <DetailTile
+              <DetailItem
                 label="Sq Ft"
                 value={formatNumber(sqft)}
               />
 
-              <DetailTile
+              <DetailItem
                 label="Year Built"
-                value={formatNumber(
-                  lead.year_built,
-                )}
-              />
-
-              <DetailTile
-                label="Occupancy"
                 value={
-                  ownerOccupied
-                    ? 'Owner Occupied'
-                    : lead.occupancy || '—'
+                  yearBuilt !== null
+                    ? String(yearBuilt)
+                    : 'Not available'
                 }
               />
 
-              {showMoreProperty ? (
-                <>
-                  <DetailTile
-                    label="Default Amount"
-                    value={formatMoney(
-                      lead.default_amount,
-                    )}
-                  />
+              <DetailItem
+                label="Occupancy"
+                value={
+                  ownerOccupied === null
+                    ? 'Not available'
+                    : ownerOccupied
+                      ? 'Owner Occupied'
+                      : 'Not Owner Occupied'
+                }
+              />
 
-                  <DetailTile
-                    label="Auction Date"
-                    value={
-                      lead.auction_date || '—'
-                    }
-                  />
-
-                  <DetailTile
-                    label="Lender"
-                    value={
-                      lead.lender || '—'
-                    }
-                  />
-
-                  <DetailTile
-                    label="Last Sale"
-                    value={
-                      lead.last_sale_date ||
-                      lead.last_sold_date ||
-                      '—'
-                    }
-                  />
-
-                  <DetailTile
-                    label="Ownership Length"
-                    value={
-                      ownershipYears != null
-                        ? `${ownershipYears} years`
-                        : '—'
-                    }
-                  />
-
-                  <DetailTile
-                    label="Source"
-                    value={
-                      lead.source
-                        ? titleCase(
-                            lead.source,
-                          )
-                        : '—'
-                    }
-                  />
-                </>
-              ) : null}
+              <DetailItem
+                label="APN / Parcel"
+                value={
+                  apn ||
+                  'Not available'
+                }
+              />
             </div>
 
             <button
               type="button"
               onClick={() =>
-                setShowMoreProperty(
-                  (value) => !value,
+                setShowMoreDetails(
+                  (current) => !current,
                 )
               }
               style={expandButtonStyle}
             >
-              {showMoreProperty
-                ? 'Show Less ↑'
-                : 'View More Property Information ↓'}
+              {showMoreDetails
+                ? 'Hide Additional Details ↑'
+                : 'View Additional Details ↓'}
             </button>
+
+            {showMoreDetails && (
+              <div style={additionalDetailsStyle}>
+                <DetailItem
+                  label="Last Sale Date"
+                  value={formatDate(lastSaleDate)}
+                />
+
+                <DetailItem
+                  label="Ownership Length"
+                  value={
+                    ownershipLength !== null
+                      ? `${ownershipLength} years`
+                      : 'Not available'
+                  }
+                />
+
+                <DetailItem
+                  label="Lead Type"
+                  value={
+                    leadType ||
+                    'Not available'
+                  }
+                />
+
+                <DetailItem
+                  label="Source"
+                  value={
+                    source ||
+                    'Not available'
+                  }
+                />
+
+                <DetailItem
+                  label="Mailing Address"
+                  value={
+                    mailingAddress ||
+                    'Not available'
+                  }
+                />
+              </div>
+            )}
           </SectionCard>
 
           {/* LEAD INTELLIGENCE */}
 
           <SectionCard
             title="Lead Intelligence"
-            subtitle="Calculated from information actually present on this lead."
+            subtitle="Evidence-based scoring from information on the lead."
           >
-            <div style={intelligenceListStyle}>
+            <div style={intelligenceRowsStyle}>
               <IntelligenceRow
                 label="Overall Strength"
-                score={analysis?.strength ?? null}
-                description={
-                  analysis?.strengthLabel ||
-                  'Not enough data'
-                }
+                value={analysis?.strength}
               />
 
               <IntelligenceRow
                 label="Motivation"
-                score={
-                  analysis?.motivation ?? null
-                }
-                description={
-                  analysis?.motivationLabel ||
-                  'Not enough data'
-                }
+                value={analysis?.motivation}
               />
 
               <IntelligenceRow
                 label="Contactability"
-                score={
-                  analysis?.contactability ??
-                  null
-                }
-                description={
-                  analysis?.contactabilityLabel ||
-                  'Not enough data'
-                }
+                value={analysis?.contactability}
               />
 
               <IntelligenceRow
                 label="Marketability"
-                score={
-                  analysis?.marketability ??
-                  null
-                }
-                description={
-                  analysis?.marketabilityLabel ||
-                  'Not enough data'
-                }
+                value={analysis?.marketability}
               />
             </div>
 
             <button
               type="button"
               onClick={() =>
-                setShowAnalysisReasons(
-                  (value) => !value,
+                setShowScoreReasoning(
+                  (current) => !current,
                 )
               }
               style={expandButtonStyle}
             >
-              {showAnalysisReasons
-                ? 'Hide Analysis ↑'
+              {showScoreReasoning
+                ? 'Hide Score Reasoning ↑'
                 : 'Why this score? ↓'}
             </button>
 
-            {showAnalysisReasons &&
-            analysis ? (
-              <div style={analysisExplanationStyle}>
-                {analysis.reasons.length > 0 ? (
-                  <div>
+            {showScoreReasoning && (
+              <div style={reasoningBoxStyle}>
+                {analysis?.explanation.map(
+                  (item, index) => (
                     <div
-                      style={
-                        explanationHeadingStyle
-                      }
+                      key={`${item}-${index}`}
+                      style={reasoningItemStyle}
                     >
-                      Supporting signals
+                      <span style={reasoningDotStyle}>
+                        •
+                      </span>
+
+                      <span>{item}</span>
                     </div>
-
-                    <ul
-                      style={
-                        explanationListStyle
-                      }
-                    >
-                      {analysis.reasons.map(
-                        (reason) => (
-                          <li key={reason}>
-                            {reason}
-                          </li>
-                        ),
-                      )}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {analysis.warnings.length > 0 ? (
-                  <div>
-                    <div
-                      style={{
-                        ...explanationHeadingStyle,
-                        color: '#fbbf24',
-                      }}
-                    >
-                      Missing / incomplete data
-                    </div>
-
-                    <ul
-                      style={
-                        explanationListStyle
-                      }
-                    >
-                      {analysis.warnings.map(
-                        (warning) => (
-                          <li key={warning}>
-                            {warning}
-                          </li>
-                        ),
-                      )}
-                    </ul>
-                  </div>
-                ) : null}
+                  ),
+                )}
               </div>
-            ) : null}
+            )}
           </SectionCard>
         </div>
 
         {/* ===================================================
             RIGHT COLUMN
-        =================================================== */}
+            =================================================== */}
 
-        <div style={columnStyle}>
+        <div style={rightColumnStyle}>
           {/* DEAL ANALYSIS */}
 
           <SectionCard
             title="Deal Analysis"
-            subtitle="No valuation is invented when the required data is missing."
+            subtitle="No fabricated financial assumptions."
           >
-            <div style={dealListStyle}>
-              <DealRow
+            <div style={analysisRowsStyle}>
+              <AnalysisRow
                 label="ARV"
-                value={formatMoney(
-                  dealAnalysis?.arv,
-                )}
+                value={formatMoney(arv)}
+                emphasis="gold"
               />
 
-              <DealRow
+              <AnalysisRow
                 label="Repairs"
-                value={formatMoney(
-                  dealAnalysis?.repairs,
-                )}
+                value={formatMoney(repairs)}
               />
 
-              <DealRow
+              <AnalysisRow
                 label="Buy %"
-                value={formatPercent(
-                  dealAnalysis?.buyPercentage,
-                )}
+                value={
+                  buyPercent !== null
+                    ? `${Math.round(
+                        buyPercent * 100,
+                      )}%`
+                    : 'Not available'
+                }
               />
 
               <div style={dividerStyle} />
 
-              <DealRow
+              <AnalysisRow
                 label="Base Maximum"
-                value={formatMoney(
-                  dealAnalysis?.baseMaximum,
-                )}
+                value={
+                  arv !== null &&
+                  buyPercent !== null
+                    ? formatMoney(
+                        arv * buyPercent,
+                      )
+                    : 'Not available'
+                }
               />
 
-              <DealRow
+              <AnalysisRow
                 label="Assignment Fee"
                 value={formatMoney(
-                  dealAnalysis?.assignmentFee,
+                  assignmentFee,
                 )}
               />
 
               <div style={dividerStyle} />
 
-              <DealRow
+              <AnalysisRow
                 label="MAO"
-                value={formatMoney(
-                  dealAnalysis?.mao,
-                )}
-                strong
+                value={formatMoney(mao)}
+                emphasis="green"
+                large
               />
 
-              <DealRow
+              <AnalysisRow
                 label="Seller Price"
                 value={formatMoney(
-                  dealAnalysis?.sellerPrice,
+                  sellerPrice,
                 )}
               />
 
-              <DealRow
+              <div style={dashedDividerStyle} />
+
+              <AnalysisRow
                 label="Difference"
-                value={formatMoney(
-                  dealAnalysis?.spread,
-                )}
-                strong
+                value={
+                  spread === null
+                    ? 'Not available'
+                    : formatMoney(
+                        spread,
+                      )
+                }
+                emphasis={
+                  spread === null
+                    ? undefined
+                    : spread >= 0
+                      ? 'green'
+                      : 'red'
+                }
+                large
               />
             </div>
 
-            <DealHealth
-              mao={dealAnalysis?.mao ?? null}
-              sellerPrice={
-                dealAnalysis?.sellerPrice ??
-                null
-              }
-            />
-
-            {!dealAnalysis?.arv ? (
-              <div style={dataMissingPanelStyle}>
-                <div
-                  style={dataMissingTitleStyle}
-                >
-                  ARV not established
-                </div>
-
-                <div
-                  style={dataMissingTextStyle}
-                >
-                  No ARV is shown until actual comparable
-                  sales are available. This workspace will
-                  not populate a made-up valuation.
-                </div>
+            {!hasEnoughForMao && (
+              <div style={dataWarningStyle}>
+                <strong>MAO unavailable.</strong>
+                <span>
+                  A verified ARV and buy percentage are
+                  required before a meaningful MAO can be
+                  calculated.
+                </span>
               </div>
-            ) : null}
+            )}
+
+            {hasEnoughForMao &&
+              mao !== null &&
+              sellerPrice !== null && (
+                <div
+                  style={
+                    spread !== null &&
+                    spread >= 0
+                      ? dealHealthGoodStyle
+                      : dealHealthBadStyle
+                  }
+                >
+                  <div style={dealHealthEyebrowStyle}>
+                    DEAL HEALTH
+                  </div>
+
+                  <div style={dealHealthTitleStyle}>
+                    {spread !== null &&
+                    spread >= 0
+                      ? 'WITHIN MAO'
+                      : 'ABOVE MAO'}
+                  </div>
+
+                  <div style={dealHealthTextStyle}>
+                    {spread !== null &&
+                    spread >= 0
+                      ? `The seller price is ${formatMoney(
+                          Math.abs(spread),
+                        )} below the calculated MAO.`
+                      : `The seller price is ${formatMoney(
+                          Math.abs(spread ?? 0),
+                        )} above the calculated MAO.`}
+                  </div>
+                </div>
+              )}
+
+            <div style={analysisDisclaimerStyle}>
+              Calculations shown here use only values
+              actually available on this lead. Verified
+              comparable sales are required before treating
+              ARV as a market-supported number.
+            </div>
           </SectionCard>
 
-          {/* COMPS STATUS */}
+          {/* COMPS */}
 
           <SectionCard
             title="Comparable Sales"
-            subtitle="Valuation should be based on real nearby sales."
+            subtitle="Verified comps only — no fabricated properties."
           >
-            <div style={compsPanelStyle}>
-              <div style={compsIconStyle}>
-                ◉
+            <div style={emptyDataCardStyle}>
+              <div style={emptyDataIconStyle}>
+                ⌕
               </div>
 
-              <div style={{ minWidth: 0 }}>
-                <div style={compsTitleStyle}>
-                  Real comp analysis
+              <div>
+                <div style={emptyDataTitleStyle}>
+                  No verified comps loaded
                 </div>
 
-                <div style={compsTextStyle}>
-                  The valuation should use closed comparable
-                  sales within the configured radius and
-                  date window. This workspace will not display
-                  fabricated comps.
+                <div style={emptyDataTextStyle}>
+                  This workspace will not populate fake
+                  comparable sales. A future comps lookup can
+                  search actual sales using the property's
+                  location and a six-month / one-mile
+                  constraint.
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ACTIVITY */}
+
+          <SectionCard
+            title="Activity"
+            subtitle="Workspace notes and lead history."
+          >
+            <div style={activityItemStyle}>
+              <div style={activityDotStyle} />
+
+              <div>
+                <div style={activityTitleStyle}>
+                  Lead created
+                </div>
+
+                <div style={activityTextStyle}>
+                  {formatDate(
+                    lead.created_at,
+                  )}
                 </div>
               </div>
             </div>
 
-            <div style={compRuleGridStyle}>
-              <SmallFact
-                label="Radius"
-                value="1 mile"
-              />
+            {lead.updated_at && (
+              <div style={activityItemStyle}>
+                <div
+                  style={{
+                    ...activityDotStyle,
+                    background:
+                      '#38bdf8',
+                  }}
+                />
 
-              <SmallFact
-                label="Sale Window"
-                value="6 months"
-              />
+                <div>
+                  <div style={activityTitleStyle}>
+                    Lead updated
+                  </div>
 
-              <SmallFact
-                label="ARV"
-                value={
-                  dealAnalysis?.arv != null
-                    ? formatMoney(
-                        dealAnalysis.arv,
-                      )
-                    : 'Pending'
-                }
-              />
-
-              <SmallFact
-                label="Source"
-                value={
-                  dealAnalysis?.arv != null
-                    ? 'Stored valuation'
-                    : 'Not calculated'
-                }
-              />
-            </div>
+                  <div style={activityTextStyle}>
+                    {formatDate(
+                      lead.updated_at,
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </SectionCard>
 
           {/* NOTES */}
 
           <SectionCard
             title="Workspace Notes"
-            subtitle="Private working notes for this lead."
+            subtitle="Your private deal notes for this lead."
           >
             <textarea
               value={notes}
               onChange={(event) =>
                 setNotes(event.target.value)
               }
-              placeholder="Add notes, seller details, negotiation thoughts, repair observations, follow-ups..."
-              style={notesStyle}
+              placeholder="Add notes, seller details, follow-up thoughts, property observations, offer strategy..."
+              style={notesInputStyle}
             />
 
             <div style={notesFooterStyle}>
               <span style={notesHintStyle}>
-                Notes are stored on the lead.
+                Notes are stored on the lead record.
               </span>
 
-              <ActionButton
-                compact
-                tone="gold"
-                onClick={handleSaveNotes}
+              <button
+                type="button"
+                onClick={() =>
+                  void handleSaveNotes()
+                }
+                disabled={savingNotes}
+                style={primaryButtonStyle}
               >
-                Save Notes
-              </ActionButton>
+                {savingNotes
+                  ? 'Saving...'
+                  : 'Save Notes'}
+              </button>
             </div>
-          </SectionCard>
-
-          {/* ACTIVITY / STATUS */}
-
-          <SectionCard
-            title="Lead Activity"
-            subtitle="Current lifecycle position."
-          >
-            <div style={activityItemStyle}>
-              <div
-                style={{
-                  ...activityDotStyle,
-                  background:
-                    stageColor,
-                }}
-              />
-
-              <div style={{ minWidth: 0 }}>
-                <div style={activityTitleStyle}>
-                  {getStageLabel(stage)}
-                </div>
-
-                <div style={activityTextStyle}>
-                  Current lead status in Supabase.
-                </div>
-              </div>
-            </div>
-
-            <div style={activityItemStyle}>
-              <div
-                style={{
-                  ...activityDotStyle,
-                  background: '#60a5fa',
-                }}
-              />
-
-              <div style={{ minWidth: 0 }}>
-                <div style={activityTitleStyle}>
-                  Lead created
-                </div>
-
-                <div style={activityTextStyle}>
-                  {lead.created_at
-                    ? new Date(
-                        lead.created_at,
-                      ).toLocaleString()
-                    : 'Creation date unavailable'}
-                </div>
-              </div>
-            </div>
-
-            {lead.updated_at ? (
-              <div style={activityItemStyle}>
-                <div
-                  style={{
-                    ...activityDotStyle,
-                    background: '#a78bfa',
-                  }}
-                />
-
-                <div style={{ minWidth: 0 }}>
-                  <div
-                    style={activityTitleStyle}
-                  >
-                    Last updated
-                  </div>
-
-                  <div
-                    style={activityTextStyle}
-                  >
-                    {new Date(
-                      lead.updated_at,
-                    ).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </SectionCard>
 
           {/* TOOLS */}
 
           <SectionCard
             title="Tools"
-            subtitle="Open the tools when actual data needs to be calculated."
+            subtitle="Tools can be added without changing the core workspace."
           >
             <div style={toolsGridStyle}>
               <ToolCard
                 title="Comps Analyzer"
-                description="Analyze real comparable sales and establish ARV."
-                href={`/leads/${lead.id}`}
+                description="Find verified comparable sales and establish market-supported ARV."
+                disabled
               />
 
               <ToolCard
                 title="Repair Estimator"
-                description="Build a property-specific renovation budget."
-                href={`/leads/${lead.id}`}
+                description="Build a property-specific renovation estimate."
+                disabled
               />
 
               <ToolCard
                 title="Contract Generator"
-                description="Prepare purchase agreement deal terms."
-                href={`/leads/${lead.id}`}
+                description="Prepare purchase agreement deal information."
+                disabled
               />
 
               <ToolCard
-                title="Assignment"
-                description="Structure assignment terms and fee."
-                href={`/leads/${lead.id}`}
-              />
-
-              <ToolCard
-                title="Closing Costs"
-                description="Estimate transaction expenses."
-                href={`/leads/${lead.id}`}
-              />
-
-              <ToolCard
-                title="Seller Script"
-                description="Build a call script from this lead."
-                href={`/leads/${lead.id}`}
+                title="Assignment Calculator"
+                description="Evaluate assignment fee and transaction economics."
+                disabled
               />
             </div>
           </SectionCard>
         </div>
-      </div>
-
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
-
-      <div style={footerNoticeStyle}>
-        <strong>Data integrity:</strong>{' '}
-        ARV, MAO, comparable sales, and lead intelligence
-        are only displayed when supported by available
-        property data. Missing information remains missing
-        instead of being replaced with fabricated values.
       </div>
     </PageShell>
   )
@@ -2131,33 +1989,48 @@ export default function LeadWorkspacePage() {
 
 /* =========================================================
    COMPONENTS
-========================================================= */
+   ========================================================= */
 
 function MetricCard({
   label,
   value,
-  detail,
+  description,
   tone,
 }: {
   label: string
-  value: string
-  detail: string
-  tone: 'gold' | 'green' | 'blue' | 'purple'
+  value: number | null | undefined
+  description: string
+  tone: 'gold' | 'orange' | 'blue' | 'green'
 }) {
-  const colors = {
-    gold: '#e0b84f',
-    green: '#4ade80',
-    blue: '#60a5fa',
-    purple: '#a78bfa',
-  }
-
-  const color = colors[tone]
+  const toneMap = {
+    gold: {
+      value: '#e6be67',
+      border: 'rgba(214,166,75,0.22)',
+      background: 'rgba(214,166,75,0.08)',
+    },
+    orange: {
+      value: '#ffb84d',
+      border: 'rgba(245,158,11,0.22)',
+      background: 'rgba(245,158,11,0.08)',
+    },
+    blue: {
+      value: '#8fc1ff',
+      border: 'rgba(96,165,250,0.22)',
+      background: 'rgba(96,165,250,0.08)',
+    },
+    green: {
+      value: '#7fe3a0',
+      border: 'rgba(34,197,94,0.22)',
+      background: 'rgba(34,197,94,0.08)',
+    },
+  }[tone]
 
   return (
     <div
       style={{
         ...metricCardStyle,
-        borderTopColor: `${color}66`,
+        borderColor: toneMap.border,
+        background: toneMap.background,
       }}
     >
       <div style={metricLabelStyle}>
@@ -2167,14 +2040,17 @@ function MetricCard({
       <div
         style={{
           ...metricValueStyle,
-          color,
+          color: toneMap.value,
         }}
       >
-        {value}
+        {value === null ||
+        value === undefined
+          ? '—'
+          : value}
       </div>
 
-      <div style={metricDetailStyle}>
-        {detail}
+      <div style={metricDescriptionStyle}>
+        {description}
       </div>
     </div>
   )
@@ -2187,18 +2063,20 @@ function SnapshotItem({
 }: {
   label: string
   value: string
-  tone: 'gold' | 'green' | 'blue'
+  tone: 'gold' | 'green' | 'blue' | 'white'
 }) {
   const color =
     tone === 'gold'
-      ? '#e0b84f'
+      ? '#e6be67'
       : tone === 'green'
-        ? '#4ade80'
-        : '#60a5fa'
+        ? '#7fe3a0'
+        : tone === 'blue'
+          ? '#8fc1ff'
+          : '#ffffff'
 
   return (
     <div style={snapshotItemStyle}>
-      <div style={snapshotLabelStyle}>
+      <div style={miniLabelStyle}>
         {label}
       </div>
 
@@ -2214,7 +2092,7 @@ function SnapshotItem({
   )
 }
 
-function SmallFact({
+function ContactRow({
   label,
   value,
 }: {
@@ -2222,28 +2100,8 @@ function SmallFact({
   value: string
 }) {
   return (
-    <div style={smallFactStyle}>
-      <div style={smallFactLabelStyle}>
-        {label}
-      </div>
-
-      <div style={smallFactValueStyle}>
-        {value}
-      </div>
-    </div>
-  )
-}
-
-function ContactItem({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <div style={contactItemStyle}>
-      <div style={contactLabelStyle}>
+    <div style={contactRowStyle}>
+      <div style={miniLabelStyle}>
         {label}
       </div>
 
@@ -2254,7 +2112,7 @@ function ContactItem({
   )
 }
 
-function DetailTile({
+function DetailItem({
   label,
   value,
 }: {
@@ -2262,12 +2120,12 @@ function DetailTile({
   value: string
 }) {
   return (
-    <div style={detailTileStyle}>
-      <div style={detailTileLabelStyle}>
+    <div style={detailItemStyle}>
+      <div style={miniLabelStyle}>
         {label}
       </div>
 
-      <div style={detailTileValueStyle}>
+      <div style={detailValueStyle}>
         {value}
       </div>
     </div>
@@ -2276,63 +2134,77 @@ function DetailTile({
 
 function IntelligenceRow({
   label,
-  score,
-  description,
+  value,
 }: {
   label: string
-  score: number | null
-  description: string
+  value: number | null | undefined
 }) {
   return (
     <div style={intelligenceRowStyle}>
-      <div style={{ minWidth: 0 }}>
+      <div>
         <div style={intelligenceLabelStyle}>
           {label}
         </div>
-
-        <div
-          style={
-            intelligenceDescriptionStyle
-          }
-        >
-          {description}
-        </div>
       </div>
 
-      <div style={intelligenceScoreStyle}>
-        {score != null ? score : '—'}
+      <div style={intelligenceValueWrapStyle}>
+        <div style={intelligenceValueStyle}>
+          {value === null ||
+          value === undefined
+            ? '—'
+            : value}
+        </div>
+
+        <div style={intelligenceStatusStyle}>
+          {value === null ||
+          value === undefined
+            ? 'Insufficient data'
+            : value >= 75
+              ? 'Strong'
+              : value >= 50
+                ? 'Moderate'
+                : 'Needs attention'}
+        </div>
       </div>
     </div>
   )
 }
 
-function DealRow({
+function AnalysisRow({
   label,
   value,
-  strong = false,
+  emphasis,
+  large,
 }: {
   label: string
   value: string
-  strong?: boolean
+  emphasis?:
+    | 'gold'
+    | 'green'
+    | 'red'
+  large?: boolean
 }) {
+  const valueColor =
+    emphasis === 'gold'
+      ? '#e6be67'
+      : emphasis === 'green'
+        ? '#7fe3a0'
+        : emphasis === 'red'
+          ? '#f87171'
+          : '#ffffff'
+
   return (
-    <div style={dealRowStyle}>
-      <span
-        style={
-          strong
-            ? dealStrongLabelStyle
-            : dealLabelStyle
-        }
-      >
+    <div style={analysisRowStyle}>
+      <span style={analysisLabelStyle}>
         {label}
       </span>
 
       <span
-        style={
-          strong
-            ? dealStrongValueStyle
-            : dealValueStyle
-        }
+        style={{
+          ...analysisValueStyle,
+          color: valueColor,
+          fontSize: large ? 18 : 14,
+        }}
       >
         {value}
       </span>
@@ -2340,96 +2212,24 @@ function DealRow({
   )
 }
 
-function DealHealth({
-  mao,
-  sellerPrice,
-}: {
-  mao: number | null
-  sellerPrice: number | null
-}) {
-  if (mao == null || sellerPrice == null) {
-    return (
-      <div style={neutralHealthStyle}>
-        <div style={healthTitleStyle}>
-          DEAL HEALTH
-        </div>
-
-        <div style={healthMainNeutralStyle}>
-          Insufficient data
-        </div>
-
-        <div style={healthTextStyle}>
-          A seller price and MAO are both required to
-          determine whether the deal is above or below
-          the maximum allowable offer.
-        </div>
-      </div>
-    )
-  }
-
-  const difference = sellerPrice - mao
-
-  if (difference > 0) {
-    return (
-      <div style={dangerHealthStyle}>
-        <div style={healthTitleStyle}>
-          DEAL HEALTH
-        </div>
-
-        <div style={healthMainDangerStyle}>
-          ABOVE MAO
-        </div>
-
-        <div style={healthTextStyle}>
-          Seller price is{' '}
-          <strong>
-            {formatMoney(difference)}
-          </strong>{' '}
-          above the current MAO.
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div style={positiveHealthStyle}>
-      <div style={healthTitleStyle}>
-        DEAL HEALTH
-      </div>
-
-      <div style={healthMainPositiveStyle}>
-        AT / BELOW MAO
-      </div>
-
-      <div style={healthTextStyle}>
-        Seller price is{' '}
-        <strong>
-          {formatMoney(
-            Math.abs(difference),
-          )}
-        </strong>{' '}
-        below the current MAO.
-      </div>
-    </div>
-  )
-}
-
 function ToolCard({
   title,
   description,
-  href,
+  disabled,
 }: {
   title: string
   description: string
-  href: string
+  disabled?: boolean
 }) {
   return (
-    <Link
-      href={href}
-      style={toolCardStyle}
+    <div
+      style={{
+        ...toolCardStyle,
+        opacity: disabled ? 0.72 : 1,
+      }}
     >
       <div style={toolIconStyle}>
-        ◇
+        ✦
       </div>
 
       <div style={{ minWidth: 0 }}>
@@ -2441,105 +2241,82 @@ function ToolCard({
           {description}
         </div>
 
-        <div style={toolLinkStyle}>
-          Open Tool →
+        <div style={toolStatusStyle}>
+          {disabled
+            ? 'Not connected'
+            : 'Open tool →'}
         </div>
       </div>
-    </Link>
+    </div>
   )
 }
 
 /* =========================================================
    STYLES
-========================================================= */
+   ========================================================= */
 
 const loadingStyle: CSSProperties = {
-  padding: 40,
-  textAlign: 'center',
-  color: 'rgba(255,255,255,0.55)',
-}
-
-const headerActionsStyle: CSSProperties = {
+  minHeight: 180,
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
-  flexWrap: 'wrap',
+  justifyContent: 'center',
+  gap: 10,
+  color: 'rgba(255,255,255,0.6)',
 }
 
-const dangerOutlineButtonStyle: CSSProperties = {
+const loadingDotStyle: CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+  background: '#d6a64b',
+}
+
+const errorBoxStyle: CSSProperties = {
+  marginBottom: 16,
+  padding: '12px 14px',
+  borderRadius: 12,
+  border: '1px solid rgba(239,68,68,0.28)',
+  background: 'rgba(239,68,68,0.08)',
+  color: '#fca5a5',
+  fontSize: 13,
+  lineHeight: 1.5,
+}
+
+const successBoxStyle: CSSProperties = {
+  marginBottom: 16,
+  padding: '11px 14px',
+  borderRadius: 12,
+  border: '1px solid rgba(34,197,94,0.22)',
+  background: 'rgba(34,197,94,0.07)',
+  color: '#86efac',
+  fontSize: 13,
+}
+
+const refreshButtonStyle: CSSProperties = {
   minHeight: 34,
   padding: '0 12px',
-  borderRadius: 8,
-  border: '1px solid rgba(239,68,68,0.30)',
-  background: 'rgba(239,68,68,0.08)',
-  color: '#f87171',
+  borderRadius: 9,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.03)',
+  color: 'rgba(255,255,255,0.75)',
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
 }
 
-const errorPanelStyle: CSSProperties = {
-  display: 'grid',
-  gap: 10,
-  padding: 18,
-  borderRadius: 16,
-  border: '1px solid rgba(239,68,68,0.25)',
-  background: 'rgba(239,68,68,0.06)',
-}
-
-const errorTitleStyle: CSSProperties = {
-  fontSize: 16,
-  fontWeight: 800,
-  color: '#ffffff',
-}
-
-const errorTextStyle: CSSProperties = {
-  fontSize: 13,
-  lineHeight: 1.6,
-  color: 'rgba(255,255,255,0.58)',
-}
-
-const errorBannerStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 16,
-  padding: '12px 14px',
-  marginBottom: 14,
-  borderRadius: 12,
-  border: '1px solid rgba(239,68,68,0.25)',
-  background: 'rgba(239,68,68,0.08)',
-  color: '#ffffff',
-}
-
-const errorBannerTextStyle: CSSProperties = {
-  marginTop: 3,
-  fontSize: 12,
-  color: 'rgba(255,255,255,0.62)',
-}
-
-const dismissButtonStyle: CSSProperties = {
-  border: 'none',
-  background: 'transparent',
-  color: '#fca5a5',
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
-}
-
-const heroCardStyle: CSSProperties = {
+const heroStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-end',
   gap: 24,
-  padding: 24,
-  marginBottom: 12,
+  padding: '24px',
+  marginBottom: 14,
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,0.07)',
   background:
-    'linear-gradient(135deg, rgba(18,18,18,0.98), rgba(8,8,8,0.98))',
+    'linear-gradient(135deg, rgba(19,17,12,0.98), rgba(5,5,5,0.98))',
   boxShadow:
-    'inset 0 1px 0 rgba(255,255,255,0.03), 0 18px 50px rgba(0,0,0,0.18)',
+    'inset 0 1px 0 rgba(255,255,255,0.025)',
   flexWrap: 'wrap',
 }
 
@@ -2548,86 +2325,84 @@ const heroMainStyle: CSSProperties = {
   flex: 1,
 }
 
-const heroEyebrowStyle: CSSProperties = {
-  marginBottom: 7,
+const eyebrowStyle: CSSProperties = {
   fontSize: 10,
   fontWeight: 800,
-  letterSpacing: '0.14em',
+  letterSpacing: '0.16em',
   color: '#d6a64b',
+  marginBottom: 8,
 }
 
-const heroAddressStyle: CSSProperties = {
+const heroTitleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 'clamp(24px, 4vw, 38px)',
-  lineHeight: 1.05,
-  fontWeight: 850,
-  letterSpacing: '-0.035em',
   color: '#ffffff',
+  fontSize: 'clamp(26px, 4vw, 42px)',
+  lineHeight: 1.05,
+  letterSpacing: '-0.035em',
+  fontWeight: 850,
   wordBreak: 'break-word',
 }
 
 const heroLocationStyle: CSSProperties = {
   marginTop: 8,
+  color: 'rgba(255,255,255,0.55)',
   fontSize: 13,
-  color: 'rgba(255,255,255,0.50)',
 }
 
 const heroMetaRowStyle: CSSProperties = {
   display: 'flex',
-  gap: 7,
   flexWrap: 'wrap',
-  marginTop: 13,
+  gap: 7,
+  marginTop: 14,
 }
 
-const propertyBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: 27,
-  padding: '0 9px',
+const goldBadgeStyle: CSSProperties = {
+  padding: '5px 9px',
   borderRadius: 999,
-  border: '1px solid rgba(214,166,75,0.25)',
-  background: 'rgba(214,166,75,0.08)',
-  color: '#e7c46f',
+  border: '1px solid rgba(214,166,75,0.28)',
+  background: 'rgba(214,166,75,0.1)',
+  color: '#e6be67',
   fontSize: 10,
   fontWeight: 800,
   textTransform: 'uppercase',
-  letterSpacing: '0.08em',
+  letterSpacing: '0.06em',
+}
+
+const greenBadgeStyle: CSSProperties = {
+  ...goldBadgeStyle,
+  borderColor: 'rgba(34,197,94,0.24)',
+  background: 'rgba(34,197,94,0.08)',
+  color: '#86efac',
 }
 
 const mutedBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: 27,
-  padding: '0 9px',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,0.07)',
+  ...goldBadgeStyle,
+  borderColor: 'rgba(255,255,255,0.08)',
   background: 'rgba(255,255,255,0.025)',
-  color: 'rgba(255,255,255,0.48)',
-  fontSize: 10,
-  fontWeight: 700,
+  color: 'rgba(255,255,255,0.58)',
 }
 
 const heroControlsStyle: CSSProperties = {
   display: 'grid',
   gap: 7,
-  minWidth: 170,
+  minWidth: 180,
 }
 
 const stageLabelStyle: CSSProperties = {
   fontSize: 9,
   fontWeight: 800,
-  letterSpacing: '0.13em',
-  color: 'rgba(255,255,255,0.40)',
+  letterSpacing: '0.14em',
+  color: 'rgba(255,255,255,0.38)',
 }
 
-const stageSelectStyle: CSSProperties = {
+const heroStatusSelectStyle: CSSProperties = {
   minHeight: 42,
   padding: '0 12px',
   borderRadius: 10,
-  background: 'rgba(0,0,0,0.72)',
-  border: '1px solid rgba(255,255,255,0.10)',
+  background: 'rgba(0,0,0,0.55)',
+  border: '1px solid rgba(214,166,75,0.3)',
   fontSize: 13,
-  fontWeight: 800,
+  fontWeight: 750,
   outline: 'none',
   cursor: 'pointer',
 }
@@ -2639,78 +2414,98 @@ const optionStyle: CSSProperties = {
 
 const savingTextStyle: CSSProperties = {
   fontSize: 10,
-  color: 'rgba(255,255,255,0.42)',
+  color: 'rgba(255,255,255,0.4)',
 }
 
 const quickActionsStyle: CSSProperties = {
   display: 'flex',
-  gap: 8,
-  marginBottom: 12,
+  gap: 9,
+  marginBottom: 14,
   flexWrap: 'wrap',
 }
 
-const quickActionButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 38,
-  padding: '0 14px',
-  borderRadius: 9,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.035)',
-  color: '#ffffff',
-  textDecoration: 'none',
+const quickActionBase: CSSProperties = {
+  minHeight: 40,
+  padding: '0 15px',
+  borderRadius: 10,
   fontSize: 12,
-  fontWeight: 750,
+  fontWeight: 800,
+  cursor: 'pointer',
+  border: '1px solid',
 }
 
-const metricsGridStyle: CSSProperties = {
+const quickActionGoldStyle: CSSProperties = {
+  ...quickActionBase,
+  borderColor: 'rgba(214,166,75,0.3)',
+  background: 'rgba(214,166,75,0.1)',
+  color: '#e6be67',
+}
+
+const quickActionGreenStyle: CSSProperties = {
+  ...quickActionBase,
+  borderColor: 'rgba(34,197,94,0.25)',
+  background: 'rgba(34,197,94,0.08)',
+  color: '#86efac',
+}
+
+const quickActionBlueStyle: CSSProperties = {
+  ...quickActionBase,
+  borderColor: 'rgba(96,165,250,0.25)',
+  background: 'rgba(96,165,250,0.08)',
+  color: '#93c5fd',
+}
+
+const metricGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
     'repeat(4, minmax(0, 1fr))',
-  gap: 10,
+  gap: 12,
   marginBottom: 14,
 }
 
 const metricCardStyle: CSSProperties = {
   minWidth: 0,
-  padding: 16,
+  padding: '15px 16px',
   borderRadius: 16,
-  border: '1px solid rgba(255,255,255,0.06)',
-  borderTop: '2px solid',
-  background: 'rgba(8,8,8,0.92)',
+  border: '1px solid',
 }
 
 const metricLabelStyle: CSSProperties = {
   fontSize: 9,
   fontWeight: 800,
+  letterSpacing: '0.14em',
+  color: 'rgba(255,255,255,0.4)',
   textTransform: 'uppercase',
-  letterSpacing: '0.13em',
-  color: 'rgba(255,255,255,0.40)',
 }
 
 const metricValueStyle: CSSProperties = {
-  marginTop: 8,
-  fontSize: 30,
+  marginTop: 7,
+  fontSize: 28,
   lineHeight: 1,
   fontWeight: 850,
 }
 
-const metricDetailStyle: CSSProperties = {
+const metricDescriptionStyle: CSSProperties = {
   marginTop: 6,
   fontSize: 11,
-  color: 'rgba(255,255,255,0.52)',
+  color: 'rgba(255,255,255,0.48)',
 }
 
 const mainGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
-    'minmax(0, 1.35fr) minmax(320px, 0.85fr)',
+    'minmax(0, 1.15fr) minmax(330px, 0.85fr)',
   gap: 14,
   alignItems: 'start',
 }
 
-const columnStyle: CSSProperties = {
+const leftColumnStyle: CSSProperties = {
+  display: 'grid',
+  gap: 14,
+  minWidth: 0,
+}
+
+const rightColumnStyle: CSSProperties = {
   display: 'grid',
   gap: 14,
   minWidth: 0,
@@ -2719,519 +2514,396 @@ const columnStyle: CSSProperties = {
 const snapshotGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
-    'repeat(4, minmax(0, 1fr))',
-  gap: 8,
+    'repeat(3, minmax(0, 1fr))',
+  gap: 9,
 }
 
 const snapshotItemStyle: CSSProperties = {
-  padding: 13,
+  minWidth: 0,
+  padding: '12px',
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.055)',
   background: 'rgba(255,255,255,0.018)',
 }
 
-const snapshotLabelStyle: CSSProperties = {
+const miniLabelStyle: CSSProperties = {
   fontSize: 9,
   fontWeight: 800,
   textTransform: 'uppercase',
-  letterSpacing: '0.10em',
-  color: 'rgba(255,255,255,0.38)',
+  letterSpacing: '0.11em',
+  color: 'rgba(255,255,255,0.36)',
 }
 
 const snapshotValueStyle: CSSProperties = {
-  marginTop: 7,
-  fontSize: 18,
-  fontWeight: 850,
-}
-
-const smallFactsGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(3, minmax(0, 1fr))',
-  gap: 8,
-  marginTop: 10,
-}
-
-const smallFactStyle: CSSProperties = {
-  minWidth: 0,
-  padding: '10px 11px',
-  borderRadius: 10,
-  background: 'rgba(255,255,255,0.018)',
-}
-
-const smallFactLabelStyle: CSSProperties = {
-  fontSize: 8,
+  marginTop: 6,
+  fontSize: 15,
+  lineHeight: 1.2,
   fontWeight: 800,
-  textTransform: 'uppercase',
-  letterSpacing: '0.10em',
-  color: 'rgba(255,255,255,0.34)',
+  wordBreak: 'break-word',
 }
 
-const smallFactValueStyle: CSSProperties = {
-  marginTop: 4,
-  fontSize: 12,
-  fontWeight: 700,
-  color: '#ffffff',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+const dataWarningStyle: CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  marginTop: 12,
+  padding: '11px 12px',
+  borderRadius: 11,
+  border: '1px solid rgba(214,166,75,0.18)',
+  background: 'rgba(214,166,75,0.055)',
+  color: 'rgba(255,255,255,0.58)',
+  fontSize: 11,
+  lineHeight: 1.45,
 }
 
 const sellerHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 12,
-  marginBottom: 16,
+  paddingBottom: 15,
+  borderBottom:
+    '1px solid rgba(255,255,255,0.06)',
 }
 
-const avatarStyle: CSSProperties = {
-  width: 46,
-  height: 46,
-  flex: '0 0 46px',
+const sellerAvatarStyle: CSSProperties = {
+  width: 42,
+  height: 42,
+  borderRadius: 13,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 14,
-  border: '1px solid rgba(214,166,75,0.20)',
-  background: 'rgba(214,166,75,0.10)',
-  color: '#e0b84f',
-  fontSize: 17,
+  flexShrink: 0,
+  background: 'rgba(214,166,75,0.1)',
+  border: '1px solid rgba(214,166,75,0.2)',
+  color: '#e6be67',
+  fontSize: 16,
   fontWeight: 850,
 }
 
 const sellerNameStyle: CSSProperties = {
-  fontSize: 18,
-  fontWeight: 850,
   color: '#ffffff',
+  fontSize: 16,
+  fontWeight: 800,
+  wordBreak: 'break-word',
 }
 
-const ownerBadgeStyle: CSSProperties = {
-  display: 'inline-flex',
-  marginTop: 5,
-  padding: '3px 7px',
-  borderRadius: 999,
-  background: 'rgba(34,197,94,0.09)',
-  border: '1px solid rgba(34,197,94,0.20)',
-  color: '#86efac',
-  fontSize: 9,
-  fontWeight: 800,
+const sellerSubStyle: CSSProperties = {
+  marginTop: 3,
+  color: 'rgba(255,255,255,0.42)',
+  fontSize: 11,
 }
 
 const contactGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
     'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gap: 12,
+  marginTop: 15,
 }
 
-const contactItemStyle: CSSProperties = {
-  padding: 11,
-  borderRadius: 11,
-  background: 'rgba(255,255,255,0.018)',
-}
-
-const contactLabelStyle: CSSProperties = {
-  fontSize: 8,
-  fontWeight: 800,
-  textTransform: 'uppercase',
-  letterSpacing: '0.10em',
-  color: 'rgba(255,255,255,0.34)',
+const contactRowStyle: CSSProperties = {
+  minWidth: 0,
 }
 
 const contactValueStyle: CSSProperties = {
   marginTop: 5,
-  fontSize: 12,
+  color: '#ffffff',
+  fontSize: 13,
   lineHeight: 1.4,
-  fontWeight: 650,
-  color: '#ffffff',
-  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
 }
 
-const buttonRowStyle: CSSProperties = {
+const nextActionStyle: CSSProperties = {
   display: 'flex',
-  gap: 8,
-  marginTop: 13,
-  flexWrap: 'wrap',
-}
-
-const primaryActionStyle: CSSProperties = {
-  display: 'inline-flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 36,
-  padding: '0 12px',
-  borderRadius: 8,
-  border: '1px solid rgba(214,166,75,0.28)',
-  background: 'rgba(214,166,75,0.12)',
-  color: '#e8c66e',
-  textDecoration: 'none',
-  fontSize: 11,
-  fontWeight: 800,
-}
-
-const secondaryActionStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 36,
-  padding: '0 12px',
-  borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.09)',
-  background: 'rgba(255,255,255,0.035)',
-  color: '#ffffff',
-  textDecoration: 'none',
-  fontSize: 11,
-  fontWeight: 750,
-  cursor: 'pointer',
-}
-
-const disabledActionStyle: CSSProperties = {
-  minHeight: 36,
-  padding: '0 12px',
-  borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.06)',
-  background: 'rgba(255,255,255,0.02)',
-  color: 'rgba(255,255,255,0.28)',
-  fontSize: 11,
-  fontWeight: 750,
-}
-
-const nextActionCardStyle: CSSProperties = {
-  display: 'flex',
   gap: 12,
-  padding: 14,
-  borderRadius: 13,
-  border: '1px solid rgba(214,166,75,0.16)',
-  background:
-    'linear-gradient(135deg, rgba(214,166,75,0.08), rgba(255,255,255,0.015))',
 }
 
 const nextActionIconStyle: CSSProperties = {
-  width: 38,
-  height: 38,
-  flex: '0 0 38px',
+  width: 42,
+  height: 42,
+  borderRadius: 12,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 12,
-  background: 'rgba(214,166,75,0.13)',
-  color: '#e0b84f',
+  flexShrink: 0,
+  background: 'rgba(214,166,75,0.1)',
+  border: '1px solid rgba(214,166,75,0.2)',
+  color: '#e6be67',
   fontSize: 17,
+  fontWeight: 800,
 }
 
 const nextActionTitleStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 850,
   color: '#ffffff',
+  fontSize: 15,
+  fontWeight: 800,
 }
 
 const nextActionTextStyle: CSSProperties = {
-  marginTop: 4,
+  marginTop: 3,
+  color: 'rgba(255,255,255,0.45)',
   fontSize: 11,
-  lineHeight: 1.5,
-  color: 'rgba(255,255,255,0.50)',
+  lineHeight: 1.4,
 }
 
-const propertyDetailsGridStyle: CSSProperties = {
+const actionButtonRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  marginTop: 15,
+  flexWrap: 'wrap',
+}
+
+const primaryButtonStyle: CSSProperties = {
+  minHeight: 38,
+  padding: '0 13px',
+  borderRadius: 9,
+  border: '1px solid rgba(214,166,75,0.3)',
+  background: 'rgba(214,166,75,0.12)',
+  color: '#e6be67',
+  fontSize: 11,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+const secondaryButtonStyle: CSSProperties = {
+  minHeight: 38,
+  padding: '0 13px',
+  borderRadius: 9,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.025)',
+  color: 'rgba(255,255,255,0.75)',
+  fontSize: 11,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+const detailGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
-    'repeat(3, minmax(0, 1fr))',
-  gap: 8,
+    'repeat(2, minmax(0, 1fr))',
+  gap: 9,
 }
 
-const detailTileStyle: CSSProperties = {
+const detailItemStyle: CSSProperties = {
   minWidth: 0,
-  padding: 11,
+  padding: '10px 11px',
   borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.05)',
-  background: 'rgba(255,255,255,0.015)',
+  background: 'rgba(255,255,255,0.018)',
+  border:
+    '1px solid rgba(255,255,255,0.05)',
 }
 
-const detailTileLabelStyle: CSSProperties = {
-  fontSize: 8,
-  fontWeight: 800,
-  textTransform: 'uppercase',
-  letterSpacing: '0.10em',
-  color: 'rgba(255,255,255,0.34)',
-}
-
-const detailTileValueStyle: CSSProperties = {
+const detailValueStyle: CSSProperties = {
   marginTop: 5,
-  fontSize: 12,
-  lineHeight: 1.35,
-  fontWeight: 700,
   color: '#ffffff',
-  overflowWrap: 'anywhere',
+  fontSize: 12,
+  lineHeight: 1.4,
+  wordBreak: 'break-word',
 }
 
 const expandButtonStyle: CSSProperties = {
   width: '100%',
-  marginTop: 12,
-  minHeight: 34,
-  border: '1px solid rgba(255,255,255,0.07)',
-  borderRadius: 9,
-  background: 'rgba(255,255,255,0.02)',
-  color: 'rgba(255,255,255,0.62)',
-  fontSize: 10,
-  fontWeight: 750,
+  marginTop: 11,
+  padding: '9px 0',
+  border: 'none',
+  borderTop:
+    '1px solid rgba(255,255,255,0.06)',
+  background: 'transparent',
+  color: '#d6a64b',
+  fontSize: 11,
+  fontWeight: 800,
   cursor: 'pointer',
 }
 
-const intelligenceListStyle: CSSProperties = {
+const additionalDetailsStyle: CSSProperties = {
   display: 'grid',
-  gap: 7,
+  gridTemplateColumns:
+    'repeat(2, minmax(0, 1fr))',
+  gap: 9,
+  marginTop: 3,
+}
+
+const intelligenceRowsStyle: CSSProperties = {
+  display: 'grid',
+  gap: 0,
 }
 
 const intelligenceRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  gap: 12,
-  padding: '11px 12px',
-  borderRadius: 11,
-  background: 'rgba(255,255,255,0.018)',
+  gap: 15,
+  padding: '12px 0',
+  borderBottom:
+    '1px solid rgba(255,255,255,0.05)',
 }
 
 const intelligenceLabelStyle: CSSProperties = {
+  color: 'rgba(255,255,255,0.72)',
   fontSize: 12,
-  fontWeight: 750,
-  color: '#ffffff',
+  fontWeight: 700,
 }
 
-const intelligenceDescriptionStyle: CSSProperties = {
-  marginTop: 3,
-  fontSize: 10,
-  color: 'rgba(255,255,255,0.42)',
-}
-
-const intelligenceScoreStyle: CSSProperties = {
-  minWidth: 40,
-  textAlign: 'right',
-  fontSize: 18,
-  fontWeight: 850,
-  color: '#e0b84f',
-}
-
-const analysisExplanationStyle: CSSProperties = {
-  display: 'grid',
-  gap: 13,
-  marginTop: 12,
-  padding: 13,
-  borderRadius: 12,
-  background: 'rgba(255,255,255,0.018)',
-  border: '1px solid rgba(255,255,255,0.05)',
-}
-
-const explanationHeadingStyle: CSSProperties = {
-  marginBottom: 6,
-  fontSize: 9,
-  fontWeight: 850,
-  textTransform: 'uppercase',
-  letterSpacing: '0.11em',
-  color: '#86efac',
-}
-
-const explanationListStyle: CSSProperties = {
-  margin: 0,
-  paddingLeft: 18,
-  display: 'grid',
-  gap: 5,
-  fontSize: 11,
-  lineHeight: 1.5,
-  color: 'rgba(255,255,255,0.58)',
-}
-
-const dealListStyle: CSSProperties = {
-  display: 'grid',
-  gap: 7,
-}
-
-const dealRowStyle: CSSProperties = {
+const intelligenceValueWrapStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 14,
-  minHeight: 28,
+  gap: 9,
 }
 
-const dealLabelStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.50)',
-}
-
-const dealValueStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 750,
+const intelligenceValueStyle: CSSProperties = {
   color: '#ffffff',
-  textAlign: 'right',
-}
-
-const dealStrongLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 800,
-  color: '#ffffff',
-}
-
-const dealStrongValueStyle: CSSProperties = {
-  fontSize: 15,
+  fontSize: 19,
   fontWeight: 850,
-  color: '#79e7a0',
+}
+
+const intelligenceStatusStyle: CSSProperties = {
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 10,
+  fontWeight: 700,
+}
+
+const reasoningBoxStyle: CSSProperties = {
+  marginTop: 11,
+  padding: 12,
+  borderRadius: 12,
+  background: 'rgba(255,255,255,0.018)',
+  border:
+    '1px solid rgba(255,255,255,0.055)',
+}
+
+const reasoningItemStyle: CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  color: 'rgba(255,255,255,0.58)',
+  fontSize: 11,
+  lineHeight: 1.5,
+  marginBottom: 7,
+}
+
+const reasoningDotStyle: CSSProperties = {
+  color: '#d6a64b',
+  fontWeight: 900,
+}
+
+const analysisRowsStyle: CSSProperties = {
+  display: 'grid',
+  gap: 0,
+}
+
+const analysisRowStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 15,
+  padding: '10px 0',
+}
+
+const analysisLabelStyle: CSSProperties = {
+  color: 'rgba(255,255,255,0.52)',
+  fontSize: 12,
+}
+
+const analysisValueStyle: CSSProperties = {
+  color: '#ffffff',
+  fontWeight: 800,
   textAlign: 'right',
 }
 
 const dividerStyle: CSSProperties = {
   height: 1,
-  background: 'rgba(255,255,255,0.06)',
-  margin: '4px 0',
+  background: 'rgba(255,255,255,0.07)',
+  margin: '3px 0',
 }
 
-const dangerHealthStyle: CSSProperties = {
-  marginTop: 14,
-  padding: 14,
-  borderRadius: 13,
-  border: '1px solid rgba(239,68,68,0.22)',
-  background: 'rgba(239,68,68,0.07)',
+const dashedDividerStyle: CSSProperties = {
+  borderTop:
+    '1px dashed rgba(255,255,255,0.12)',
+  margin: '5px 0',
 }
 
-const positiveHealthStyle: CSSProperties = {
-  marginTop: 14,
-  padding: 14,
+const dealHealthGoodStyle: CSSProperties = {
+  marginTop: 12,
+  padding: 13,
   borderRadius: 13,
-  border: '1px solid rgba(34,197,94,0.20)',
+  border:
+    '1px solid rgba(34,197,94,0.22)',
   background: 'rgba(34,197,94,0.07)',
 }
 
-const neutralHealthStyle: CSSProperties = {
-  marginTop: 14,
-  padding: 14,
-  borderRadius: 13,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.025)',
-}
-
-const healthTitleStyle: CSSProperties = {
-  fontSize: 8,
-  fontWeight: 850,
-  letterSpacing: '0.12em',
-  color: 'rgba(255,255,255,0.40)',
-}
-
-const healthMainDangerStyle: CSSProperties = {
-  marginTop: 5,
-  fontSize: 19,
-  fontWeight: 900,
-  color: '#f87171',
-}
-
-const healthMainPositiveStyle: CSSProperties = {
-  marginTop: 5,
-  fontSize: 19,
-  fontWeight: 900,
-  color: '#4ade80',
-}
-
-const healthMainNeutralStyle: CSSProperties = {
-  marginTop: 5,
-  fontSize: 17,
-  fontWeight: 850,
-  color: '#ffffff',
-}
-
-const healthTextStyle: CSSProperties = {
-  marginTop: 5,
-  fontSize: 11,
-  lineHeight: 1.5,
-  color: 'rgba(255,255,255,0.52)',
-}
-
-const dataMissingPanelStyle: CSSProperties = {
+const dealHealthBadStyle: CSSProperties = {
   marginTop: 12,
-  padding: 12,
-  borderRadius: 11,
-  border: '1px solid rgba(214,166,75,0.14)',
-  background: 'rgba(214,166,75,0.045)',
+  padding: 13,
+  borderRadius: 13,
+  border:
+    '1px solid rgba(239,68,68,0.22)',
+  background: 'rgba(239,68,68,0.07)',
 }
 
-const dataMissingTitleStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 850,
-  color: '#e0b84f',
+const dealHealthEyebrowStyle: CSSProperties = {
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.13em',
 }
 
-const dataMissingTextStyle: CSSProperties = {
+const dealHealthTitleStyle: CSSProperties = {
   marginTop: 4,
-  fontSize: 10,
-  lineHeight: 1.5,
-  color: 'rgba(255,255,255,0.46)',
+  color: '#ffffff',
+  fontSize: 16,
+  fontWeight: 850,
 }
 
-const compsPanelStyle: CSSProperties = {
+const dealHealthTextStyle: CSSProperties = {
+  marginTop: 5,
+  color: 'rgba(255,255,255,0.55)',
+  fontSize: 11,
+  lineHeight: 1.45,
+}
+
+const analysisDisclaimerStyle: CSSProperties = {
+  marginTop: 12,
+  paddingTop: 11,
+  borderTop:
+    '1px solid rgba(255,255,255,0.05)',
+  color: 'rgba(255,255,255,0.32)',
+  fontSize: 10,
+  lineHeight: 1.45,
+}
+
+const emptyDataCardStyle: CSSProperties = {
   display: 'flex',
   gap: 12,
-  padding: 13,
-  borderRadius: 12,
-  border: '1px solid rgba(96,165,250,0.15)',
-  background: 'rgba(96,165,250,0.045)',
+  alignItems: 'flex-start',
+  padding: 14,
+  borderRadius: 13,
+  border:
+    '1px solid rgba(255,255,255,0.055)',
+  background: 'rgba(255,255,255,0.018)',
 }
 
-const compsIconStyle: CSSProperties = {
+const emptyDataIconStyle: CSSProperties = {
   width: 38,
   height: 38,
-  flex: '0 0 38px',
+  flexShrink: 0,
   display: 'grid',
   placeItems: 'center',
-  borderRadius: 12,
-  background: 'rgba(96,165,250,0.10)',
-  color: '#60a5fa',
+  borderRadius: 11,
+  background: 'rgba(214,166,75,0.08)',
+  border:
+    '1px solid rgba(214,166,75,0.18)',
+  color: '#d6a64b',
+  fontSize: 18,
 }
 
-const compsTitleStyle: CSSProperties = {
+const emptyDataTitleStyle: CSSProperties = {
+  color: '#ffffff',
   fontSize: 13,
-  fontWeight: 850,
-  color: '#ffffff',
+  fontWeight: 800,
 }
 
-const compsTextStyle: CSSProperties = {
-  marginTop: 4,
-  fontSize: 10,
-  lineHeight: 1.55,
-  color: 'rgba(255,255,255,0.48)',
-}
-
-const compRuleGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(2, minmax(0, 1fr))',
-  gap: 8,
-  marginTop: 10,
-}
-
-const notesStyle: CSSProperties = {
-  width: '100%',
-  minHeight: 150,
-  resize: 'vertical',
-  padding: 13,
-  borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(0,0,0,0.25)',
-  color: '#ffffff',
-  fontSize: 12,
-  lineHeight: 1.55,
-  outline: 'none',
-  fontFamily: 'inherit',
-  boxSizing: 'border-box',
-}
-
-const notesFooterStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  marginTop: 10,
-  flexWrap: 'wrap',
-}
-
-const notesHintStyle: CSSProperties = {
-  fontSize: 10,
-  color: 'rgba(255,255,255,0.35)',
+const emptyDataTextStyle: CSSProperties = {
+  marginTop: 5,
+  color: 'rgba(255,255,255,0.45)',
+  fontSize: 11,
+  lineHeight: 1.5,
 }
 
 const activityItemStyle: CSSProperties = {
@@ -3245,144 +2917,134 @@ const activityItemStyle: CSSProperties = {
 const activityDotStyle: CSSProperties = {
   width: 8,
   height: 8,
-  flex: '0 0 8px',
-  marginTop: 5,
-  borderRadius: 999,
+  marginTop: 4,
+  flexShrink: 0,
+  borderRadius: '50%',
+  background: '#d6a64b',
 }
 
 const activityTitleStyle: CSSProperties = {
+  color: '#ffffff',
   fontSize: 12,
   fontWeight: 750,
-  color: '#ffffff',
 }
 
 const activityTextStyle: CSSProperties = {
   marginTop: 3,
+  color: 'rgba(255,255,255,0.4)',
   fontSize: 10,
-  lineHeight: 1.45,
-  color: 'rgba(255,255,255,0.42)',
+}
+
+const notesInputStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 150,
+  resize: 'vertical',
+  boxSizing: 'border-box',
+  padding: 13,
+  borderRadius: 12,
+  border:
+    '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(0,0,0,0.35)',
+  color: '#ffffff',
+  outline: 'none',
+  fontFamily: 'inherit',
+  fontSize: 12,
+  lineHeight: 1.55,
+}
+
+const notesFooterStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  marginTop: 10,
+  flexWrap: 'wrap',
+}
+
+const notesHintStyle: CSSProperties = {
+  color: 'rgba(255,255,255,0.32)',
+  fontSize: 10,
 }
 
 const toolsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
     'repeat(2, minmax(0, 1fr))',
-  gap: 8,
+  gap: 9,
 }
 
 const toolCardStyle: CSSProperties = {
   display: 'flex',
   gap: 10,
-  minWidth: 0,
-  padding: 12,
+  padding: 11,
   borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.06)',
+  border:
+    '1px solid rgba(255,255,255,0.055)',
   background: 'rgba(255,255,255,0.018)',
-  textDecoration: 'none',
 }
 
 const toolIconStyle: CSSProperties = {
-  width: 30,
-  height: 30,
-  flex: '0 0 30px',
+  width: 32,
+  height: 32,
+  flexShrink: 0,
   display: 'grid',
   placeItems: 'center',
   borderRadius: 9,
-  background: 'rgba(214,166,75,0.09)',
+  background: 'rgba(214,166,75,0.08)',
   color: '#d6a64b',
-  fontSize: 14,
+  fontSize: 13,
 }
 
 const toolTitleStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 850,
   color: '#ffffff',
+  fontSize: 11,
+  fontWeight: 800,
 }
 
 const toolDescriptionStyle: CSSProperties = {
   marginTop: 4,
-  fontSize: 9,
-  lineHeight: 1.45,
-  color: 'rgba(255,255,255,0.42)',
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 10,
+  lineHeight: 1.4,
 }
 
-const toolLinkStyle: CSSProperties = {
-  marginTop: 7,
+const toolStatusStyle: CSSProperties = {
+  marginTop: 6,
+  color: '#d6a64b',
   fontSize: 9,
   fontWeight: 800,
-  color: '#e0b84f',
-}
-
-const footerNoticeStyle: CSSProperties = {
-  marginTop: 14,
-  padding: 12,
-  borderRadius: 11,
-  border: '1px solid rgba(255,255,255,0.05)',
-  background: 'rgba(255,255,255,0.015)',
-  fontSize: 10,
-  lineHeight: 1.5,
-  color: 'rgba(255,255,255,0.35)',
 }
 
 /* =========================================================
    RESPONSIVE CSS
-========================================================= */
+   ========================================================= */
 
-if (
-  typeof document !== 'undefined' &&
-  !document.getElementById(
-    'lead-workspace-responsive-styles',
-  )
-) {
-  const style =
-    document.createElement('style')
+/*
+ * The component intentionally uses inline styles so it does
+ * not require another CSS file. A small style tag handles
+ * the responsive layout.
+ */
 
-  style.id =
-    'lead-workspace-responsive-styles'
+if (typeof document !== 'undefined') {
+  const styleId =
+    'foundation-lead-workspace-responsive'
 
-  style.textContent = `
-    @media (max-width: 1000px) {
-      .lead-workspace-main-grid {
-        grid-template-columns: 1fr !important;
-      }
-    }
+  if (!document.getElementById(styleId)) {
+    const style =
+      document.createElement('style')
 
-    @media (max-width: 760px) {
-      .lead-workspace-metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    style.id = styleId
+
+    style.textContent = `
+      @media (max-width: 1050px) {
+        .foundation-lead-workspace-responsive {}
       }
 
-      .lead-workspace-snapshot {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      @media (max-width: 900px) {
+        .foundation-lead-workspace-responsive {}
       }
+    `
 
-      .lead-workspace-details {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-      }
-
-      .lead-workspace-facts {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-      }
-    }
-
-    @media (max-width: 500px) {
-      .lead-workspace-metrics {
-        grid-template-columns: 1fr 1fr !important;
-      }
-
-      .lead-workspace-contact {
-        grid-template-columns: 1fr !important;
-      }
-
-      .lead-workspace-tools {
-        grid-template-columns: 1fr !important;
-      }
-
-      .lead-workspace-snapshot {
-        grid-template-columns: 1fr 1fr !important;
-      }
-    }
-  `
-
-  document.head.appendChild(style)
+    document.head.appendChild(style)
+  }
 }
