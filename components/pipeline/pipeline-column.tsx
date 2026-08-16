@@ -3,7 +3,9 @@
 import type { CSSProperties } from 'react'
 import type { CrmStage } from '@/lib/crm-stage'
 import { CRM_STAGE_META } from '@/lib/crm-stage'
-import PipelineCard, { type PipelineLead } from '@/components/pipeline/pipeline-card'
+import PipelineCard, {
+  type PipelineLead,
+} from '@/components/pipeline/pipeline-card'
 
 type PipelineColumnProps = {
   stage: CrmStage
@@ -11,8 +13,14 @@ type PipelineColumnProps = {
   isDragOver: boolean
   onDragOver: (stage: CrmStage) => void
   onDragLeave: (stage: CrmStage) => void
-  onDropLead: (stage: CrmStage, leadId: string) => void | Promise<void>
-  onMoveToStage: (lead: PipelineLead, nextStage: CrmStage) => void | Promise<void>
+  onDropLead: (
+    stage: CrmStage,
+    leadId: string
+  ) => void | Promise<void>
+  onMoveToStage: (
+    lead: PipelineLead,
+    nextStage: CrmStage
+  ) => void | Promise<void>
 }
 
 export default function PipelineColumn({
@@ -27,15 +35,26 @@ export default function PipelineColumn({
   const meta = CRM_STAGE_META[stage]
   const accentColor = meta.color || '#d6a64b'
 
-  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+  function handleDragOver(
+    event: React.DragEvent<HTMLDivElement>
+  ) {
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
     onDragOver(stage)
   }
 
-  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+  function handleDrop(
+    event: React.DragEvent<HTMLDivElement>
+  ) {
     event.preventDefault()
-    const leadId = event.dataTransfer.getData('text/plain')
+
+    const leadId =
+      event.dataTransfer.getData('text/plain')
+
+    if (!leadId) {
+      return
+    }
+
     void onDropLead(stage, leadId)
   }
 
@@ -43,7 +62,9 @@ export default function PipelineColumn({
     <section
       style={{
         ...columnStyle,
-        borderColor: isDragOver ? `${accentColor}80` : `${accentColor}30`,
+        borderColor: isDragOver
+          ? `${accentColor}80`
+          : `${accentColor}30`,
         boxShadow: isDragOver
           ? `0 0 0 1px ${accentColor}66 inset, 0 0 32px ${accentColor}25, 0 12px 40px rgba(0,0,0,0.6)`
           : `0 0 0 1px ${accentColor}18 inset, 0 8px 32px rgba(0,0,0,0.45)`,
@@ -61,7 +82,8 @@ export default function PipelineColumn({
         <div style={headerTextGroupStyle}>
           <div style={titleStyle}>{meta.label}</div>
           <div style={subtitleStyle}>
-            {leads.length} lead{leads.length === 1 ? '' : 's'}
+            {leads.length} lead
+            {leads.length === 1 ? '' : 's'}
           </div>
         </div>
 
@@ -71,16 +93,20 @@ export default function PipelineColumn({
             background: `linear-gradient(180deg, ${accentColor}20, ${accentColor}10)`,
             borderColor: `${accentColor}44`,
             color: accentColor,
-            boxShadow: `0 0 12px ${accentColor}15`,
           }}
         >
           {leads.length}
         </span>
       </div>
 
-      <div style={bodyStyle} className="crm-custom-scroll">
+      <div
+        style={bodyStyle}
+        className="crm-custom-scroll"
+      >
         {leads.length === 0 ? (
-          <div style={emptyStyle}>Drop here or move a lead into this stage.</div>
+          <div style={emptyStyle}>
+            Drop a lead here or use the stage selector.
+          </div>
         ) : (
           leads.map((lead) => (
             <PipelineCard
@@ -103,11 +129,13 @@ const columnStyle: CSSProperties = {
   maxHeight: 'calc(100vh - 265px)',
   borderRadius: 20,
   border: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(12,10,6,0.85), rgba(0,0,0,0.96))',
+  background:
+    'linear-gradient(180deg, rgba(12,10,6,0.85), rgba(0,0,0,0.96))',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
   overflow: 'hidden',
-  transition: 'border-color 200ms ease, box-shadow 200ms ease',
+  transition:
+    'border-color 200ms ease, box-shadow 200ms ease',
 }
 
 const headerStyle: CSSProperties = {
@@ -120,9 +148,8 @@ const headerStyle: CSSProperties = {
   justifyContent: 'space-between',
   gap: 12,
   borderBottom: '1px solid rgba(255,255,255,0.06)',
-  background: 'linear-gradient(180deg, rgba(14,12,8,0.95), rgba(4,4,4,0.98))',
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
+  background:
+    'linear-gradient(180deg, rgba(14,12,8,0.95), rgba(4,4,4,0.98))',
 }
 
 const headerTextGroupStyle: CSSProperties = {
@@ -132,9 +159,8 @@ const headerTextGroupStyle: CSSProperties = {
 
 const titleStyle: CSSProperties = {
   fontSize: 14,
-  fontWeight: 750,
+  fontWeight: 700,
   color: '#ffffff',
-  letterSpacing: '-0.01em',
 }
 
 const subtitleStyle: CSSProperties = {
@@ -154,7 +180,6 @@ const badgeStyle: CSSProperties = {
   border: '1px solid transparent',
   fontSize: 12,
   fontWeight: 800,
-  lineHeight: 1,
 }
 
 const bodyStyle: CSSProperties = {
