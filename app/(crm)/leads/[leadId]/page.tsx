@@ -1,64 +1,181 @@
 'use client'
 
 import Link from 'next/link'
-import { Suspense, useEffect, useMemo, useState } from 'react'
-import type { CSSProperties, ComponentType } from 'react'
-import { useSearchParams } from 'next/navigation'
-
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import ActionButton from '@/components/ui/action-button'
 import PageShell from '@/components/ui/page-shell'
 import SectionCard from '@/components/ui/section-card'
-import ActionButton from '@/components/ui/action-button'
 import WorkspaceCanvas from '@/components/workspace-canvas'
-
 import { supabase } from '@/lib/supabase'
-import { getToolConfig, type ToolSlug } from './tool-config'
+import { resolveField, resolveNumericField } from '@/lib/resolve-field'
+import { FIELD_ALIASES } from '@/lib/field-aliases'
+import { computeOwnershipYears } from '@/lib/compute-fields'
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-type Lead = {
+type LeadRecord = {
   id: string
+
   property_address_1?: string | null
+  property_address?: string | null
   city?: string | null
   state?: string | null
   zip?: string | null
   county?: string | null
+
   owner_name?: string | null
+  owner_phone?: string | null
+  owner_phone_primary?: string | null
+  phone?: string | null
+  phone1?: string | null
+  owner_email?: string | null
+  email?: string | null
+  email1?: string | null
+
+  owner_mailing_address?: string | null
+  owner_mailing_city?: string | null
+  owner_mailing_state?: string | null
+  owner_mailing_zip?: string | null
+
   property_type?: string | null
+  property_use?: string | null
+
   bedrooms?: number | null
   bathrooms?: number | null
   square_feet?: number | null
   year_built?: number | null
+
   apn?: string | null
-  lead_type?: string | null
+
+  status?: string | null
+
   house_value?: number | null
   estimated_value?: number | null
   market_value?: number | null
+
   equity_amount?: number | null
+  equity_percent?: number | null
   mortgage_balance?: number | null
+
   last_sale_amount?: number | null
+  last_sale_date?: string | null
+
+  asking_price?: number | null
+  listing_price?: number | null
+
   default_amount?: number | null
+  auction_date?: string | null
+  lender_name?: string | null
+
+  ownership_length?: number | null
+
+  owner_occupied?: boolean | null
+  vacant?: boolean | null
+
+  lead_type?: string | null
+
+  lead_intelligence?: Record<string, unknown> | null
+  raw_import_data?: Record<string, unknown> | null
+  source_columns?: Record<string, unknown> | null
 }
 
-type NumberInputProps = {
+type Comp = {
+  id?: string
+  address?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  distance_miles?: number | null
+  sold_price?: number | null
+  sale_date?: string | null
+  bedrooms?: number | null
+  bathrooms?: number | null
+  square_feet?: number | null
+  year_built?: number | null
+  property_type?: string | null
+}
+
+type Analysis = {
+  overall: number | null
+  motivation: number | null
+  contactability: number | null
+  marketability: number | null
+  dealPotential: number | null
+  confidence: number
   label: string
-  value: number
-  onChange: (value: number) => void
-  prefix?: string
-  suffix?: string
+  explanation: string
+  evidence: string[]
+  warnings: string[]
 }
 
-type ToolProps = {
-  lead: Lead | null
+type DealAnalysis = {
+  arv: number | null
+  repairs: number | null
+  buyPercent: number
+  assignmentFee: number
+  mao: number | null
+  sellerPrice: number | null
+  spread: number | null
 }
 
-/* =========================================================
-   HELPERS
-========================================================= */
+const STAGE_OPTIONS = [
+  { value: 'new_lead', label: 'New Lead' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'appointment_set', label: 'Appointment Set' },
+  { value: 'offer_sent', label: 'Offer Sent' },
+  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'under_contract', label: 'Under Contract' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'dead_lead', label: 'Dead / Archive' },
+]
 
-function money(value: number) {
-  if (!Number.isFinite(value)) return '$0'
+function text(value: unknown) {
+  if (value === null || value === undefined) return null
+
+  const result = String(value).trim()
+
+  return result || null
+}
+
+function numberValue(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+
+  const parsed = Number(
+    String(value).replace(/[$,%\s,]/g, '')
+  )
+
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function firstText(...values: unknown[]) {
+  for (const value of values) {
+    const result = text(value)
+
+    if (result) return result
+  }
+
+  return null
+}
+
+function firstNumber(...values: unknown[]) {
+  for (const value of values) {
+    const result = numberValue(value)
+
+    if (result !== null) return result
+  }
+
+  return null
+}
+
+function money(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—'
+  }
 
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -67,2519 +184,1745 @@ function money(value: number) {
   }).format(value)
 }
 
-function number(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 2,
-  }).format(value)
+function percent(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—'
+
+  return `${Math.round(value)}%`
 }
 
-function leadValue(lead: Lead | null) {
+function stageLabel(value: string) {
   return (
-    lead?.estimated_value ??
-    lead?.house_value ??
-    lead?.market_value ??
-    0
+    STAGE_OPTIONS.find((item) => item.value === value)?.label ||
+    value.replaceAll('_', ' ')
   )
 }
 
-function copyText(text: string) {
+function calculateAnalysis(
+  lead: LeadRecord,
+  comps: Comp[],
+  deal: DealAnalysis
+): Analysis {
+  const raw = lead.raw_import_data as any
+  const intelligence = lead.lead_intelligence as any
+
+  const phone = firstText(
+    lead.owner_phone,
+    lead.owner_phone_primary,
+    lead.phone,
+    lead.phone1,
+    raw?.owner_phone,
+    raw?.phone,
+    intelligence?.owner_phone,
+    intelligence?.phone
+  )
+
+  const email = firstText(
+    lead.owner_email,
+    lead.email,
+    lead.email1,
+    raw?.owner_email,
+    raw?.email,
+    intelligence?.owner_email,
+    intelligence?.email
+  )
+
+  const owner = firstText(
+    lead.owner_name,
+    raw?.owner_name,
+    intelligence?.owner_name
+  )
+
+  const propertyAddress = firstText(
+    lead.property_address_1,
+    lead.property_address
+  )
+
+  const marketValue = firstNumber(
+    lead.market_value,
+    lead.estimated_value,
+    lead.house_value,
+    intelligence?.market_value,
+    intelligence?.estimated_value,
+    intelligence?.house_value
+  )
+
+  const equity = firstNumber(
+    lead.equity_amount,
+    intelligence?.equity_amount
+  )
+
+  const equityPercent = firstNumber(
+    lead.equity_percent,
+    intelligence?.equity_percent
+  )
+
+  const ownershipYears =
+    lead.ownership_length ??
+    computeOwnershipYears({
+      ...lead,
+      last_sale_date: lead.last_sale_date,
+    })
+
+  /*
+   * CONTACTABILITY
+   *
+   * This score is based on actual contact information.
+   * No arbitrary starting score.
+   */
+  const contactEvidence = [
+    owner ? 25 : 0,
+    phone ? 50 : 0,
+    email ? 25 : 0,
+  ]
+
+  const contactability = Math.min(
+    100,
+    contactEvidence.reduce((a, b) => a + b, 0)
+  )
+
+  /*
+   * MARKETABILITY
+   *
+   * Verified comps are weighted heavily.
+   */
+  let marketability = 0
+  const marketEvidence: string[] = []
+  const warnings: string[] = []
+
+  if (propertyAddress) {
+    marketability += 10
+    marketEvidence.push('Property address verified')
+  }
+
+  if (lead.bedrooms != null) {
+    marketability += 10
+    marketEvidence.push('Bedroom count available')
+  }
+
+  if (lead.bathrooms != null) {
+    marketability += 10
+    marketEvidence.push('Bathroom count available')
+  }
+
+  if (lead.square_feet != null) {
+    marketability += 10
+    marketEvidence.push('Square footage available')
+  }
+
+  if (marketValue !== null) {
+    marketability += 15
+    marketEvidence.push('Market value available')
+  }
+
+  if (comps.length >= 3) {
+    marketability += 30
+    marketEvidence.push(
+      `${comps.length} verified comparable sales within target criteria`
+    )
+  } else if (comps.length > 0) {
+    marketability += 15
+    marketEvidence.push(
+      `${comps.length} verified comparable sale(s) found`
+    )
+  } else {
+    warnings.push(
+      'No verified qualifying comparable sales were returned.'
+    )
+  }
+
+  if (deal.arv !== null) {
+    marketability += 15
+    marketEvidence.push('ARV supported by verified comparable sales')
+  }
+
+  /*
+   * MOTIVATION
+   *
+   * Motivation is evidence-based. Merely having an owner name
+   * does not make the lead motivated.
+   */
+  let motivation = 0
+  const motivationEvidence: string[] = []
+
+  if (lead.vacant === true) {
+    motivation += 25
+    motivationEvidence.push('Property is marked vacant')
+  }
+
+  if (lead.owner_occupied === false) {
+    motivation += 15
+    motivationEvidence.push('Owner appears absentee')
+  }
+
+  if (lead.default_amount != null && lead.default_amount > 0) {
+    motivation += 25
+    motivationEvidence.push('Default amount reported')
+  }
+
+  if (lead.auction_date) {
+    motivation += 25
+    motivationEvidence.push('Auction date reported')
+  }
+
+  if (lead.equity_percent != null && lead.equity_percent >= 40) {
+    motivation += 10
+    motivationEvidence.push('Substantial equity reported')
+  }
+
   if (
-    typeof navigator !== 'undefined' &&
-    navigator.clipboard
+    ownershipYears !== null &&
+    ownershipYears !== undefined &&
+    ownershipYears >= 10
   ) {
-    void navigator.clipboard.writeText(text)
-  }
-}
-
-/* =========================================================
-   BASIC INPUTS
-========================================================= */
-
-function NumberInput({
-  label,
-  value,
-  onChange,
-  prefix,
-  suffix,
-}: NumberInputProps) {
-  return (
-    <label style={fieldStyle}>
-      <span style={fieldLabelStyle}>{label}</span>
-
-      <div style={inputWrapStyle}>
-        {prefix && (
-          <span style={prefixStyle}>{prefix}</span>
-        )}
-
-        <input
-          type="number"
-          value={Number.isFinite(value) ? value : 0}
-          onChange={(event) => {
-            const parsed = Number(event.target.value)
-
-            onChange(
-              Number.isFinite(parsed) ? parsed : 0
-            )
-          }}
-          style={inputStyle}
-        />
-
-        {suffix && (
-          <span style={prefixStyle}>{suffix}</span>
-        )}
-      </div>
-    </label>
-  )
-}
-
-function TextInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  placeholder?: string
-}) {
-  return (
-    <label style={fieldStyle}>
-      <span style={fieldLabelStyle}>{label}</span>
-
-      <input
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        placeholder={placeholder}
-        style={inputStyle}
-      />
-    </label>
-  )
-}
-
-function SelectInput({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: string[]
-}) {
-  return (
-    <label style={fieldStyle}>
-      <span style={fieldLabelStyle}>{label}</span>
-
-      <select
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        style={inputStyle}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
-/* =========================================================
-   RESULT CARD
-========================================================= */
-
-function ResultCard({
-  label,
-  value,
-  tone = 'gold',
-}: {
-  label: string
-  value: string
-  tone?: 'gold' | 'green' | 'blue'
-}) {
-  const palette =
-    tone === 'gold'
-      ? {
-          border: 'rgba(214,166,75,0.24)',
-          bg: 'rgba(214,166,75,0.06)',
-          text: '#d6a64b',
-        }
-      : tone === 'green'
-        ? {
-            border: 'rgba(74,222,128,0.22)',
-            bg: 'rgba(74,222,128,0.05)',
-            text: '#4ade80',
-          }
-        : {
-            border: 'rgba(147,197,253,0.22)',
-            bg: 'rgba(147,197,253,0.05)',
-            text: '#93c5fd',
-          }
-
-  return (
-    <div
-      style={{
-        ...resultCardStyle,
-        borderColor: palette.border,
-        background: palette.bg,
-      }}
-    >
-      <div style={fieldLabelStyle}>{label}</div>
-
-      <div
-        style={{
-          ...resultValueStyle,
-          color: palette.text,
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  )
-}
-
-/* =========================================================
-   PROPERTY SNAPSHOT
-========================================================= */
-
-function PropertySnapshot({
-  lead,
-}: {
-  lead: Lead
-}) {
-  const value = leadValue(lead)
-
-  return (
-    <SectionCard
-      title={
-        lead.property_address_1 ||
-        'Subject Property'
-      }
-      subtitle={[
-        lead.city,
-        lead.state,
-        lead.zip,
-      ]
-        .filter(Boolean)
-        .join(', ')}
-    >
-      <div style={leadGridStyle}>
-        <ResultCard
-          label="Estimated Value"
-          value={money(value)}
-          tone="gold"
-        />
-
-        <ResultCard
-          label="Equity"
-          value={money(
-            lead.equity_amount ?? 0
-          )}
-          tone="green"
-        />
-
-        <ResultCard
-          label="Mortgage"
-          value={money(
-            lead.mortgage_balance ?? 0
-          )}
-          tone="blue"
-        />
-
-        <ResultCard
-          label="Square Feet"
-          value={number(
-            lead.square_feet ?? 0
-          )}
-          tone="blue"
-        />
-
-        <ResultCard
-          label="Bedrooms"
-          value={String(
-            lead.bedrooms ?? 0
-          )}
-          tone="gold"
-        />
-
-        <ResultCard
-          label="Bathrooms"
-          value={String(
-            lead.bathrooms ?? 0
-          )}
-          tone="gold"
-        />
-      </div>
-    </SectionCard>
-  )
-}
-
-/* =========================================================
-   TOOL HEADER
-========================================================= */
-
-function ToolHeader({
-  title,
-  description,
-}: {
-  title: string
-  description: string
-}) {
-  return (
-    <div style={toolHeaderStyle}>
-      <div style={eyebrowStyle}>
-        FOUNDATION ACQUISITIONS LLC
-      </div>
-
-      <h1 style={toolTitleStyle}>{title}</h1>
-
-      <p style={toolDescriptionStyle}>
-        {description}
-      </p>
-    </div>
-  )
-}
-
-/* =========================================================
-   ASSIGNMENT CONTRACT
-========================================================= */
-
-function AssignmentContractTool({
-  lead,
-}: ToolProps) {
-  const [assignor, setAssignor] = useState('')
-  const [assignee, setAssignee] = useState('')
-
-  const [purchasePrice, setPurchasePrice] =
-    useState(
-      lead?.last_sale_amount ??
-        leadValue(lead)
-    )
-
-  const [assignmentFee, setAssignmentFee] =
-    useState(20000)
-
-  const [earnestMoney, setEarnestMoney] =
-    useState(5000)
-
-  const [closingDate, setClosingDate] =
-    useState('')
-
-  const assignmentPrice =
-    purchasePrice + assignmentFee
-
-  const totalConsideration =
-    assignmentPrice + earnestMoney
-
-  const summary = [
-    'ASSIGNMENT DEAL SUMMARY',
-    '',
-    `Property: ${
-      lead?.property_address_1 || '—'
-    }`,
-    `Assignor: ${assignor || '—'}`,
-    `Assignee: ${assignee || '—'}`,
-    `Original Purchase Price: ${money(
-      purchasePrice
-    )}`,
-    `Assignment Fee: ${money(
-      assignmentFee
-    )}`,
-    `Assignment Price: ${money(
-      assignmentPrice
-    )}`,
-    `Earnest Money: ${money(
-      earnestMoney
-    )}`,
-    `Closing Date: ${
-      closingDate || '—'
-    }`,
-  ].join('\n')
-
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Assignment Terms"
-        subtitle="Enter the parties and financial terms."
-      >
-        <div style={formGridStyle}>
-          <TextInput
-            label="Assignor"
-            value={assignor}
-            onChange={setAssignor}
-            placeholder="Assignor name"
-          />
-
-          <TextInput
-            label="Assignee"
-            value={assignee}
-            onChange={setAssignee}
-            placeholder="Buyer / assignee"
-          />
-
-          <NumberInput
-            label="Original Purchase Price"
-            value={purchasePrice}
-            onChange={setPurchasePrice}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Assignment Fee"
-            value={assignmentFee}
-            onChange={setAssignmentFee}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Earnest Money"
-            value={earnestMoney}
-            onChange={setEarnestMoney}
-            prefix="$"
-          />
-
-          <TextInput
-            label="Closing Date"
-            value={closingDate}
-            onChange={setClosingDate}
-            placeholder="MM/DD/YYYY"
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Assignment Analysis"
-        subtitle="Calculated deal economics."
-      >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Original Contract"
-            value={money(purchasePrice)}
-          />
-
-          <ResultCard
-            label="Assignment Fee"
-            value={money(assignmentFee)}
-            tone="green"
-          />
-
-          <ResultCard
-            label="Assignment Price"
-            value={money(
-              assignmentPrice
-            )}
-            tone="gold"
-          />
-
-          <ResultCard
-            label="Earnest Money"
-            value={money(earnestMoney)}
-            tone="blue"
-          />
-
-          <ResultCard
-            label="Total Consideration"
-            value={money(
-              totalConsideration
-            )}
-            tone="green"
-          />
-        </div>
-
-        <div style={outputBoxStyle}>
-          <strong>Deal Summary</strong>
-
-          <p>
-            {assignor || 'Assignor'} intends
-            to assign the purchase agreement to{' '}
-            {assignee || 'Assignee'}.
-          </p>
-
-          <p>
-            Assignment fee:{' '}
-            {money(assignmentFee)}.
-          </p>
-
-          <p>
-            Assignment price:{' '}
-            {money(assignmentPrice)}.
-          </p>
-        </div>
-
-        <div style={actionRowStyle}>
-          <ActionButton
-            tone="gold"
-            onClick={() =>
-              copyText(summary)
-            }
-          >
-            Copy Deal Summary
-          </ActionButton>
-        </div>
-      </SectionCard>
-    </div>
-  )
-}
-
-/* =========================================================
-   BUYER BLAST
-========================================================= */
-
-function BuyerBlastTool({
-  lead,
-}: ToolProps) {
-  const [buyerName, setBuyerName] =
-    useState('')
-
-  const [buyerEmail, setBuyerEmail] =
-    useState('')
-
-  const [buyerPhone, setBuyerPhone] =
-    useState('')
-
-  const [strategy, setStrategy] =
-    useState('Fix & Flip')
-
-  const [minPrice, setMinPrice] =
-    useState(0)
-
-  const [maxPrice, setMaxPrice] =
-    useState(leadValue(lead))
-
-  const [area, setArea] =
-    useState(lead?.city ?? '')
-
-  const [propertyType, setPropertyType] =
-    useState(
-      lead?.property_type ??
-        'Single Family'
-    )
-
-  const [message, setMessage] =
-    useState('')
-
-  const propertyValue =
-    leadValue(lead)
-
-  const matchScore = useMemo(() => {
-    let score = 50
-
-    if (
-      maxPrice >= propertyValue &&
-      maxPrice > 0
-    ) {
-      score += 20
-    }
-
-    if (
-      minPrice <= propertyValue
-    ) {
-      score += 10
-    }
-
-    if (
-      area &&
-      lead?.city?.toLowerCase() ===
-        area.toLowerCase()
-    ) {
-      score += 10
-    }
-
-    if (strategy) {
-      score += 10
-    }
-
-    return Math.min(score, 100)
-  }, [
-    maxPrice,
-    minPrice,
-    area,
-    propertyValue,
-    strategy,
-    lead,
-  ])
-
-  function generateBlast() {
-    const address =
-      lead?.property_address_1 ||
-      'off-market property'
-
-    const city =
-      lead?.city ||
-      area ||
-      'the target market'
-
-    setMessage(
-      [
-        `OFF-MARKET OPPORTUNITY — ${address}`,
-        '',
-        `Location: ${city}`,
-        `Property Type: ${propertyType}`,
-        `Estimated Value: ${
-          propertyValue
-            ? money(propertyValue)
-            : 'Available upon request'
-        }`,
-        `Strategy: ${strategy}`,
-        '',
-        `Looking for a buyer interested in ${strategy.toLowerCase()} opportunities in ${city}.`,
-        '',
-        `If this fits your buy box, reply with your interest and I can provide additional deal information.`,
-        '',
-        'Foundation Acquisitions LLC',
-      ].join('\n')
+    motivation += 10
+    motivationEvidence.push(
+      `${Math.round(ownershipYears)} years of ownership`
     )
   }
 
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Buyer Buy Box"
-        subtitle="Enter the buyer's acquisition criteria."
-      >
-        <div style={formGridStyle}>
-          <TextInput
-            label="Buyer Name"
-            value={buyerName}
-            onChange={setBuyerName}
-          />
+  motivation = Math.min(100, motivation)
 
-          <TextInput
-            label="Buyer Email"
-            value={buyerEmail}
-            onChange={setBuyerEmail}
-          />
+  /*
+   * DEAL POTENTIAL
+   *
+   * Cannot be calculated without a verified ARV and seller price.
+   */
+  let dealPotential: number | null = null
 
-          <TextInput
-            label="Buyer Phone"
-            value={buyerPhone}
-            onChange={setBuyerPhone}
-          />
+  if (deal.arv !== null && deal.sellerPrice !== null) {
+    const spread = deal.arv - deal.sellerPrice
 
-          <SelectInput
-            label="Property Type"
-            value={propertyType}
-            onChange={setPropertyType}
-            options={[
-              'Single Family',
-              'Multi Family',
-              'Townhouse',
-              'Condo',
-              'Land',
-              'Other',
-            ]}
-          />
+    if (spread <= 0) {
+      dealPotential = 0
+    } else {
+      dealPotential = Math.max(
+        0,
+        Math.min(100, Math.round((spread / deal.arv) * 100))
+      )
+    }
+  }
 
-          <SelectInput
-            label="Strategy"
-            value={strategy}
-            onChange={setStrategy}
-            options={[
-              'Fix & Flip',
-              'Buy & Hold',
-              'BRRRR',
-              'Cash Buyer',
-              'Rental',
-              'New Construction',
-              'Land',
-            ]}
-          />
+  /*
+   * OVERALL
+   *
+   * Only available when sufficient evidence exists.
+   */
+  const components = [
+    contactability,
+    motivation,
+    marketability,
+    dealPotential,
+  ].filter((value): value is number => value !== null)
 
-          <NumberInput
-            label="Minimum Price"
-            value={minPrice}
-            onChange={setMinPrice}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Maximum Price"
-            value={maxPrice}
-            onChange={setMaxPrice}
-            prefix="$"
-          />
-
-          <TextInput
-            label="Target Area"
-            value={area}
-            onChange={setArea}
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Buyer Match"
-        subtitle="Estimated fit between the buyer and current deal."
-      >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Match Score"
-            value={`${matchScore}/100`}
-            tone={
-              matchScore >= 80
-                ? 'green'
-                : 'gold'
-            }
-          />
-
-          <ResultCard
-            label="Deal Value"
-            value={money(propertyValue)}
-          />
-
-          <ResultCard
-            label="Buyer Max"
-            value={money(maxPrice)}
-            tone="blue"
-          />
-        </div>
-
-        <div style={actionRowStyle}>
-          <ActionButton
-            tone="gold"
-            onClick={generateBlast}
-          >
-            Generate Buyer Blast
-          </ActionButton>
-        </div>
-
-        <textarea
-          value={message}
-          onChange={(event) =>
-            setMessage(event.target.value)
-          }
-          placeholder="Generated buyer outreach will appear here..."
-          style={textareaStyle}
-        />
-
-        {message && (
-          <div style={actionRowStyle}>
-            <ActionButton
-              tone="ghost"
-              onClick={() =>
-                copyText(message)
-              }
-            >
-              Copy Outreach
-            </ActionButton>
-          </div>
-        )}
-      </SectionCard>
-    </div>
-  )
-}
-
-/* =========================================================
-   CLOSING COST
-========================================================= */
-
-function ClosingCostTool({
-  lead,
-}: ToolProps) {
-  const [purchasePrice, setPurchasePrice] =
-    useState(leadValue(lead))
-
-  const [title, setTitle] =
-    useState(1500)
-
-  const [recording, setRecording] =
-    useState(100)
-
-  const [transferTax, setTransferTax] =
-    useState(0)
-
-  const [propertyTax, setPropertyTax] =
-    useState(0)
-
-  const [insurance, setInsurance] =
-    useState(0)
-
-  const [inspection, setInspection] =
-    useState(500)
-
-  const [other, setOther] =
-    useState(0)
-
-  const total =
-    title +
-    recording +
-    transferTax +
-    propertyTax +
-    insurance +
-    inspection +
-    other
-
-  const cashRequired =
-    purchasePrice + total
-
-  const costPercent =
-    purchasePrice > 0
-      ? (total / purchasePrice) * 100
-      : 0
-
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Transaction Inputs"
-        subtitle="Estimate acquisition-side closing expenses."
-      >
-        <div style={formGridStyle}>
-          <NumberInput
-            label="Purchase Price"
-            value={purchasePrice}
-            onChange={setPurchasePrice}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Title / Settlement"
-            value={title}
-            onChange={setTitle}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Recording"
-            value={recording}
-            onChange={setRecording}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Transfer Tax"
-            value={transferTax}
-            onChange={setTransferTax}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Property Tax / Proration"
-            value={propertyTax}
-            onChange={setPropertyTax}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Insurance"
-            value={insurance}
-            onChange={setInsurance}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Inspection"
-            value={inspection}
-            onChange={setInspection}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Other Costs"
-            value={other}
-            onChange={setOther}
-            prefix="$"
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Closing Analysis"
-        subtitle="Projected transaction economics."
-      >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Purchase Price"
-            value={money(
-              purchasePrice
-            )}
-          />
-
-          <ResultCard
-            label="Closing Costs"
-            value={money(total)}
-            tone="gold"
-          />
-
-          <ResultCard
-            label="Cash Required"
-            value={money(
-              cashRequired
-            )}
-            tone="green"
-          />
-
-          <ResultCard
-            label="Cost %"
-            value={`${costPercent.toFixed(
-              2
-            )}%`}
-            tone="blue"
-          />
-        </div>
-      </SectionCard>
-    </div>
-  )
-}
-
-/* =========================================================
-   COMPS ANALYZER
-========================================================= */
-
-type Comp = {
-  id: number
-  salePrice: number
-  sqft: number
-  distance: number
-  ageMonths: number
-}
-
-function CompsAnalyzerTool({
-  lead,
-}: ToolProps) {
-  const subjectSqft =
-    lead?.square_feet ?? 0
-
-  const [comps, setComps] =
-    useState<Comp[]>([
-      {
-        id: 1,
-        salePrice: 0,
-        sqft: subjectSqft,
-        distance: 0,
-        ageMonths: 0,
-      },
-      {
-        id: 2,
-        salePrice: 0,
-        sqft: subjectSqft,
-        distance: 0,
-        ageMonths: 0,
-      },
-      {
-        id: 3,
-        salePrice: 0,
-        sqft: subjectSqft,
-        distance: 0,
-        ageMonths: 0,
-      },
-    ])
-
-  const calculated =
-    comps.filter(
-      (comp) =>
-        comp.salePrice > 0 &&
-        comp.sqft > 0
-    )
-
-  const averagePrice =
-    calculated.length
-      ? calculated.reduce(
-          (sum, comp) =>
-            sum + comp.salePrice,
-          0
-        ) / calculated.length
-      : 0
-
-  const averagePricePerSqft =
-    calculated.length
-      ? calculated.reduce(
-          (sum, comp) =>
-            sum +
-            comp.salePrice /
-              comp.sqft,
-          0
-        ) / calculated.length
-      : 0
-
-  const estimatedArv =
-    subjectSqft > 0
-      ? subjectSqft *
-        averagePricePerSqft
-      : averagePrice
+  const confidenceInputs = [
+    propertyAddress,
+    owner,
+    phone,
+    email,
+    marketValue,
+    lead.square_feet,
+    lead.bedrooms,
+    lead.bathrooms,
+    comps.length > 0 ? comps.length : null,
+    deal.arv,
+  ]
 
   const confidence =
-    calculated.length >= 3
-      ? 'High'
-      : calculated.length === 2
-        ? 'Moderate'
-        : calculated.length === 1
-          ? 'Low'
-          : 'Insufficient'
-
-  function updateComp(
-    id: number,
-    key: keyof Comp,
-    value: number
-  ) {
-    setComps((current) =>
-      current.map((comp) =>
-        comp.id === id
-          ? {
-              ...comp,
-              [key]: value,
-            }
-          : comp
-      )
-    )
-  }
-
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Subject Property"
-        subtitle="Use the current lead as the ARV subject."
-      >
-        <div style={leadGridStyle}>
-          <ResultCard
-            label="Subject Value"
-            value={money(
-              leadValue(lead)
-            )}
-          />
-
-          <ResultCard
-            label="Subject Sq Ft"
-            value={number(
-              subjectSqft
-            )}
-            tone="blue"
-          />
-
-          <ResultCard
-            label="Bedrooms"
-            value={String(
-              lead?.bedrooms ?? 0
-            )}
-            tone="gold"
-          />
-
-          <ResultCard
-            label="Bathrooms"
-            value={String(
-              lead?.bathrooms ?? 0
-            )}
-            tone="gold"
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Comparable Sales"
-        subtitle="Enter nearby comparable sales."
-      >
-        <div
-          style={{
-            overflowX: 'auto',
-          }}
-        >
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>
-                  Comp
-                </th>
-                <th style={thStyle}>
-                  Sale Price
-                </th>
-                <th style={thStyle}>
-                  Sq Ft
-                </th>
-                <th style={thStyle}>
-                  Miles
-                </th>
-                <th style={thStyle}>
-                  Age
-                </th>
-                <th style={thStyle}>
-                  $/SF
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {comps.map((comp) => (
-                <tr key={comp.id}>
-                  <td style={tdStyle}>
-                    Comp {comp.id}
-                  </td>
-
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      value={
-                        comp.salePrice
-                      }
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'salePrice',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
-
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      value={comp.sqft}
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'sqft',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
-
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={
-                        comp.distance
-                      }
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'distance',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
-
-                  <td style={tdStyle}>
-                    <input
-                      type="number"
-                      value={
-                        comp.ageMonths
-                      }
-                      onChange={(event) =>
-                        updateComp(
-                          comp.id,
-                          'ageMonths',
-                          Number(
-                            event.target
-                              .value
-                          ) || 0
-                        )
-                      }
-                      style={
-                        tableInputStyle
-                      }
-                    />
-                  </td>
-
-                  <td style={tdStyle}>
-                    {comp.salePrice > 0 &&
-                    comp.sqft > 0
-                      ? money(
-                          comp.salePrice /
-                            comp.sqft
-                        )
-                      : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={actionRowStyle}>
-          <ActionButton
-            tone="gold"
-            onClick={() =>
-              setComps(
-                (current) => [
-                  ...current,
-                  {
-                    id:
-                      current.length +
-                      1,
-                    salePrice: 0,
-                    sqft:
-                      subjectSqft,
-                    distance: 0,
-                    ageMonths: 0,
-                  },
-                ]
-              )
-            }
-          >
-            + Add Comp
-          </ActionButton>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="ARV Analysis"
-        subtitle="Estimated using comparable price per square foot."
-      >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Valid Comps"
-            value={String(
-              calculated.length
-            )}
-            tone="blue"
-          />
-
-          <ResultCard
-            label="Average Sale Price"
-            value={money(
-              averagePrice
-            )}
-          />
-
-          <ResultCard
-            label="Average $/SF"
-            value={`$${averagePricePerSqft.toFixed(
-              2
-            )}`}
-            tone="blue"
-          />
-
-          <ResultCard
-            label="Estimated ARV"
-            value={money(
-              estimatedArv
-            )}
-            tone="green"
-          />
-
-          <ResultCard
-            label="Confidence"
-            value={confidence}
-            tone={
-              confidence === 'High'
-                ? 'green'
-                : 'gold'
-            }
-          />
-        </div>
-      </SectionCard>
-    </div>
-  )
-}
-
-/* =========================================================
-   CONTRACT GENERATOR
-========================================================= */
-
-function ContractGeneratorTool({
-  lead,
-}: ToolProps) {
-  const [buyer, setBuyer] =
-    useState('')
-
-  const [seller, setSeller] =
-    useState(
-      lead?.owner_name ?? ''
-    )
-
-  const [purchasePrice, setPurchasePrice] =
-    useState(leadValue(lead))
-
-  const [earnestMoney, setEarnestMoney] =
-    useState(5000)
-
-  const [closingDate, setClosingDate] =
-    useState('')
-
-  const [financing, setFinancing] =
-    useState('Cash')
-
-  const [contingencies, setContingencies] =
-    useState(
-      'Inspection and due diligence'
-    )
-
-  const [generated, setGenerated] =
-    useState('')
-
-  function generate() {
-    setGenerated(
-      [
-        'PURCHASE AGREEMENT TERM SUMMARY',
-        '',
-        `Buyer: ${buyer || '—'}`,
-        `Seller: ${seller || '—'}`,
-        `Property: ${
-          lead?.property_address_1 ||
-          '—'
-        }`,
-        `Purchase Price: ${money(
-          purchasePrice
-        )}`,
-        `Earnest Money: ${money(
-          earnestMoney
-        )}`,
-        `Closing Date: ${
-          closingDate || '—'
-        }`,
-        `Financing: ${financing}`,
-        `Contingencies: ${contingencies}`,
-        '',
-        'This generated output is a deal-term summary and should be reviewed against the applicable contract form and legal requirements before execution.',
-      ].join('\n')
-    )
-  }
-
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Contract Terms"
-        subtitle="Build the purchase agreement data set."
-      >
-        <div style={formGridStyle}>
-          <TextInput
-            label="Buyer"
-            value={buyer}
-            onChange={setBuyer}
-          />
-
-          <TextInput
-            label="Seller"
-            value={seller}
-            onChange={setSeller}
-          />
-
-          <NumberInput
-            label="Purchase Price"
-            value={purchasePrice}
-            onChange={setPurchasePrice}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Earnest Money"
-            value={earnestMoney}
-            onChange={setEarnestMoney}
-            prefix="$"
-          />
-
-          <TextInput
-            label="Closing Date"
-            value={closingDate}
-            onChange={setClosingDate}
-          />
-
-          <SelectInput
-            label="Financing"
-            value={financing}
-            onChange={setFinancing}
-            options={[
-              'Cash',
-              'Conventional',
-              'Hard Money',
-              'Private Money',
-              'Seller Financing',
-              'Other',
-            ]}
-          />
-        </div>
-
-        <div
-          style={{
-            marginTop: 12,
-          }}
-        >
-          <label style={fieldStyle}>
-            <span style={fieldLabelStyle}>
-              Contingencies
-            </span>
-
-            <textarea
-              value={contingencies}
-              onChange={(event) =>
-                setContingencies(
-                  event.target.value
-                )
-              }
-              style={textareaStyle}
-            />
-          </label>
-        </div>
-
-        <div style={actionRowStyle}>
-          <ActionButton
-            tone="gold"
-            onClick={generate}
-          >
-            Generate Term Summary
-          </ActionButton>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Generated Contract Data"
-        subtitle="Structured deal information."
-      >
-        <textarea
-          value={generated}
-          onChange={(event) =>
-            setGenerated(
-              event.target.value
-            )
-          }
-          placeholder="Your generated contract terms will appear here..."
-          style={{
-            ...textareaStyle,
-            minHeight: 330,
-          }}
-        />
-
-        {generated && (
-          <div style={actionRowStyle}>
-            <ActionButton
-              tone="ghost"
-              onClick={() =>
-                copyText(generated)
-              }
-            >
-              Copy Contract Data
-            </ActionButton>
-          </div>
-        )}
-      </SectionCard>
-    </div>
-  )
-}
-
-/* =========================================================
-   MARKETING ROI
-========================================================= */
-
-function MarketingROITool({
-  lead: _lead,
-}: ToolProps) {
-  const [spend, setSpend] =
-    useState(0)
-
-  const [leads, setLeads] =
-    useState(0)
-
-  const [contacts, setContacts] =
-    useState(0)
-
-  const [appointments, setAppointments] =
-    useState(0)
-
-  const [offers, setOffers] =
-    useState(0)
-
-  const [contracts, setContracts] =
-    useState(0)
-
-  const [closings, setClosings] =
-    useState(0)
-
-  const [revenue, setRevenue] =
-    useState(0)
-
-  const costPerLead =
-    leads > 0
-      ? spend / leads
-      : 0
-
-  const costPerContract =
-    contracts > 0
-      ? spend / contracts
-      : 0
-
-  const conversionRate =
-    leads > 0
-      ? (closings / leads) * 100
-      : 0
-
-  const roi =
-    spend > 0
-      ? ((revenue - spend) /
-          spend) *
+    Math.round(
+      (confidenceInputs.filter(
+        (value) => value !== null && value !== undefined
+      ).length /
+        confidenceInputs.length) *
         100
-      : 0
-
-  const roas =
-    spend > 0
-      ? revenue / spend
-      : 0
-
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Marketing Funnel"
-        subtitle="Enter campaign performance."
-      >
-        <div style={formGridStyle}>
-          <NumberInput
-            label="Marketing Spend"
-            value={spend}
-            onChange={setSpend}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Leads"
-            value={leads}
-            onChange={setLeads}
-          />
-
-          <NumberInput
-            label="Contacts"
-            value={contacts}
-            onChange={setContacts}
-          />
-
-          <NumberInput
-            label="Appointments"
-            value={appointments}
-            onChange={setAppointments}
-          />
-
-          <NumberInput
-            label="Offers"
-            value={offers}
-            onChange={setOffers}
-          />
-
-          <NumberInput
-            label="Contracts"
-            value={contracts}
-            onChange={setContracts}
-          />
-
-          <NumberInput
-            label="Closings"
-            value={closings}
-            onChange={setClosings}
-          />
-
-          <NumberInput
-            label="Revenue"
-            value={revenue}
-            onChange={setRevenue}
-            prefix="$"
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Marketing Performance"
-        subtitle="Calculated campaign economics."
-      >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Cost Per Lead"
-            value={money(
-              costPerLead
-            )}
-            tone="gold"
-          />
-
-          <ResultCard
-            label="Cost Per Contract"
-            value={money(
-              costPerContract
-            )}
-            tone="blue"
-          />
-
-          <ResultCard
-            label="Lead → Close"
-            value={`${conversionRate.toFixed(
-              2
-            )}%`}
-            tone="green"
-          />
-
-          <ResultCard
-            label="ROI"
-            value={`${roi.toFixed(
-              2
-            )}%`}
-            tone={
-              roi >= 0
-                ? 'green'
-                : 'gold'
-            }
-          />
-
-          <ResultCard
-            label="ROAS"
-            value={`${roas.toFixed(
-              2
-            )}x`}
-            tone="green"
-          />
-        </div>
-      </SectionCard>
-    </div>
-  )
-}
-
-/* =========================================================
-   REPAIR ESTIMATOR
-========================================================= */
-
-function RepairEstimatorTool({
-  lead,
-}: ToolProps) {
-  const [roof, setRoof] =
-    useState(0)
-
-  const [hvac, setHvac] =
-    useState(0)
-
-  const [plumbing, setPlumbing] =
-    useState(0)
-
-  const [electrical, setElectrical] =
-    useState(0)
-
-  const [kitchen, setKitchen] =
-    useState(0)
-
-  const [bathrooms, setBathrooms] =
-    useState(0)
-
-  const [flooring, setFlooring] =
-    useState(0)
-
-  const [paint, setPaint] =
-    useState(0)
-
-  const [landscaping, setLandscaping] =
-    useState(0)
-
-  const [other, setOther] =
-    useState(0)
-
-  const [contingency, setContingency] =
-    useState(10)
-
-  const base =
-    roof +
-    hvac +
-    plumbing +
-    electrical +
-    kitchen +
-    bathrooms +
-    flooring +
-    paint +
-    landscaping +
-    other
-
-  const contingencyAmount =
-    base *
-    (contingency / 100)
-
-  const total =
-    base +
-    contingencyAmount
-
-  const repairLevel =
-    total === 0
-      ? 'Not Estimated'
-      : total < 25000
-        ? 'Light'
-        : total < 60000
-          ? 'Moderate'
-          : total < 100000
-            ? 'Heavy'
-            : 'Major Rehab'
-
-  const summary = [
-    'REPAIR ESTIMATE',
-    '',
-    `Property: ${
-      lead?.property_address_1 ||
-      'Standalone Estimate'
-    }`,
-    `Base Repairs: ${money(base)}`,
-    `Contingency: ${money(
-      contingencyAmount
-    )}`,
-    `Total Repairs: ${money(total)}`,
-    `Repair Level: ${repairLevel}`,
-  ].join('\n')
-
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Repair Budget"
-        subtitle="Enter estimated costs by category."
-      >
-        <div style={formGridStyle}>
-          <NumberInput
-            label="Roof"
-            value={roof}
-            onChange={setRoof}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="HVAC"
-            value={hvac}
-            onChange={setHvac}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Plumbing"
-            value={plumbing}
-            onChange={setPlumbing}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Electrical"
-            value={electrical}
-            onChange={setElectrical}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Kitchen"
-            value={kitchen}
-            onChange={setKitchen}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Bathrooms"
-            value={bathrooms}
-            onChange={setBathrooms}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Flooring"
-            value={flooring}
-            onChange={setFlooring}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Paint"
-            value={paint}
-            onChange={setPaint}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Landscaping"
-            value={landscaping}
-            onChange={setLandscaping}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Other"
-            value={other}
-            onChange={setOther}
-            prefix="$"
-          />
-
-          <NumberInput
-            label="Contingency"
-            value={contingency}
-            onChange={setContingency}
-            suffix="%"
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Repair Analysis"
-        subtitle="Projected renovation budget."
-      >
-        <div style={resultGridStyle}>
-          <ResultCard
-            label="Base Repairs"
-            value={money(base)}
-            tone="gold"
-          />
-
-          <ResultCard
-            label="Contingency"
-            value={money(
-              contingencyAmount
-            )}
-            tone="blue"
-          />
-
-          <ResultCard
-            label="Total Repairs"
-            value={money(total)}
-            tone="green"
-          />
-
-          <ResultCard
-            label="Repair Level"
-            value={repairLevel}
-            tone="gold"
-          />
-        </div>
-
-        <div style={actionRowStyle}>
-          <ActionButton
-            tone="ghost"
-            onClick={() =>
-              copyText(summary)
-            }
-          >
-            Copy Repair Summary
-          </ActionButton>
-        </div>
-      </SectionCard>
-    </div>
-  )
-}
-
-/* =========================================================
-   SCRIPT GENERATOR
-========================================================= */
-
-function ScriptGeneratorTool({
-  lead,
-}: ToolProps) {
-  const [leadType, setLeadType] =
-    useState(
-      lead?.lead_type ||
-        'Distressed Seller'
     )
 
-  const [motivation, setMotivation] =
-    useState(
-      'Needs a simple and convenient sale'
-    )
-
-  const [condition, setCondition] =
-    useState('Unknown')
-
-  const [objective, setObjective] =
-    useState(
-      'Qualify the seller and determine whether an offer makes sense'
-    )
-
-  const [objection, setObjection] =
-    useState(
-      'I need to think about it'
-    )
-
-  const [script, setScript] =
-    useState('')
-
-  function generateScript() {
-    setScript(
-      [
-        'SELLER CONVERSATION SCRIPT',
-        '',
-        `Lead Type: ${leadType}`,
-        `Motivation: ${motivation}`,
-        `Property Condition: ${condition}`,
-        '',
-        'OPENING',
-        '“Hi, this is Foundation Acquisitions. I’m reaching out about the property. I wanted to see if you had a few minutes to talk about it.”',
-        '',
-        'DISCOVERY',
-        '1. What are you looking to do with the property?',
-        '2. What has you considering selling?',
-        '3. How quickly would you ideally like to move?',
-        '4. What condition is the property currently in?',
-        '5. Is there a mortgage or other obligation on the property?',
-        '6. What would make the sale worthwhile for you?',
-        '',
-        'OBJECTIVE',
-        objective,
-        '',
-        'OBJECTION',
-        `Seller: “${objection}.”`,
-        '',
-        'RESPONSE',
-        '“Absolutely. I understand. My goal is not to pressure you. I just want to understand what would make sense for you and determine whether we can put together an option worth considering.”',
-        '',
-        'OFFER TRANSITION',
-        '“Based on what you have told me, would you be open to hearing what we could potentially offer?”',
-        '',
-        'FOLLOW UP',
-        'Confirm the next step, preferred contact method, and specific follow-up date/time.',
-      ].join('\n')
-    )
+  if (components.length < 2 || confidence < 40) {
+    return {
+      overall: null,
+      motivation,
+      contactability,
+      marketability,
+      dealPotential,
+      confidence,
+      label: 'Insufficient Data',
+      explanation:
+        'There is not enough verified property, ownership, contact, or market information to produce a reliable lead-strength score.',
+      evidence: [
+        ...motivationEvidence,
+        ...marketEvidence,
+      ],
+      warnings,
+    }
   }
 
-  return (
-    <div style={toolGridStyle}>
-      <SectionCard
-        title="Conversation Inputs"
-        subtitle="Customize the script to the seller situation."
-      >
-        <div style={formGridStyle}>
-          <SelectInput
-            label="Lead Type"
-            value={leadType}
-            onChange={setLeadType}
-            options={[
-              'Distressed Seller',
-              'Absentee Owner',
-              'Tax Delinquent',
-              'Foreclosure',
-              'Probate',
-              'Vacant',
-              'High Equity',
-              'Unknown',
-            ]}
-          />
-
-          <SelectInput
-            label="Property Condition"
-            value={condition}
-            onChange={setCondition}
-            options={[
-              'Unknown',
-              'Excellent',
-              'Good',
-              'Average',
-              'Needs Repairs',
-              'Major Rehab',
-            ]}
-          />
-        </div>
-
-        <div
-          style={{
-            marginTop: 12,
-          }}
-        >
-          <TextInput
-            label="Motivation"
-            value={motivation}
-            onChange={setMotivation}
-          />
-        </div>
-
-        <div
-          style={{
-            marginTop: 12,
-          }}
-        >
-          <TextInput
-            label="Call Objective"
-            value={objective}
-            onChange={setObjective}
-          />
-        </div>
-
-        <div
-          style={{
-            marginTop: 12,
-          }}
-        >
-          <TextInput
-            label="Likely Objection"
-            value={objection}
-            onChange={setObjection}
-          />
-        </div>
-
-        <div style={actionRowStyle}>
-          <ActionButton
-            tone="gold"
-            onClick={generateScript}
-          >
-            Generate Script
-          </ActionButton>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Generated Script"
-        subtitle="Editable conversation framework."
-      >
-        <textarea
-          value={script}
-          onChange={(event) =>
-            setScript(
-              event.target.value
-            )
-          }
-          placeholder="Your script will appear here..."
-          style={{
-            ...textareaStyle,
-            minHeight: 500,
-          }}
-        />
-
-        {script && (
-          <div style={actionRowStyle}>
-            <ActionButton
-              tone="ghost"
-              onClick={() =>
-                copyText(script)
-              }
-            >
-              Copy Script
-            </ActionButton>
-          </div>
-        )}
-      </SectionCard>
-    </div>
+  const overall = Math.round(
+    components.reduce((sum, value) => sum + value, 0) /
+      components.length
   )
+
+  let label = 'Needs Attention'
+
+  if (overall >= 80) label = 'Strong Opportunity'
+  else if (overall >= 65) label = 'Promising'
+  else if (overall >= 45) label = 'Moderate'
+
+  const explanation =
+    overall >= 80
+      ? 'Multiple verified property, ownership, contact, and/or deal signals indicate this lead deserves active attention.'
+      : overall >= 65
+        ? 'The available evidence suggests a potentially workable opportunity, but additional qualification may improve confidence.'
+        : overall >= 45
+          ? 'Some useful signals exist, but the opportunity needs additional qualification before it should receive high priority.'
+          : 'The available evidence is currently weak or incomplete.'
+
+  return {
+    overall,
+    motivation,
+    contactability,
+    marketability,
+    dealPotential,
+    confidence,
+    label,
+    explanation,
+    evidence: [
+      ...motivationEvidence,
+      ...marketEvidence,
+    ],
+    warnings,
+  }
 }
 
-/* =========================================================
-   TOOL REGISTRY
-========================================================= */
+export default function LeadWorkspacePage() {
+  const params = useParams()
+  const router = useRouter()
 
-const TOOL_COMPONENTS: Record<
-  ToolSlug,
-  ComponentType<ToolProps>
-> = {
-  'assignment-contract':
-    AssignmentContractTool,
+  const leadId = String(params?.leadId || '')
 
-  'buyer-blast':
-    BuyerBlastTool,
-
-  'closing-cost':
-    ClosingCostTool,
-
-  'comps-analyzer':
-    CompsAnalyzerTool,
-
-  'contract-generator':
-    ContractGeneratorTool,
-
-  'marketing-roi':
-    MarketingROITool,
-
-  'repair-estimator':
-    RepairEstimatorTool,
-
-  'script-generator':
-    ScriptGeneratorTool,
-}
-
-/* =========================================================
-   TOOL WORKSPACE CONTENT
-========================================================= */
-
-function ToolWorkspaceContent({
-  slug,
-}: {
-  slug: ToolSlug
-}) {
-  const searchParams =
-    useSearchParams()
-
-  const leadId =
-    searchParams.get('leadId')
-
-  const config =
-    getToolConfig(slug)
-
-  const [
-    lead,
-    setLead,
-  ] = useState<Lead | null>(null)
-
-  const [
-    loadingLead,
-    setLoadingLead,
-  ] = useState(
-    Boolean(leadId)
-  )
-
-  const [
-    leadError,
-    setLeadError,
-  ] = useState<string | null>(
-    null
-  )
+  const [lead, setLead] = useState<LeadRecord | null>(null)
+  const [comps, setComps] = useState<Comp[]>([])
+  const [loading, setLoading] = useState(true)
+  const [compsLoading, setCompsLoading] = useState(false)
+  const [savingStage, setSavingStage] = useState(false)
+  const [compsMessage, setCompsMessage] = useState('')
 
   useEffect(() => {
-    let cancelled = false
-
     async function loadLead() {
-      if (!leadId) {
-        setLoadingLead(false)
-        return
-      }
+      if (!leadId) return
 
-      setLoadingLead(true)
-      setLeadError(null)
+      setLoading(true)
 
-      const {
-        data,
-        error,
-      } = await supabase
+      const { data, error } = await supabase
         .from('leads')
         .select('*')
         .eq('id', leadId)
         .single()
 
-      if (cancelled) return
-
       if (error) {
-        console.error(
-          'Tool lead load error:',
-          error
-        )
-
+        console.error('Failed to load lead:', error)
         setLead(null)
-        setLeadError(
-          'The property information could not be loaded. The tool can still be used manually.'
-        )
       } else {
-        setLead(
-          data as Lead
-        )
+        setLead(data as LeadRecord)
       }
 
-      setLoadingLead(false)
+      setLoading(false)
     }
 
     void loadLead()
-
-    return () => {
-      cancelled = true
-    }
   }, [leadId])
 
-  if (!config) {
-    return (
-      <PageShell
-        title="Tool Not Found"
-        subtitle="The requested acquisition tool does not exist."
-      >
-        <SectionCard title="Unknown Tool">
-          <Link href="/tools">
-            <ActionButton tone="gold">
-              Back to Tools
-            </ActionButton>
-          </Link>
-        </SectionCard>
-      </PageShell>
+  const normalizedLead = useMemo(() => {
+    if (!lead) return null
+
+    const raw = lead.raw_import_data as any
+    const source = lead.source_columns as any
+    const intelligence = lead.lead_intelligence as any
+
+    const bedrooms =
+      resolveNumericField(
+        lead as any,
+        FIELD_ALIASES.beds,
+        null,
+        {
+          treatZeroAsMissing: true,
+          min: 1,
+        }
+      ) ??
+      firstNumber(
+        lead.bedrooms,
+        raw?.bedrooms,
+        raw?.beds,
+        source?.bedrooms,
+        source?.beds,
+        intelligence?.bedrooms
+      )
+
+    const bathrooms =
+      resolveNumericField(
+        lead as any,
+        FIELD_ALIASES.baths,
+        null,
+        {
+          treatZeroAsMissing: false,
+          min: 0,
+        }
+      ) ??
+      firstNumber(
+        lead.bathrooms,
+        raw?.bathrooms,
+        raw?.baths,
+        source?.bathrooms,
+        source?.baths,
+        intelligence?.bathrooms
+      )
+
+    const squareFeet =
+      resolveNumericField(
+        lead as any,
+        FIELD_ALIASES.sqft,
+        null,
+        {
+          treatZeroAsMissing: true,
+          min: 1,
+        }
+      ) ??
+      firstNumber(
+        lead.square_feet,
+        raw?.square_feet,
+        raw?.sqft,
+        source?.square_feet,
+        source?.sqft,
+        intelligence?.square_feet
+      )
+
+    const ownerName = firstText(
+      resolveField(
+        lead as any,
+        FIELD_ALIASES.ownerName
+      ),
+      lead.owner_name,
+      intelligence?.owner_name,
+      raw?.owner_name
     )
+
+    const ownerPhone = firstText(
+      lead.owner_phone,
+      lead.owner_phone_primary,
+      lead.phone,
+      lead.phone1,
+      intelligence?.owner_phone,
+      intelligence?.phone,
+      raw?.owner_phone,
+      raw?.phone
+    )
+
+    const ownerEmail = firstText(
+      lead.owner_email,
+      lead.email,
+      lead.email1,
+      intelligence?.owner_email,
+      intelligence?.email,
+      raw?.owner_email,
+      raw?.email
+    )
+
+    const lastSaleDate = firstText(
+      resolveField(
+        lead as any,
+        FIELD_ALIASES.lastSaleDate
+      ),
+      lead.last_sale_date,
+      intelligence?.last_sale_date
+    )
+
+    const estimatedValue = firstNumber(
+      resolveField(
+        lead as any,
+        FIELD_ALIASES.estimatedValue
+      ),
+      lead.market_value,
+      lead.estimated_value,
+      lead.house_value,
+      intelligence?.market_value,
+      intelligence?.estimated_value,
+      intelligence?.house_value
+    )
+
+    const ownershipLength =
+      computeOwnershipYears({
+        ...lead,
+        last_sale_date: lastSaleDate,
+      }) ??
+      lead.ownership_length ??
+      null
+
+    return {
+      ...lead,
+      bedrooms,
+      bathrooms,
+      square_feet: squareFeet,
+      owner_name: ownerName,
+      owner_phone: ownerPhone,
+      owner_email: ownerEmail,
+      last_sale_date: lastSaleDate,
+      ownership_length: ownershipLength,
+      resolved_value: estimatedValue,
+      status: lead.status || 'new_lead',
+    }
+  }, [lead])
+
+  /*
+   * REAL COMPS
+   *
+   * This intentionally calls an application endpoint.
+   * The endpoint must return actual sold records.
+   *
+   * We do NOT create fallback/fake comps.
+   */
+  useEffect(() => {
+    async function loadComps() {
+      if (!normalizedLead) return
+
+      const address = firstText(
+        normalizedLead.property_address_1,
+        normalizedLead.property_address
+      )
+
+      if (!address) {
+        setComps([])
+        setCompsMessage(
+          'Property address is required before comparable sales can be searched.'
+        )
+        return
+      }
+
+      setCompsLoading(true)
+      setCompsMessage('')
+
+      try {
+        const params = new URLSearchParams({
+          address,
+          city: normalizedLead.city || '',
+          state: normalizedLead.state || '',
+          zip: normalizedLead.zip || '',
+          radiusMiles: '1',
+          months: '6',
+          soldOnly: 'true',
+          limit: '20',
+        })
+
+        const response = await fetch(
+          `/api/comps?${params.toString()}`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(
+            `Comparable search failed (${response.status})`
+          )
+        }
+
+        const result = await response.json()
+
+        const returnedComps = Array.isArray(result?.comps)
+          ? result.comps
+          : []
+
+        const verifiedComps = returnedComps.filter(
+          (comp: Comp) =>
+            comp.sold_price != null &&
+            comp.sale_date != null
+        )
+
+        setComps(verifiedComps)
+
+        if (verifiedComps.length === 0) {
+          setCompsMessage(
+            'No verified sold comparables were found within 1 mile and the last 6 months.'
+          )
+        } else {
+          setCompsMessage(
+            `${verifiedComps.length} verified comparable sale${verifiedComps.length === 1 ? '' : 's'} found.`
+          )
+        }
+      } catch (error) {
+        console.error('Comparable search failed:', error)
+
+        setComps([])
+        setCompsMessage(
+          'Verified comparable sales could not be retrieved. ARV was not estimated.'
+        )
+      } finally {
+        setCompsLoading(false)
+      }
+    }
+
+    void loadComps()
+  }, [normalizedLead])
+
+  const arv = useMemo(() => {
+    if (comps.length === 0) return null
+
+    const prices = comps
+      .map((comp) => numberValue(comp.sold_price))
+      .filter(
+        (value): value is number =>
+          value !== null && value > 0
+      )
+
+    if (prices.length === 0) return null
+
+    /*
+     * Conservative verified-comp approach:
+     * use median sold price rather than inventing an appreciation
+     * factor or unsupported adjustment.
+     */
+    const sorted = [...prices].sort((a, b) => a - b)
+
+    const middle = Math.floor(sorted.length / 2)
+
+    if (sorted.length % 2 === 0) {
+      return Math.round(
+        (sorted[middle - 1] + sorted[middle]) / 2
+      )
+    }
+
+    return Math.round(sorted[middle])
+  }, [comps])
+
+  const deal = useMemo<DealAnalysis>(() => {
+    if (!normalizedLead) {
+      return {
+        arv,
+        repairs: null,
+        buyPercent: 70,
+        assignmentFee: 20000,
+        mao: null,
+        sellerPrice: null,
+        spread: null,
+      }
+    }
+
+    const sellerPrice = firstNumber(
+      normalizedLead.asking_price,
+      normalizedLead.listing_price
+    )
+
+    const repairs = firstNumber(
+      (normalizedLead.lead_intelligence as any)?.repair_estimate,
+      (normalizedLead.lead_intelligence as any)?.repairs,
+      (normalizedLead.raw_import_data as any)?.repair_estimate,
+      (normalizedLead.raw_import_data as any)?.repairs
+    )
+
+    const buyPercent = 70
+    const assignmentFee = 20000
+
+    /*
+     * MAO is only calculated when we have a verified ARV.
+     *
+     * Repairs are not fabricated. If repairs are missing, MAO remains
+     * unavailable because pretending repairs are $0 would distort the deal.
+     */
+    const mao =
+      arv !== null && repairs !== null
+        ? Math.round(
+            arv * (buyPercent / 100) -
+              repairs -
+              assignmentFee
+          )
+        : null
+
+    const spread =
+      mao !== null && sellerPrice !== null
+        ? mao - sellerPrice
+        : null
+
+    return {
+      arv,
+      repairs,
+      buyPercent,
+      assignmentFee,
+      mao,
+      sellerPrice,
+      spread,
+    }
+  }, [normalizedLead, arv])
+
+  const analysis = useMemo(() => {
+    if (!normalizedLead) return null
+
+    return calculateAnalysis(
+      normalizedLead,
+      comps,
+      deal
+    )
+  }, [normalizedLead, comps, deal])
+
+  async function handleUpdateStage(nextStage: string) {
+    if (!leadId || savingStage) return
+
+    setSavingStage(true)
+
+    /*
+     * IMPORTANT:
+     *
+     * `status` is the canonical pipeline field.
+     * We intentionally do NOT update stage, lead_status,
+     * deal_status, or pipeline_stage.
+     */
+    const { data, error } = await supabase
+      .from('leads')
+      .update({
+        status: nextStage,
+      })
+      .eq('id', leadId)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Failed to update lead status:', error)
+
+      alert(
+        `Unable to update lead status.\n\n${error.message}`
+      )
+
+      setSavingStage(false)
+      return
+    }
+
+    setLead(data as LeadRecord)
+    setSavingStage(false)
   }
 
-  if (loadingLead) {
+  async function handleDeleteLead() {
+    if (!leadId) return
+
+    if (
+      !confirm(
+        'Are you sure you want to permanently delete this lead?'
+      )
+    ) {
+      return
+    }
+
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .eq('id', leadId)
+
+    if (error) {
+      alert(
+        `Failed to delete lead: ${error.message}`
+      )
+      return
+    }
+
+    router.push('/leads')
+  }
+
+  if (loading) {
     return (
       <PageShell
-        title={config.name}
-        subtitle="Loading property workspace..."
+        title="Lead Workspace"
+        subtitle="Loading property intelligence..."
       >
         <SectionCard title="Loading">
           <div style={loadingStyle}>
-            Loading property intelligence...
+            Loading lead...
           </div>
         </SectionCard>
       </PageShell>
     )
   }
 
-  const ToolComponent =
-    TOOL_COMPONENTS[slug]
-
-  if (!ToolComponent) {
+  if (!normalizedLead || !analysis) {
     return (
       <PageShell
-        title="Tool Error"
-        subtitle="This tool is not registered correctly."
+        title="Lead Workspace"
+        subtitle="Lead could not be found."
       >
-        <SectionCard title="Configuration Error">
-          <p style={errorTextStyle}>
-            The tool exists in the
-            configuration but does not
-            have a workspace component.
-          </p>
-
-          <Link href="/tools">
+        <SectionCard title="Lead Not Found">
+          <Link href="/leads">
             <ActionButton tone="gold">
-              Back to Tools
+              Back to Leads
             </ActionButton>
           </Link>
         </SectionCard>
       </PageShell>
     )
   }
+
+  const address =
+    normalizedLead.property_address_1 ||
+    normalizedLead.property_address ||
+    'Unknown Property'
+
+  const location = [
+    normalizedLead.city,
+    normalizedLead.state,
+    normalizedLead.zip,
+  ]
+    .filter(Boolean)
+    .join(', ')
 
   return (
     <PageShell
-      title={config.name}
-      subtitle={config.description}
+      title="Lead Workspace"
+      subtitle="Property intelligence, verified market data, deal analysis, and next actions."
       actions={
-        <>
-          <Link href="/tools">
-            <ActionButton
-              compact
-              tone="ghost"
-            >
-              Tools
-            </ActionButton>
-          </Link>
-
-          {leadId && (
-            <Link
-              href={`/leads/${leadId}`}
-            >
-              <ActionButton
-                compact
-                tone="gold"
+        <div style={headerActionsStyle}>
+          <select
+            value={normalizedLead.status || 'new_lead'}
+            onChange={(event) =>
+              void handleUpdateStage(
+                event.target.value
+              )
+            }
+            disabled={savingStage}
+            style={stageSelectStyle}
+          >
+            {STAGE_OPTIONS.map((option) => (
+              <option
+                key={option.value}
+                value={option.value}
               >
-                Lead Workspace
-              </ActionButton>
-            </Link>
-          )}
-        </>
+                {savingStage
+                  ? 'Saving...'
+                  : option.label}
+              </option>
+            ))}
+          </select>
+
+          <ActionButton
+            compact
+            tone="danger"
+            onClick={handleDeleteLead}
+          >
+            Delete
+          </ActionButton>
+        </div>
       }
     >
-      <div style={pageStyle}>
-        <ToolHeader
-          title={config.name}
-          description={
-            config.longDescription
-          }
-        />
-
-        {leadError && (
-          <div style={warningBoxStyle}>
-            {leadError}
-          </div>
-        )}
-
-        {lead && (
-          <PropertySnapshot
-            lead={lead}
-          />
-        )}
-
-        <ToolComponent
-          lead={lead}
-        />
-
-        {leadId && (
-          <div
-            style={
-              workspaceSectionStyle
+      <div style={pageGridStyle}>
+        <div style={mainColumnStyle}>
+          <SectionCard
+            title={address}
+            subtitle={location || 'Location unavailable'}
+            actions={
+              <span style={statusBadgeStyle}>
+                {stageLabel(
+                  normalizedLead.status ||
+                    'new_lead'
+                )}
+              </span>
             }
           >
-            <WorkspaceCanvas
-              leadId={leadId}
-              leadTitle={
-                lead?.property_address_1 ||
-                config.name
-              }
-            />
-          </div>
-        )}
+            <div style={heroGridStyle}>
+              <Metric
+                label="Lead Strength"
+                value={
+                  analysis.overall === null
+                    ? '—'
+                    : String(analysis.overall)
+                }
+                detail={analysis.label}
+                tone="gold"
+              />
+
+              <Metric
+                label="Motivation"
+                value={
+                  analysis.motivation === null
+                    ? '—'
+                    : String(analysis.motivation)
+                }
+                detail={
+                  analysis.motivation >= 75
+                    ? 'High'
+                    : analysis.motivation >= 45
+                      ? 'Moderate'
+                      : 'Limited'
+                }
+                tone="green"
+              />
+
+              <Metric
+                label="Contactability"
+                value={
+                  analysis.contactability === null
+                    ? '—'
+                    : String(
+                        analysis.contactability
+                      )
+                }
+                detail={
+                  analysis.contactability >= 75
+                    ? 'Strong'
+                    : analysis.contactability >= 40
+                      ? 'Partial'
+                      : 'Limited'
+                }
+                tone="blue"
+              />
+
+              <Metric
+                label="Marketability"
+                value={
+                  analysis.marketability === null
+                    ? '—'
+                    : String(
+                        analysis.marketability
+                      )
+                }
+                detail={
+                  comps.length > 0
+                    ? 'Verified comps'
+                    : 'Insufficient market data'
+                }
+                tone="green"
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Deal Analysis"
+            subtitle="Calculations only use verified values. Missing inputs remain unavailable."
+          >
+            <div style={dealGridStyle}>
+              <DealValue
+                label="ARV"
+                value={money(deal.arv)}
+                tone="green"
+              />
+
+              <DealValue
+                label="Repairs"
+                value={money(deal.repairs)}
+                tone="gold"
+              />
+
+              <DealValue
+                label="Buy %"
+                value={`${deal.buyPercent}%`}
+                tone="blue"
+              />
+
+              <DealValue
+                label="Assignment Fee"
+                value={money(deal.assignmentFee)}
+                tone="gold"
+              />
+
+              <DealValue
+                label="MAO"
+                value={money(deal.mao)}
+                tone="green"
+              />
+
+              <DealValue
+                label="Seller Price"
+                value={money(deal.sellerPrice)}
+                tone="blue"
+              />
+
+              <DealValue
+                label="Potential Spread"
+                value={money(deal.spread)}
+                tone={
+                  deal.spread !== null &&
+                  deal.spread > 0
+                    ? 'green'
+                    : 'red'
+                }
+              />
+            </div>
+
+            <div style={verificationBoxStyle}>
+              <strong>
+                {compsLoading
+                  ? 'Searching verified comps...'
+                  : compsMessage ||
+                    'Market verification pending.'}
+              </strong>
+
+              {deal.arv === null ? (
+                <span>
+                  ARV is intentionally unavailable until
+                  qualifying sold comps are verified.
+                </span>
+              ) : (
+                <span>
+                  ARV is based on the median verified
+                  comparable sale price returned by the
+                  market-data service.
+                </span>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Lead Intelligence"
+            subtitle="Evidence-based analysis of the actual information available for this property."
+          >
+            <div style={analysisHeroStyle}>
+              <div>
+                <div style={eyebrowStyle}>
+                  Overall Opportunity
+                </div>
+
+                <div style={analysisScoreStyle}>
+                  {analysis.overall === null
+                    ? '—'
+                    : analysis.overall}
+                </div>
+
+                <div style={analysisLabelStyle}>
+                  {analysis.label}
+                </div>
+              </div>
+
+              <div style={confidenceBoxStyle}>
+                <div style={eyebrowStyle}>
+                  Analysis Confidence
+                </div>
+
+                <strong>
+                  {analysis.confidence}%
+                </strong>
+              </div>
+            </div>
+
+            <p style={analysisTextStyle}>
+              {analysis.explanation}
+            </p>
+
+            {analysis.evidence.length > 0 && (
+              <div style={evidenceGridStyle}>
+                {analysis.evidence.map(
+                  (item, index) => (
+                    <div
+                      key={`${item}-${index}`}
+                      style={evidenceItemStyle}
+                    >
+                      ✓ {item}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {analysis.warnings.length > 0 && (
+              <div style={warningStyle}>
+                <strong>
+                  Data limitations
+                </strong>
+
+                {analysis.warnings.map(
+                  (warning, index) => (
+                    <div
+                      key={`${warning}-${index}`}
+                    >
+                      {warning}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Property Details"
+            subtitle="Verified and imported property information."
+          >
+            <div style={propertyGridStyle}>
+              <Info
+                label="Owner"
+                value={
+                  normalizedLead.owner_name ||
+                  'Not available'
+                }
+              />
+
+              <Info
+                label="Bedrooms"
+                value={
+                  normalizedLead.bedrooms != null
+                    ? String(
+                        normalizedLead.bedrooms
+                      )
+                    : '—'
+                }
+              />
+
+              <Info
+                label="Bathrooms"
+                value={
+                  normalizedLead.bathrooms != null
+                    ? String(
+                        normalizedLead.bathrooms
+                      )
+                    : '—'
+                }
+              />
+
+              <Info
+                label="Square Feet"
+                value={
+                  normalizedLead.square_feet != null
+                    ? normalizedLead.square_feet.toLocaleString()
+                    : '—'
+                }
+              />
+
+              <Info
+                label="Year Built"
+                value={
+                  normalizedLead.year_built != null
+                    ? String(
+                        normalizedLead.year_built
+                      )
+                    : '—'
+                }
+              />
+
+              <Info
+                label="County"
+                value={
+                  normalizedLead.county || '—'
+                }
+              />
+
+              <Info
+                label="APN"
+                value={
+                  normalizedLead.apn || '—'
+                }
+              />
+
+              <Info
+                label="Ownership"
+                value={
+                  normalizedLead.ownership_length !=
+                  null
+                    ? `${Math.round(
+                        normalizedLead.ownership_length
+                      )} years`
+                    : '—'
+                }
+              />
+
+              <Info
+                label="Occupancy"
+                value={
+                  normalizedLead.owner_occupied ===
+                  true
+                    ? 'Owner Occupied'
+                    : normalizedLead.owner_occupied ===
+                        false
+                      ? 'Absentee'
+                      : 'Unknown'
+                }
+              />
+
+              <Info
+                label="Equity"
+                value={money(
+                  normalizedLead.equity_amount
+                )}
+              />
+
+              <Info
+                label="Equity %"
+                value={percent(
+                  normalizedLead.equity_percent
+                )}
+              />
+
+              <Info
+                label="Mortgage"
+                value={money(
+                  normalizedLead.mortgage_balance
+                )}
+              />
+
+              <Info
+                label="Last Sale"
+                value={money(
+                  normalizedLead.last_sale_amount
+                )}
+              />
+
+              <Info
+                label="Last Sale Date"
+                value={
+                  normalizedLead.last_sale_date ||
+                  '—'
+                }
+              />
+
+              <Info
+                label="Default"
+                value={money(
+                  normalizedLead.default_amount
+                )}
+              />
+
+              <Info
+                label="Auction"
+                value={
+                  normalizedLead.auction_date ||
+                  '—'
+                }
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Verified Comparable Sales"
+            subtitle="Target: sold properties within 1 mile during the previous 6 months."
+          >
+            {compsLoading ? (
+              <div style={loadingStyle}>
+                Searching real comparable sales...
+              </div>
+            ) : comps.length === 0 ? (
+              <div style={emptyStateStyle}>
+                <strong>
+                  No verified comps available
+                </strong>
+
+                <span>
+                  ARV will remain unavailable until
+                  qualifying real sold-property data
+                  is returned.
+                </span>
+              </div>
+            ) : (
+              <div style={compListStyle}>
+                {comps.map((comp, index) => (
+                  <div
+                    key={
+                      comp.id ||
+                      `${comp.address}-${index}`
+                    }
+                    style={compStyle}
+                  >
+                    <div>
+                      <strong>
+                        {comp.address ||
+                          'Unknown address'}
+                      </strong>
+
+                      <div
+                        style={smallTextStyle}
+                      >
+                        {[
+                          comp.city,
+                          comp.state,
+                        ]
+                          .filter(Boolean)
+                          .join(', ') ||
+                          'Location unavailable'}
+                      </div>
+                    </div>
+
+                    <div style={compStatsStyle}>
+                      <span>
+                        {money(
+                          comp.sold_price
+                        )}
+                      </span>
+
+                      <small>
+                        {comp.sale_date ||
+                          'Date unavailable'}
+                      </small>
+
+                      {comp.distance_miles !=
+                        null && (
+                        <small>
+                          {comp.distance_miles.toFixed(
+                            2
+                          )}{' '}
+                          mi
+                        </small>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Owner Contact"
+            subtitle="Available contact information."
+          >
+            <div style={contactGridStyle}>
+              <Info
+                label="Phone"
+                value={
+                  normalizedLead.owner_phone ||
+                  'Not available'
+                }
+              />
+
+              <Info
+                label="Email"
+                value={
+                  normalizedLead.owner_email ||
+                  'Not available'
+                }
+              />
+
+              <Info
+                label="Mailing Address"
+                value={
+                  [
+                    normalizedLead.owner_mailing_address,
+                    normalizedLead.owner_mailing_city,
+                    normalizedLead.owner_mailing_state,
+                    normalizedLead.owner_mailing_zip,
+                  ]
+                    .filter(Boolean)
+                    .join(', ') ||
+                  'Not available'
+                }
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Deal Tools"
+            subtitle="Continue analysis without leaving the lead."
+          >
+            <div style={toolsGridStyle}>
+              <Tool
+                href={`/tools/comps-analyzer?leadId=${encodeURIComponent(
+                  leadId
+                )}`}
+                title="Comps Analyzer"
+                description="Review comparable sales."
+              />
+
+              <Tool
+                href={`/tools/repair-estimator?leadId=${encodeURIComponent(
+                  leadId
+                )}`}
+                title="Repair Estimator"
+                description="Build a verified repair budget."
+              />
+
+              <Tool
+                href={`/tools/contract-generator?leadId=${encodeURIComponent(
+                  leadId
+                )}`}
+                title="Contract Generator"
+                description="Prepare purchase documents."
+              />
+
+              <Tool
+                href={`/tools/assignment-contract?leadId=${encodeURIComponent(
+                  leadId
+                )}`}
+                title="Assignment Contract"
+                description="Structure the assignment."
+              />
+            </div>
+          </SectionCard>
+        </div>
+
+        <aside style={sideColumnStyle}>
+          <WorkspaceCanvas
+            leadId={leadId}
+            leadTitle={address}
+          />
+        </aside>
       </div>
     </PageShell>
   )
 }
 
-/* =========================================================
-   SUSPENSE WRAPPER
-========================================================= */
-
-export default function ToolWorkspace({
-  slug,
+function Metric({
+  label,
+  value,
+  detail,
+  tone,
 }: {
-  slug: ToolSlug
+  label: string
+  value: string
+  detail: string
+  tone: 'gold' | 'green' | 'blue'
 }) {
+  const color =
+    tone === 'gold'
+      ? '#d6a64b'
+      : tone === 'green'
+        ? '#4ade80'
+        : '#93c5fd'
+
   return (
-    <Suspense
-      fallback={
-        <PageShell
-          title="Loading Tool"
-          subtitle="Preparing your acquisition workspace..."
-        >
-          <SectionCard title="Loading">
-            <div
-              style={loadingStyle}
-            >
-              Loading tool workspace...
-            </div>
-          </SectionCard>
-        </PageShell>
-      }
-    >
-      <ToolWorkspaceContent
-        slug={slug}
-      />
-    </Suspense>
+    <div style={metricStyle}>
+      <div style={eyebrowStyle}>
+        {label}
+      </div>
+
+      <strong
+        style={{
+          fontSize: 30,
+          color,
+        }}
+      >
+        {value}
+      </strong>
+
+      <span style={smallTextStyle}>
+        {detail}
+      </span>
+    </div>
   )
 }
 
-/* =========================================================
-   STYLES
-========================================================= */
+function DealValue({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone: 'gold' | 'green' | 'blue' | 'red'
+}) {
+  const color =
+    tone === 'gold'
+      ? '#d6a64b'
+      : tone === 'green'
+        ? '#4ade80'
+        : tone === 'blue'
+          ? '#93c5fd'
+          : '#ef4444'
 
-const pageStyle: CSSProperties = {
-  display: 'grid',
-  gap: 18,
-  width: '100%',
-  minWidth: 0,
+  return (
+    <div style={dealValueStyle}>
+      <span style={eyebrowStyle}>
+        {label}
+      </span>
+
+      <strong
+        style={{
+          color,
+          fontSize: 20,
+        }}
+      >
+        {value}
+      </strong>
+    </div>
+  )
 }
 
-const toolGridStyle: CSSProperties = {
+function Info({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div style={infoStyle}>
+      <span style={eyebrowStyle}>
+        {label}
+      </span>
+
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function Tool({
+  href,
+  title,
+  description,
+}: {
+  href: string
+  title: string
+  description: string
+}) {
+  return (
+    <Link href={href} style={toolStyle}>
+      <strong>{title}</strong>
+      <span>{description}</span>
+      <b>Open →</b>
+    </Link>
+  )
+}
+
+const pageGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
-    'minmax(0, 1.2fr) minmax(300px, 0.8fr)',
+    'minmax(0, 1.25fr) minmax(320px, .75fr)',
   gap: 18,
   alignItems: 'start',
-  width: '100%',
+}
+
+const mainColumnStyle: CSSProperties = {
+  display: 'grid',
+  gap: 18,
   minWidth: 0,
 }
 
-const toolHeaderStyle: CSSProperties = {
+const sideColumnStyle: CSSProperties = {
+  minWidth: 0,
+  position: 'sticky',
+  top: 18,
+}
+
+const headerActionsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+}
+
+const stageSelectStyle: CSSProperties = {
+  minHeight: 36,
+  padding: '0 12px',
+  borderRadius: 9,
+  border:
+    '1px solid rgba(214,166,75,.35)',
+  background: 'rgba(214,166,75,.10)',
+  color: '#e0b84f',
+  fontSize: 12,
+  fontWeight: 800,
+  outline: 'none',
+}
+
+const statusBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  padding: '5px 9px',
+  borderRadius: 999,
+  background: 'rgba(214,166,75,.10)',
+  border:
+    '1px solid rgba(214,166,75,.25)',
+  color: '#e0b84f',
+  fontSize: 10,
+  fontWeight: 800,
+}
+
+const heroGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit,minmax(150px,1fr))',
+  gap: 10,
+}
+
+const metricStyle: CSSProperties = {
+  padding: 15,
+  borderRadius: 14,
+  border:
+    '1px solid rgba(255,255,255,.07)',
+  background: 'rgba(255,255,255,.025)',
+  display: 'grid',
+  gap: 5,
+}
+
+const dealGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit,minmax(150px,1fr))',
+  gap: 10,
+}
+
+const dealValueStyle: CSSProperties = {
+  padding: 14,
+  borderRadius: 13,
+  border:
+    '1px solid rgba(255,255,255,.07)',
+  background: 'rgba(255,255,255,.025)',
+  display: 'grid',
+  gap: 6,
+}
+
+const verificationBoxStyle: CSSProperties = {
+  marginTop: 12,
+  padding: 13,
+  borderRadius: 12,
+  border:
+    '1px solid rgba(147,197,253,.16)',
+  background: 'rgba(147,197,253,.04)',
+  display: 'grid',
+  gap: 5,
+  fontSize: 12,
+  color: 'rgba(255,255,255,.58)',
+}
+
+const analysisHeroStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 20,
+  padding: 18,
   borderRadius: 16,
   border:
-    '1px solid rgba(214,166,75,0.15)',
+    '1px solid rgba(214,166,75,.22)',
   background:
-    'linear-gradient(180deg, rgba(24,20,12,0.72), rgba(7,7,6,0.92))',
+    'linear-gradient(135deg,rgba(31,25,14,.9),rgba(8,7,4,.98))',
+}
+
+const analysisScoreStyle: CSSProperties = {
+  fontSize: 46,
+  lineHeight: 1,
+  fontWeight: 900,
+  color: '#d6a64b',
+  marginTop: 5,
+}
+
+const analysisLabelStyle: CSSProperties = {
+  color: '#fff',
+  fontWeight: 800,
+  fontSize: 13,
+  marginTop: 5,
+}
+
+const confidenceBoxStyle: CSSProperties = {
+  minWidth: 110,
+  textAlign: 'right',
+}
+
+const analysisTextStyle: CSSProperties = {
+  margin: '14px 0 0',
+  color: 'rgba(255,255,255,.62)',
+  fontSize: 13,
+  lineHeight: 1.6,
+}
+
+const evidenceGridStyle: CSSProperties = {
+  display: 'grid',
+  gap: 7,
+  marginTop: 14,
+}
+
+const evidenceItemStyle: CSSProperties = {
+  padding: '9px 11px',
+  borderRadius: 9,
+  background: 'rgba(74,222,128,.05)',
+  border:
+    '1px solid rgba(74,222,128,.12)',
+  color: 'rgba(255,255,255,.70)',
+  fontSize: 12,
+}
+
+const warningStyle: CSSProperties = {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 11,
+  background: 'rgba(239,68,68,.06)',
+  border:
+    '1px solid rgba(239,68,68,.18)',
+  color: 'rgba(255,255,255,.65)',
+  display: 'grid',
+  gap: 5,
+  fontSize: 12,
+}
+
+const propertyGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit,minmax(155px,1fr))',
+  gap: 9,
+}
+
+const infoStyle: CSSProperties = {
+  minWidth: 0,
+  padding: 11,
+  borderRadius: 11,
+  border:
+    '1px solid rgba(255,255,255,.06)',
+  background: 'rgba(255,255,255,.02)',
+  display: 'grid',
+  gap: 5,
+}
+
+const contactGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit,minmax(200px,1fr))',
+  gap: 10,
+}
+
+const compListStyle: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+}
+
+const compStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 15,
+  padding: 12,
+  borderRadius: 12,
+  border:
+    '1px solid rgba(255,255,255,.06)',
+  background: 'rgba(255,255,255,.02)',
+}
+
+const compStatsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-end',
+  flexDirection: 'column',
+  gap: 3,
+}
+
+const smallTextStyle: CSSProperties = {
+  color: 'rgba(255,255,255,.48)',
+  fontSize: 11,
+  lineHeight: 1.4,
+}
+
+const emptyStateStyle: CSSProperties = {
   padding: 18,
+  borderRadius: 13,
+  border:
+    '1px solid rgba(255,255,255,.07)',
+  background: 'rgba(255,255,255,.02)',
+  display: 'grid',
+  gap: 5,
+  color: 'rgba(255,255,255,.62)',
+  fontSize: 12,
+}
+
+const toolsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit,minmax(190px,1fr))',
+  gap: 10,
+}
+
+const toolStyle: CSSProperties = {
+  textDecoration: 'none',
+  color: 'inherit',
+  padding: 14,
+  borderRadius: 13,
+  border:
+    '1px solid rgba(214,166,75,.16)',
+  background:
+    'linear-gradient(180deg,rgba(31,25,14,.6),rgba(8,7,4,.9))',
+  display: 'grid',
+  gap: 6,
 }
 
 const eyebrowStyle: CSSProperties = {
   fontSize: 9,
-  fontWeight: 800,
-  letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  color: 'rgba(214,166,75,0.72)',
-}
-
-const toolTitleStyle: CSSProperties = {
-  margin: '5px 0 4px',
-  fontSize: 24,
-  fontWeight: 850,
-  color: '#fff',
-}
-
-const toolDescriptionStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  lineHeight: 1.55,
-  color: 'rgba(255,255,255,0.48)',
-  maxWidth: 720,
-}
-
-const leadGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(auto-fit, minmax(140px, 1fr))',
-  gap: 10,
-}
-
-const formGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: 12,
-}
-
-const fieldStyle: CSSProperties = {
-  display: 'grid',
-  gap: 6,
-  minWidth: 0,
-}
-
-const fieldLabelStyle: CSSProperties = {
-  fontSize: 9,
+  letterSpacing: '.1em',
+  color: 'rgba(255,255,255,.40)',
   fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-  color: 'rgba(255,255,255,0.4)',
-}
-
-const inputWrapStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  minHeight: 40,
-  borderRadius: 10,
-  border:
-    '1px solid rgba(255,255,255,0.08)',
-  background:
-    'rgba(255,255,255,0.025)',
-  overflow: 'hidden',
-}
-
-const prefixStyle: CSSProperties = {
-  padding: '0 8px',
-  color: 'rgba(255,255,255,0.38)',
-  fontSize: 12,
-}
-
-const inputStyle: CSSProperties = {
-  width: '100%',
-  minHeight: 40,
-  boxSizing: 'border-box',
-  borderRadius: 10,
-  border:
-    '1px solid rgba(255,255,255,0.08)',
-  background:
-    'rgba(255,255,255,0.025)',
-  color: '#fff',
-  padding: '0 11px',
-  outline: 'none',
-  fontSize: 12,
-}
-
-const resultGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(auto-fit, minmax(145px, 1fr))',
-  gap: 10,
-}
-
-const resultCardStyle: CSSProperties = {
-  minHeight: 74,
-  borderRadius: 12,
-  border: '1px solid transparent',
-  padding: '12px 13px',
-  display: 'grid',
-  alignContent: 'center',
-  gap: 5,
-}
-
-const resultValueStyle: CSSProperties = {
-  fontSize: 20,
-  fontWeight: 850,
-  lineHeight: 1.1,
-}
-
-const outputBoxStyle: CSSProperties = {
-  marginTop: 14,
-  borderRadius: 12,
-  border:
-    '1px solid rgba(255,255,255,0.07)',
-  background:
-    'rgba(0,0,0,0.25)',
-  padding: 14,
-  color: 'rgba(255,255,255,0.62)',
-  fontSize: 12,
-  lineHeight: 1.55,
-}
-
-const textareaStyle: CSSProperties = {
-  width: '100%',
-  minHeight: 220,
-  boxSizing: 'border-box',
-  resize: 'vertical',
-  borderRadius: 12,
-  border:
-    '1px solid rgba(255,255,255,0.08)',
-  background:
-    'rgba(0,0,0,0.25)',
-  color: '#fff',
-  padding: 13,
-  outline: 'none',
-  fontFamily: 'inherit',
-  fontSize: 12,
-  lineHeight: 1.55,
-}
-
-const actionRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-  marginTop: 14,
-}
-
-const tableStyle: CSSProperties = {
-  width: '100%',
-  minWidth: 680,
-  borderCollapse: 'collapse',
-}
-
-const thStyle: CSSProperties = {
-  textAlign: 'left',
-  padding: '9px 10px',
-  borderBottom:
-    '1px solid rgba(255,255,255,0.08)',
-  color: 'rgba(255,255,255,0.4)',
-  fontSize: 9,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-}
-
-const tdStyle: CSSProperties = {
-  padding: '9px 10px',
-  borderBottom:
-    '1px solid rgba(255,255,255,0.05)',
-  color: 'rgba(255,255,255,0.7)',
-  fontSize: 11,
-}
-
-const tableInputStyle: CSSProperties = {
-  width: 100,
-  minHeight: 34,
-  boxSizing: 'border-box',
-  borderRadius: 7,
-  border:
-    '1px solid rgba(255,255,255,0.08)',
-  background:
-    'rgba(255,255,255,0.025)',
-  color: '#fff',
-  padding: '0 8px',
-  outline: 'none',
-  fontSize: 11,
-}
-
-const workspaceSectionStyle: CSSProperties = {
-  minWidth: 0,
 }
 
 const loadingStyle: CSSProperties = {
-  minHeight: 180,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: 'rgba(255,255,255,0.45)',
-  fontSize: 13,
-}
-
-const warningBoxStyle: CSSProperties = {
-  borderRadius: 12,
-  border:
-    '1px solid rgba(214,166,75,0.25)',
-  background:
-    'rgba(214,166,75,0.06)',
-  color: 'rgba(255,255,255,0.65)',
-  padding: 12,
-  fontSize: 12,
-  lineHeight: 1.5,
-}
-
-const errorTextStyle: CSSProperties = {
-  color: 'rgba(255,255,255,0.6)',
-  fontSize: 13,
-  lineHeight: 1.5,
+  minHeight: 120,
+  display: 'grid',
+  placeItems: 'center',
+  color: 'rgba(255,255,255,.5)',
 }
