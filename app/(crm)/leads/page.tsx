@@ -14,6 +14,10 @@ import StatPill from '@/components/ui/stat-pill'
 import ActionButton from '@/components/ui/action-button'
 import { supabase } from '@/lib/supabase'
 
+/* =========================================================
+   TYPES
+========================================================= */
+
 type LeadRow = {
   id: string
 
@@ -21,7 +25,6 @@ type LeadRow = {
   property_address?: string | null
 
   owner_name?: string | null
-
   owner_phone_primary?: string | null
   phone1?: string | null
 
@@ -37,33 +40,49 @@ type LeadRow = {
   zip?: string | null
   property_zip?: string | null
 
-  /**
-   * Canonical pipeline field.
+  /*
+   * STATUS IS THE CANONICAL PIPELINE STAGE USED BY THIS PAGE.
+   *
+   * The other fields are retained for reading old/imported data,
+   * but we do NOT write to all of them when changing a stage.
+   */
+  status?: string | null
+
+  /*
+   * Legacy / existing fields that may exist in imported records.
    */
   stage?: string | null
+  lead_status?: string | null
+  deal_status?: string | null
+  pipeline_stage?: string | null
 
   asking_price?: number | null
   listing_price?: number | null
 
-  /**
-   * These are intentionally NOT used as fallbacks
-   * for ARV or market value.
-   */
   market_value?: number | null
   estimated_value?: number | null
-  arv?: number | null
 
-  /**
-   * Optional analysis fields.
-   * If your database doesn't contain these yet,
-   * the UI simply displays unavailable.
+  arv?: number | null
+  mao?: number | null
+
+  /*
+   * Optional property details.
+   * These are used only when they actually exist.
    */
-  strength?: number | null
-  motivation?: number | null
-  contactability?: number | null
-  marketability?: number | null
+  bedrooms?: number | null
+  bathrooms?: number | null
+  sqft?: number | null
+  living_area_sqft?: number | null
+  year_built?: number | null
+
+  property_type?: string | null
+  condition?: string | null
+
+  lot_size?: number | null
+  garage_spaces?: number | null
 
   created_at?: string | null
+  updated_at?: string | null
 }
 
 type FilterKey =
@@ -73,54 +92,122 @@ type FilterKey =
   | 'missing-contact'
   | 'missing-market'
 
+type EvidenceLevel =
+  | 'strong'
+  | 'moderate'
+  | 'limited'
+  | 'insufficient'
+
+type AnalysisResult = {
+  strength: number | null
+  evidenceLevel: EvidenceLevel
+  reasons: string[]
+  missing: string[]
+}
+
+/* =========================================================
+   PIPELINE STAGES
+========================================================= */
+
 const STAGE_OPTIONS = [
-  { value: 'new_lead', label: 'New Lead' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'appointment_set', label: 'Appointment Set' },
-  { value: 'offer_sent', label: 'Offer Sent' },
-  { value: 'negotiation', label: 'Negotiation' },
-  { value: 'under_contract', label: 'Under Contract' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'dead_lead', label: 'Dead / Archive' },
+  {
+    value: 'new_lead',
+    label: 'New Lead',
+    description: 'Newly added lead',
+  },
+  {
+    value: 'contacted',
+    label: 'Contacted',
+    description: 'Initial contact attempted or completed',
+  },
+  {
+    value: 'appointment_set',
+    label: 'Appointment Set',
+    description: 'Appointment scheduled',
+  },
+  {
+    value: 'offer_sent',
+    label: 'Offer Sent',
+    description: 'Offer delivered to seller',
+  },
+  {
+    value: 'negotiation',
+    label: 'Negotiation',
+    description: 'Negotiating terms',
+  },
+  {
+    value: 'under_contract',
+    label: 'Under Contract',
+    description: 'Contract executed',
+  },
+  {
+    value: 'closed',
+    label: 'Closed',
+    description: 'Deal completed',
+  },
+  {
+    value: 'dead_lead',
+    label: 'Dead / Archive',
+    description: 'No longer active',
+  },
 ] as const
 
 type StageValue = (typeof STAGE_OPTIONS)[number]['value']
 
+/* =========================================================
+   HELPERS
+========================================================= */
+
 function firstNonEmpty(
   ...values: Array<string | null | undefined>
 ): string | null {
-  return (
-    values.find(
-      (value) =>
-        typeof value === 'string' && value.trim().length > 0,
-    ) || null
-  )
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+
+  return null
+}
+
+function toNumber(
+  value: number | string | null | undefined
+): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  const numeric = Number(value)
+
+  if (!Number.isFinite(numeric)) {
+    return null
+  }
+
+  return numeric
 }
 
 function formatMoney(
-  value: number | null | undefined,
+  value: number | string | null | undefined
 ): string {
-  if (
-    typeof value !== 'number' ||
-    !Number.isFinite(value)
-  ) {
+  const numeric = toNumber(value)
+
+  if (numeric === null) {
     return '—'
   }
 
-  return `$${Math.round(value).toLocaleString()}`
+  return `$${Math.round(numeric).toLocaleString()}`
 }
 
-function formatScore(
-  value: number | null | undefined,
+function formatNumber(
+  value: number | string | null | undefined
 ): string {
-  if (
-    typeof value !== 'number' ||
-    !Number.isFinite(value)
-  ) {
+  const numeric = toNumber(value)
+
+  if (numeric === null) {
     return '—'
   }
 
-  return Math.round(value).toString()
+  return Math.round(numeric).toLocaleString()
 }
 
 function titleCase(value: string): string {
@@ -129,127 +216,423 @@ function titleCase(value: string): string {
     .replace(/\b\w/g, (match) => match.toUpperCase())
 }
 
-function getLeadStage(lead: LeadRow): StageValue {
-  const stage = lead.stage
+function normalizeStage(value: string | null | undefined): StageValue {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+
+  const exists = STAGE_OPTIONS.some(
+    (option) => option.value === normalized
+  )
+
+  if (exists) {
+    return normalized as StageValue
+  }
+
+  /*
+   * Handle common legacy values.
+   */
+  if (normalized === 'new') {
+    return 'new_lead'
+  }
+
+  if (normalized === 'appointment') {
+    return 'appointment_set'
+  }
+
+  if (normalized === 'offer') {
+    return 'offer_sent'
+  }
+
+  if (normalized === 'contract') {
+    return 'under_contract'
+  }
 
   if (
-    stage &&
-    STAGE_OPTIONS.some((option) => option.value === stage)
+    normalized === 'dead' ||
+    normalized === 'archived' ||
+    normalized === 'archive'
   ) {
-    return stage as StageValue
+    return 'dead_lead'
   }
 
   return 'new_lead'
 }
 
-function getStageTone(stage: string): string {
-  const normalized = stage.toLowerCase()
-
-  if (normalized.includes('contract')) {
-    return '#4ade80'
-  }
-
-  if (normalized.includes('contact')) {
-    return '#f59e0b'
-  }
-
-  if (normalized.includes('appoint')) {
-    return '#38bdf8'
-  }
-
-  if (normalized.includes('offer')) {
-    return '#fbbf24'
-  }
-
-  if (normalized.includes('negotiation')) {
-    return '#a78bfa'
-  }
-
-  if (
-    normalized.includes('dead') ||
-    normalized.includes('archive')
-  ) {
-    return '#ef4444'
-  }
-
-  return '#e0b84f'
-}
-
-function getPhone(lead: LeadRow): string | null {
-  return firstNonEmpty(
-    lead.owner_phone_primary,
-    lead.phone1,
+function getLeadStage(lead: LeadRow): StageValue {
+  /*
+   * STATUS is intentionally first.
+   *
+   * Older records can still fall back to legacy fields.
+   */
+  return normalizeStage(
+    firstNonEmpty(
+      lead.status,
+      lead.stage,
+      lead.lead_status,
+      lead.pipeline_stage,
+      lead.deal_status
+    )
   )
 }
 
-function getEmail(lead: LeadRow): string | null {
-  return firstNonEmpty(
-    lead.owner_email,
-    lead.email1,
-  )
+function getStageMeta(stage: string) {
+  const normalized = normalizeStage(stage)
+
+  switch (normalized) {
+    case 'contacted':
+      return {
+        color: '#f59e0b',
+        background: 'rgba(245,158,11,0.10)',
+        border: 'rgba(245,158,11,0.28)',
+      }
+
+    case 'appointment_set':
+      return {
+        color: '#38bdf8',
+        background: 'rgba(56,189,248,0.10)',
+        border: 'rgba(56,189,248,0.28)',
+      }
+
+    case 'offer_sent':
+      return {
+        color: '#fbbf24',
+        background: 'rgba(251,191,36,0.10)',
+        border: 'rgba(251,191,36,0.28)',
+      }
+
+    case 'negotiation':
+      return {
+        color: '#a78bfa',
+        background: 'rgba(167,139,250,0.10)',
+        border: 'rgba(167,139,250,0.28)',
+      }
+
+    case 'under_contract':
+      return {
+        color: '#4ade80',
+        background: 'rgba(74,222,128,0.10)',
+        border: 'rgba(74,222,128,0.28)',
+      }
+
+    case 'closed':
+      return {
+        color: '#22c55e',
+        background: 'rgba(34,197,94,0.12)',
+        border: 'rgba(34,197,94,0.30)',
+      }
+
+    case 'dead_lead':
+      return {
+        color: '#ef4444',
+        background: 'rgba(239,68,68,0.10)',
+        border: 'rgba(239,68,68,0.28)',
+      }
+
+    case 'new_lead':
+    default:
+      return {
+        color: '#d6a64b',
+        background: 'rgba(214,166,75,0.10)',
+        border: 'rgba(214,166,75,0.28)',
+      }
+  }
 }
 
 function getAddress(lead: LeadRow): string {
   return (
     firstNonEmpty(
       lead.property_address_1,
-      lead.property_address,
+      lead.property_address
     ) || 'Unknown property'
   )
 }
 
 function getLocation(lead: LeadRow): string {
-  const parts = [
-    firstNonEmpty(
-      lead.city,
-      lead.property_city,
-    ),
-    firstNonEmpty(
-      lead.state,
-      lead.property_state,
-    ),
-    firstNonEmpty(
-      lead.zip,
-      lead.property_zip,
-    ),
-  ].filter(Boolean)
+  const city = firstNonEmpty(
+    lead.city,
+    lead.property_city
+  )
 
-  return parts.length
-    ? parts.join(', ')
-    : 'Location pending'
+  const state = firstNonEmpty(
+    lead.state,
+    lead.property_state
+  )
+
+  const zip = firstNonEmpty(
+    lead.zip,
+    lead.property_zip
+  )
+
+  return [city, state, zip]
+    .filter(Boolean)
+    .join(', ') || 'Location pending'
 }
 
-function isNumber(
-  value: number | null | undefined,
-): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isFinite(value)
+function getPhone(lead: LeadRow): string | null {
+  return firstNonEmpty(
+    lead.owner_phone_primary,
+    lead.phone1
   )
 }
 
-function scoreLevel(
-  value: number | null | undefined,
-): string {
-  if (!isNumber(value)) return 'Not analyzed'
-  if (value >= 80) return 'Strong'
-  if (value >= 60) return 'Workable'
-  if (value >= 40) return 'Needs review'
-  return 'Weak'
+function getEmail(lead: LeadRow): string | null {
+  return firstNonEmpty(
+    lead.owner_email,
+    lead.email1
+  )
 }
 
-function scoreTone(
-  value: number | null | undefined,
-): 'gold' | 'green' | 'blue' | 'orange' {
-  if (!isNumber(value)) return 'blue'
-  if (value >= 80) return 'green'
-  if (value >= 60) return 'gold'
-  return 'orange'
+function getOwner(lead: LeadRow): string {
+  return (
+    firstNonEmpty(lead.owner_name) ||
+    'Owner information unavailable'
+  )
 }
+
+function getAskingPrice(lead: LeadRow): number | null {
+  return (
+    toNumber(lead.asking_price) ??
+    toNumber(lead.listing_price)
+  )
+}
+
+function getMarketValue(lead: LeadRow): number | null {
+  return (
+    toNumber(lead.market_value) ??
+    toNumber(lead.estimated_value)
+  )
+}
+
+function getArv(lead: LeadRow): number | null {
+  return toNumber(lead.arv)
+}
+
+function getMao(lead: LeadRow): number | null {
+  return toNumber(lead.mao)
+}
+
+/* =========================================================
+   REAL EVIDENCE ANALYSIS
+========================================================= */
+
+/*
+ * IMPORTANT:
+ *
+ * This is NOT a fake "lead strength" score.
+ *
+ * It starts with ZERO evidence and only adds evidence that
+ * actually exists on the lead.
+ *
+ * If the available property information is insufficient,
+ * strength remains null.
+ *
+ * No arbitrary 55/100 starting score.
+ */
+
+function analyzeLead(lead: LeadRow): AnalysisResult {
+  const reasons: string[] = []
+  const missing: string[] = []
+
+  let evidence = 0
+
+  const address = getAddress(lead)
+  const askingPrice = getAskingPrice(lead)
+  const marketValue = getMarketValue(lead)
+  const arv = getArv(lead)
+
+  const phone = getPhone(lead)
+  const email = getEmail(lead)
+
+  const bedrooms = toNumber(lead.bedrooms)
+  const bathrooms = toNumber(lead.bathrooms)
+
+  const sqft =
+    toNumber(lead.sqft) ??
+    toNumber(lead.living_area_sqft)
+
+  const yearBuilt = toNumber(lead.year_built)
+
+  /*
+   * Property identity.
+   */
+  if (address !== 'Unknown property') {
+    evidence += 10
+    reasons.push('Property address is available.')
+  } else {
+    missing.push('Property address')
+  }
+
+  /*
+   * Seller contact.
+   */
+  if (phone) {
+    evidence += 15
+    reasons.push('Seller phone number is available.')
+  } else {
+    missing.push('Seller phone')
+  }
+
+  if (email) {
+    evidence += 5
+    reasons.push('Seller email is available.')
+  }
+
+  /*
+   * Asking price.
+   */
+  if (askingPrice !== null) {
+    evidence += 15
+    reasons.push(
+      `Asking/listing price is available at ${formatMoney(askingPrice)}.`
+    )
+  } else {
+    missing.push('Asking/listing price')
+  }
+
+  /*
+   * Market value.
+   *
+   * This is evidence only. It is NOT treated as ARV.
+   */
+  if (marketValue !== null) {
+    evidence += 15
+    reasons.push(
+      `A market-value estimate is available at ${formatMoney(
+        marketValue
+      )}.`
+    )
+  } else {
+    missing.push('Verified market-value estimate')
+  }
+
+  /*
+   * ARV.
+   *
+   * This is only considered evidence if it already exists as
+   * actual property analysis data.
+   */
+  if (arv !== null) {
+    evidence += 15
+    reasons.push(
+      `ARV data is available at ${formatMoney(arv)}.`
+    )
+  } else {
+    missing.push('Verified ARV from comparable sales')
+  }
+
+  /*
+   * Property characteristics.
+   */
+  if (bedrooms !== null) {
+    evidence += 5
+    reasons.push(`${bedrooms} bedroom count is available.`)
+  } else {
+    missing.push('Bedroom count')
+  }
+
+  if (bathrooms !== null) {
+    evidence += 5
+    reasons.push(`${bathrooms} bathroom count is available.`)
+  } else {
+    missing.push('Bathroom count')
+  }
+
+  if (sqft !== null) {
+    evidence += 5
+    reasons.push(
+      `${formatNumber(sqft)} square feet is available.`
+    )
+  } else {
+    missing.push('Living area')
+  }
+
+  if (yearBuilt !== null) {
+    evidence += 5
+    reasons.push(`Year built (${yearBuilt}) is available.`)
+  }
+
+  /*
+   * We require meaningful property evidence before producing
+   * a numerical strength score.
+   *
+   * Contact information by itself is NOT enough.
+   */
+  const propertyEvidence =
+    address !== 'Unknown property' ||
+    askingPrice !== null ||
+    marketValue !== null ||
+    arv !== null ||
+    bedrooms !== null ||
+    bathrooms !== null ||
+    sqft !== null
+
+  if (!propertyEvidence) {
+    return {
+      strength: null,
+      evidenceLevel: 'insufficient',
+      reasons: [],
+      missing: Array.from(
+        new Set([
+          'Property information',
+          ...missing,
+        ])
+      ),
+    }
+  }
+
+  /*
+   * Evidence thresholds.
+   *
+   * These represent confidence in the available analysis,
+   * not "motivation magically equals X".
+   */
+  let strength: number | null = evidence
+
+  if (strength < 30) {
+    strength = null
+  } else {
+    strength = Math.min(100, strength)
+  }
+
+  if (strength === null) {
+    return {
+      strength: null,
+      evidenceLevel: 'insufficient',
+      reasons,
+      missing: Array.from(new Set(missing)),
+    }
+  }
+
+  let evidenceLevel: EvidenceLevel
+
+  if (strength >= 80) {
+    evidenceLevel = 'strong'
+  } else if (strength >= 60) {
+    evidenceLevel = 'moderate'
+  } else if (strength >= 30) {
+    evidenceLevel = 'limited'
+  } else {
+    evidenceLevel = 'insufficient'
+  }
+
+  return {
+    strength,
+    evidenceLevel,
+    reasons,
+    missing: Array.from(new Set(missing)),
+  }
+}
+
+/* =========================================================
+   COMPONENT
+========================================================= */
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<LeadRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [savingIds, setSavingIds] = useState<string[]>([])
+
   const [query, setQuery] = useState('')
   const [filter, setFilter] =
     useState<FilterKey>('all')
@@ -263,11 +646,15 @@ export default function LeadsPage() {
   const [bulkStage, setBulkStage] =
     useState<StageValue>('new_lead')
 
-  const [savingLeadId, setSavingLeadId] =
+  const [errorMessage, setErrorMessage] =
     useState<string | null>(null)
 
-  const [savingBulk, setSavingBulk] =
-    useState(false)
+  const [successMessage, setSuccessMessage] =
+    useState<string | null>(null)
+
+  /* =======================================================
+     RESPONSIVE
+  ======================================================= */
 
   useEffect(() => {
     function syncViewport() {
@@ -278,24 +665,26 @@ export default function LeadsPage() {
 
     window.addEventListener(
       'resize',
-      syncViewport,
+      syncViewport
     )
 
     return () => {
       window.removeEventListener(
         'resize',
-        syncViewport,
+        syncViewport
       )
     }
   }, [])
 
+  /* =======================================================
+     LOAD LEADS
+  ======================================================= */
+
   async function loadLeads() {
     setLoading(true)
+    setErrorMessage(null)
 
-    const {
-      data,
-      error,
-    } = await supabase
+    const { data, error } = await supabase
       .from('leads')
       .select('*')
       .order('created_at', {
@@ -305,17 +694,21 @@ export default function LeadsPage() {
     if (error) {
       console.error(
         'Failed to load leads:',
-        error,
+        error
+      )
+
+      setErrorMessage(
+        `Unable to load leads: ${error.message}`
       )
 
       setLeads([])
-      setLoading(false)
-      return
+    } else {
+      setLeads(
+        Array.isArray(data)
+          ? (data as LeadRow[])
+          : []
+      )
     }
-
-    setLeads(
-      (data as LeadRow[]) || [],
-    )
 
     setLoading(false)
   }
@@ -324,114 +717,106 @@ export default function LeadsPage() {
     void loadLeads()
   }, [])
 
+  /* =======================================================
+     ROW MODEL
+  ======================================================= */
+
   const rows = useMemo(() => {
     return leads.map((lead) => {
       const stage = getLeadStage(lead)
+      const stageMeta = getStageMeta(stage)
+
+      const analysis = analyzeLead(lead)
 
       return {
         lead,
 
         address: getAddress(lead),
-
         location: getLocation(lead),
 
-        owner:
-          lead.owner_name ||
-          'Unknown owner',
-
-        phone:
-          getPhone(lead) ||
-          'No phone',
-
-        email:
-          getEmail(lead) ||
-          'No email',
+        owner: getOwner(lead),
+        phone: getPhone(lead),
+        email: getEmail(lead),
 
         stage,
-
         stageLabel: titleCase(stage),
 
-        stageColor:
-          getStageTone(stage),
+        stageColor: stageMeta.color,
+        stageBackground:
+          stageMeta.background,
+        stageBorder:
+          stageMeta.border,
 
         askingPrice:
-          lead.asking_price ??
-          lead.listing_price ??
-          null,
+          getAskingPrice(lead),
+
+        marketValue:
+          getMarketValue(lead),
 
         arv:
-          lead.arv ?? null,
+          getArv(lead),
 
-        strength:
-          lead.strength ?? null,
+        mao:
+          getMao(lead),
 
-        motivation:
-          lead.motivation ?? null,
-
-        contactability:
-          lead.contactability ?? null,
-
-        marketability:
-          lead.marketability ?? null,
+        analysis,
       }
     })
   }, [leads])
 
+  /* =======================================================
+     FILTER
+  ======================================================= */
+
   const filteredRows = useMemo(() => {
-    const q =
-      query.trim().toLowerCase()
+    const q = query
+      .trim()
+      .toLowerCase()
 
     return rows.filter((row) => {
       const haystack = [
         row.address,
         row.location,
         row.owner,
-        row.phone,
-        row.email,
+        row.phone || '',
+        row.email || '',
         row.stageLabel,
       ]
         .join(' ')
         .toLowerCase()
 
       if (
-        q &&
+        q.length > 0 &&
         !haystack.includes(q)
       ) {
         return false
       }
 
-      if (
-        filter === 'high'
-      ) {
+      if (filter === 'high') {
         return (
-          isNumber(row.strength) &&
-          row.strength >= 80
+          row.analysis.strength !== null &&
+          row.analysis.strength >= 80
         )
       }
 
-      if (
-        filter === 'workable'
-      ) {
+      if (filter === 'workable') {
         return (
-          isNumber(row.strength) &&
-          row.strength >= 60
+          row.analysis.strength !== null &&
+          row.analysis.strength >= 60
         )
       }
 
-      if (
-        filter === 'missing-contact'
-      ) {
+      if (filter === 'missing-contact') {
         return (
-          !row.phone ||
-          row.phone === 'No phone'
+          !row.phone &&
+          !row.email
         )
       }
 
-      if (
-        filter === 'missing-market'
-      ) {
+      if (filter === 'missing-market') {
         return (
-          !isNumber(row.arv)
+          row.marketValue === null &&
+          row.arv === null
         )
       }
 
@@ -443,10 +828,14 @@ export default function LeadsPage() {
     filter,
   ])
 
+  /* =======================================================
+     STATS
+  ======================================================= */
+
   const stats = useMemo(() => {
     const analyzed = rows.filter(
       (row) =>
-        isNumber(row.strength),
+        row.analysis.strength !== null
     )
 
     return {
@@ -455,146 +844,168 @@ export default function LeadsPage() {
       highPriority:
         analyzed.filter(
           (row) =>
-            row.strength >= 80,
+            row.analysis.strength !== null &&
+            row.analysis.strength >= 80
         ).length,
 
       workable:
         analyzed.filter(
           (row) =>
-            row.strength >= 60,
+            row.analysis.strength !== null &&
+            row.analysis.strength >= 60
         ).length,
 
-      unanalyzed:
-        rows.length -
-        analyzed.length,
+      insufficient:
+        rows.filter(
+          (row) =>
+            row.analysis.strength === null
+        ).length,
 
       missingContact:
         rows.filter(
           (row) =>
-            !getPhone(row.lead),
+            !row.phone &&
+            !row.email
         ).length,
     }
   }, [rows])
 
+  /* =======================================================
+     STATUS UPDATE
+  ======================================================= */
+
   async function handleUpdateStage(
     leadId: string,
-    nextStage: string,
+    nextStage: string
   ) {
-    if (
-      !STAGE_OPTIONS.some(
-        (option) =>
-          option.value === nextStage,
-      )
-    ) {
+    const normalizedStage =
+      normalizeStage(nextStage)
+
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    /*
+     * Prevent duplicate requests.
+     */
+    if (savingIds.includes(leadId)) {
       return
     }
 
-    setSavingLeadId(leadId)
-
-    const {
-      error,
-    } = await supabase
-      .from('leads')
-      .update({
-        stage: nextStage,
-      })
-      .eq('id', leadId)
-
-    if (error) {
-      console.error(
-        'Failed to update lead stage:',
-        error,
+    const previousLead =
+      leads.find(
+        (lead) => lead.id === leadId
       )
 
-      alert(
-        `Failed to update lead stage: ${error.message}`,
-      )
-
-      setSavingLeadId(null)
+    if (!previousLead) {
       return
     }
 
+    const previousStatus =
+      previousLead.status ?? null
+
+    /*
+     * Optimistic UI.
+     *
+     * We update only `status`.
+     * Pipeline should read this same canonical field.
+     */
     setLeads((current) =>
       current.map((lead) =>
         lead.id === leadId
           ? {
               ...lead,
-              stage: nextStage,
+              status: normalizedStage,
             }
-          : lead,
-      ),
+          : lead
+      )
     )
 
-    setSavingLeadId(null)
-  }
+    setSavingIds((current) => [
+      ...current,
+      leadId,
+    ])
 
-  async function handleBulkStageChange() {
-    if (
-      selectedLeadIds.length === 0 ||
-      savingBulk
-    ) {
-      return
-    }
-
-    setSavingBulk(true)
-
-    const {
-      error,
-    } = await supabase
+    /*
+     * Supabase update.
+     *
+     * IMPORTANT:
+     * Only update the known canonical `status`
+     * column instead of guessing that every possible
+     * legacy column exists.
+     */
+    const { error } = await supabase
       .from('leads')
       .update({
-        stage: bulkStage,
+        status: normalizedStage,
       })
-      .in(
-        'id',
-        selectedLeadIds,
+      .eq('id', leadId)
+
+    setSavingIds((current) =>
+      current.filter(
+        (id) => id !== leadId
       )
+    )
 
     if (error) {
       console.error(
-        'Failed to update bulk leads:',
-        error,
+        'Failed to update lead status:',
+        error
       )
 
-      alert(
-        `Failed to update leads: ${error.message}`,
+      /*
+       * Roll back optimistic change.
+       */
+      setLeads((current) =>
+        current.map((lead) =>
+          lead.id === leadId
+            ? {
+                ...lead,
+                status: previousStatus,
+              }
+            : lead
+        )
       )
 
-      setSavingBulk(false)
+      setErrorMessage(
+        `Could not update status: ${error.message}`
+      )
+
       return
     }
 
-    setLeads((current) =>
-      current.map((lead) =>
-        selectedLeadIds.includes(
-          lead.id,
-        )
-          ? {
-              ...lead,
-              stage: bulkStage,
-            }
-          : lead,
-      ),
+    setSuccessMessage(
+      `Lead moved to ${titleCase(
+        normalizedStage
+      )}.`
     )
 
-    setSelectedLeadIds([])
-    setSavingBulk(false)
+    /*
+     * Clear success notification automatically.
+     */
+    window.setTimeout(() => {
+      setSuccessMessage(null)
+    }, 2500)
   }
 
+  /* =======================================================
+     DELETE
+  ======================================================= */
+
   async function handleDeleteLead(
-    leadId: string,
+    leadId: string
   ) {
-    if (
-      !confirm(
-        'Delete this lead permanently?',
-      )
-    ) {
+    const confirmed = window.confirm(
+      'Delete this lead permanently? This cannot be undone.'
+    )
+
+    if (!confirmed) {
       return
     }
 
-    const {
-      error,
-    } = await supabase
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    const { error } = await supabase
       .from('leads')
       .delete()
       .eq('id', leadId)
@@ -602,11 +1013,11 @@ export default function LeadsPage() {
     if (error) {
       console.error(
         'Failed to delete lead:',
-        error,
+        error
       )
 
-      alert(
-        `Failed to delete lead: ${error.message}`,
+      setErrorMessage(
+        `Could not delete lead: ${error.message}`
       )
 
       return
@@ -614,19 +1025,107 @@ export default function LeadsPage() {
 
     setLeads((current) =>
       current.filter(
-        (lead) =>
-          lead.id !== leadId,
-      ),
+        (lead) => lead.id !== leadId
+      )
     )
 
-    setSelectedLeadIds(
-      (current) =>
-        current.filter(
-          (id) =>
-            id !== leadId,
-        ),
+    setSelectedLeadIds((current) =>
+      current.filter(
+        (id) => id !== leadId
+      )
     )
+
+    setSuccessMessage(
+      'Lead deleted.'
+    )
+
+    window.setTimeout(() => {
+      setSuccessMessage(null)
+    }, 2500)
   }
+
+  /* =======================================================
+     BULK STATUS
+  ======================================================= */
+
+  async function handleBulkStageChange() {
+    if (
+      selectedLeadIds.length === 0
+    ) {
+      return
+    }
+
+    setErrorMessage(null)
+    setSuccessMessage(null)
+
+    const selectedIds =
+      [...selectedLeadIds]
+
+    /*
+     * Optimistic update.
+     */
+    setLeads((current) =>
+      current.map((lead) =>
+        selectedIds.includes(lead.id)
+          ? {
+              ...lead,
+              status: bulkStage,
+            }
+          : lead
+      )
+    )
+
+    /*
+     * One filtered Supabase update.
+     *
+     * This uses the same canonical status field
+     * as the individual status control.
+     */
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        status: bulkStage,
+      })
+      .in('id', selectedIds)
+
+    if (error) {
+      console.error(
+        'Failed to bulk update leads:',
+        error
+      )
+
+      /*
+       * Reload to restore the database state.
+       */
+      await loadLeads()
+
+      setErrorMessage(
+        `Could not update selected leads: ${error.message}`
+      )
+
+      return
+    }
+
+    setSelectedLeadIds([])
+
+    setSuccessMessage(
+      `${selectedIds.length} lead${
+        selectedIds.length === 1
+          ? ''
+          : 's'
+      } moved to ${titleCase(
+        bulkStage
+      )}.`
+    )
+
+    window.setTimeout(() => {
+      setSuccessMessage(null)
+    }, 2500)
+  }
+
+  /* =======================================================
+     BULK DELETE
+  ======================================================= */
 
   async function handleBulkDelete() {
     if (
@@ -635,36 +1134,37 @@ export default function LeadsPage() {
       return
     }
 
-    if (
-      !confirm(
+    const confirmed =
+      window.confirm(
         `Delete ${selectedLeadIds.length} selected lead${
           selectedLeadIds.length === 1
             ? ''
             : 's'
-        } permanently?`,
+        } permanently?`
       )
-    ) {
+
+    if (!confirmed) {
       return
     }
 
-    const {
-      error,
-    } = await supabase
+    setErrorMessage(null)
+
+    const selectedIds =
+      [...selectedLeadIds]
+
+    const { error } = await supabase
       .from('leads')
       .delete()
-      .in(
-        'id',
-        selectedLeadIds,
-      )
+      .in('id', selectedIds)
 
     if (error) {
       console.error(
         'Failed to delete selected leads:',
-        error,
+        error
       )
 
-      alert(
-        `Failed to delete selected leads: ${error.message}`,
+      setErrorMessage(
+        `Could not delete selected leads: ${error.message}`
       )
 
       return
@@ -673,28 +1173,54 @@ export default function LeadsPage() {
     setLeads((current) =>
       current.filter(
         (lead) =>
-          !selectedLeadIds.includes(
-            lead.id,
-          ),
-      ),
+          !selectedIds.includes(
+            lead.id
+          )
+      )
     )
 
     setSelectedLeadIds([])
+
+    setSuccessMessage(
+      `${selectedIds.length} lead${
+        selectedIds.length === 1
+          ? ''
+          : 's'
+      } deleted.`
+    )
+
+    window.setTimeout(() => {
+      setSuccessMessage(null)
+    }, 2500)
+  }
+
+  /* =======================================================
+     SELECTION
+  ======================================================= */
+
+  function toggleSelectLead(
+    id: string
+  ) {
+    setSelectedLeadIds(
+      (current) =>
+        current.includes(id)
+          ? current.filter(
+              (item) => item !== id
+            )
+          : [...current, id]
+    )
   }
 
   function toggleSelectAll() {
-    if (
-      filteredRows.length === 0
-    ) {
-      return
-    }
+    const visibleIds =
+      filteredRows.map(
+        (row) => row.lead.id
+      )
 
     const allSelected =
-      filteredRows.every(
-        (row) =>
-          selectedLeadIds.includes(
-            row.lead.id,
-          ),
+      visibleIds.length > 0 &&
+      visibleIds.every((id) =>
+        selectedLeadIds.includes(id)
       )
 
     if (allSelected) {
@@ -702,51 +1228,42 @@ export default function LeadsPage() {
         (current) =>
           current.filter(
             (id) =>
-              !filteredRows.some(
-                (row) =>
-                  row.lead.id === id,
-              ),
-          ),
+              !visibleIds.includes(id)
+          )
       )
     } else {
       setSelectedLeadIds(
-        (current) => [
-          ...new Set([
-            ...current,
-            ...filteredRows.map(
-              (row) =>
-                row.lead.id,
-            ),
-          ]),
-        ],
+        (current) =>
+          Array.from(
+            new Set([
+              ...current,
+              ...visibleIds,
+            ])
+          )
       )
     }
   }
 
-  function toggleSelectLead(
-    id: string,
-  ) {
-    setSelectedLeadIds(
-      (current) =>
-        current.includes(id)
-          ? current.filter(
-              (item) =>
-                item !== id,
-            )
-          : [
-              ...current,
-              id,
-            ],
+  const allVisibleSelected =
+    filteredRows.length > 0 &&
+    filteredRows.every(
+      (row) =>
+        selectedLeadIds.includes(
+          row.lead.id
+        )
     )
-  }
+
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
     <PageShell
       title="Leads"
       subtitle={
         isMobile
-          ? 'Scan, update, and open leads quickly.'
-          : 'Your acquisition command center for leads, analysis, and pipeline movement.'
+          ? 'Prioritize opportunities, update stages, and open the property workspace.'
+          : 'Your central lead control center — property intelligence, contact information, pipeline stage, and workspace access.'
       }
       actions={
         <>
@@ -761,8 +1278,13 @@ export default function LeadsPage() {
           />
 
           <StatPill
-            label="Unanalyzed"
-            value={stats.unanalyzed}
+            label="Workable"
+            value={stats.workable}
+          />
+
+          <StatPill
+            label="Needs Data"
+            value={stats.insufficient}
           />
 
           {!isMobile && (
@@ -780,132 +1302,212 @@ export default function LeadsPage() {
     >
       <SectionCard
         title="Lead Control Center"
-        subtitle="Search, filter, move leads through your pipeline, and open the full property workspace."
+        subtitle="Find opportunities quickly, keep pipeline stages synchronized, and open the full property workspace."
       >
+        {/* =================================================
+            NOTIFICATIONS
+        ================================================= */}
+
+        {(errorMessage ||
+          successMessage) && (
+          <div
+            style={{
+              ...notificationStyle,
+              ...(errorMessage
+                ? errorNotificationStyle
+                : successNotificationStyle),
+            }}
+          >
+            <span>
+              {errorMessage ||
+                successMessage}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage(null)
+                setSuccessMessage(null)
+              }}
+              style={
+                notificationCloseStyle
+              }
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* =================================================
+            TOOLBAR
+        ================================================= */}
+
         <div style={toolbarStyle}>
           <div
             style={
-              searchRowStyle
+              searchAndImportStyle
             }
           >
-            <input
-              value={query}
-              onChange={(event) =>
-                setQuery(
-                  event.target.value,
-                )
-              }
-              className="crm-input"
-              placeholder="Search address, owner, phone, email..."
+            <div
               style={
-                searchStyle
+                searchWrapperStyle
               }
-            />
+            >
+              <span
+                style={
+                  searchIconStyle
+                }
+              >
+                ⌕
+              </span>
+
+              <input
+                value={query}
+                onChange={(event) =>
+                  setQuery(
+                    event.target.value
+                  )
+                }
+                className="crm-input"
+                placeholder="Search address, owner, phone, email..."
+                style={
+                  searchInputStyle
+                }
+              />
+
+              {query && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQuery('')
+                  }
+                  style={
+                    clearSearchStyle
+                  }
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <Link
+              href="/imports"
+              style={
+                importLinkStyle
+              }
+            >
+              <ActionButton
+                compact
+                tone="gold"
+              >
+                Import Leads
+              </ActionButton>
+            </Link>
           </div>
 
           <div
             style={
-              filterRowStyle
+              filterScrollStyle
             }
           >
-            {(
-              [
-                [
-                  'all',
-                  'All Leads',
-                ],
-                [
-                  'high',
-                  'High Priority',
-                ],
-                [
-                  'workable',
-                  'Workable',
-                ],
-                [
-                  'missing-contact',
-                  'Missing Contact',
-                ],
-                [
-                  'missing-market',
-                  'Needs Analysis',
-                ],
-              ] as Array<
-                [FilterKey, string]
-              >
-            ).map(
-              ([
-                key,
-                label,
-              ]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() =>
-                    setFilter(key)
-                  }
-                  style={
-                    filter === key
-                      ? activeChipStyle
-                      : chipStyle
-                  }
-                >
-                  {label}
-                </button>
-              ),
-            )}
+            <FilterButton
+              label="All"
+              active={
+                filter === 'all'
+              }
+              onClick={() =>
+                setFilter('all')
+              }
+            />
+
+            <FilterButton
+              label="High Priority"
+              active={
+                filter === 'high'
+              }
+              onClick={() =>
+                setFilter('high')
+              }
+            />
+
+            <FilterButton
+              label="Workable"
+              active={
+                filter === 'workable'
+              }
+              onClick={() =>
+                setFilter('workable')
+              }
+            />
+
+            <FilterButton
+              label="Missing Contact"
+              active={
+                filter ===
+                'missing-contact'
+              }
+              onClick={() =>
+                setFilter(
+                  'missing-contact'
+                )
+              }
+            />
+
+            <FilterButton
+              label="Missing Market Data"
+              active={
+                filter ===
+                'missing-market'
+              }
+              onClick={() =>
+                setFilter(
+                  'missing-market'
+                )
+              }
+            />
           </div>
 
           {selectedLeadIds.length >
             0 && (
             <div
               style={
-                bulkBarContainerStyle
+                bulkBarStyle
               }
             >
-              <div>
-                <div
-                  style={
-                    bulkCountStyle
-                  }
-                >
+              <div
+                style={
+                  bulkSelectionTextStyle
+                }
+              >
+                <strong>
                   {
                     selectedLeadIds.length
-                  }{' '}
-                  selected
-                </div>
-
-                <div
-                  style={
-                    bulkHintStyle
                   }
-                >
-                  Apply one pipeline
-                  stage to the
-                  selected leads.
-                </div>
+                </strong>{' '}
+                selected
               </div>
 
               <div
                 style={
-                  bulkActionGroupStyle
+                  bulkActionsStyle
                 }
               >
                 <select
-                  value={bulkStage}
-                  disabled={
-                    savingBulk
+                  value={
+                    bulkStage
                   }
-                  onChange={(
-                    event,
-                  ) =>
+                  onChange={(event) =>
                     setBulkStage(
-                      event.target
-                        .value as StageValue,
+                      normalizeStage(
+                        event.target
+                          .value
+                      )
                     )
                   }
                   style={
-                    selectStyle
+                    bulkSelectStyle
                   }
                 >
                   {STAGE_OPTIONS.map(
@@ -917,39 +1519,26 @@ export default function LeadsPage() {
                         value={
                           option.value
                         }
-                        style={
-                          optionStyle
-                        }
                       >
-                        {
-                          option.label
-                        }
+                        {option.label}
                       </option>
-                    ),
+                    )
                   )}
                 </select>
 
                 <ActionButton
                   compact
                   tone="gold"
-                  disabled={
-                    savingBulk
-                  }
                   onClick={
                     handleBulkStageChange
                   }
                 >
-                  {savingBulk
-                    ? 'Saving...'
-                    : 'Apply Stage'}
+                  Move Stage
                 </ActionButton>
 
                 <ActionButton
                   compact
                   tone="danger"
-                  disabled={
-                    savingBulk
-                  }
                   onClick={
                     handleBulkDelete
                   }
@@ -960,6 +1549,10 @@ export default function LeadsPage() {
             </div>
           )}
         </div>
+
+        {/* =================================================
+            CONTENT
+        ================================================= */}
 
         {loading ? (
           <LoadingState />
@@ -981,38 +1574,37 @@ export default function LeadsPage() {
           >
             {filteredRows.map(
               (row) => (
-                <LeadCard
+                <MobileLeadCard
                   key={
                     row.lead.id
                   }
                   row={row}
                   selected={selectedLeadIds.includes(
-                    row.lead.id,
-                  )}
-                  saving={
-                    savingLeadId ===
                     row.lead.id
-                  }
+                  )}
+                  saving={savingIds.includes(
+                    row.lead.id
+                  )}
                   onSelect={() =>
                     toggleSelectLead(
-                      row.lead.id,
+                      row.lead.id
                     )
                   }
                   onStageChange={(
-                    stage,
+                    stage
                   ) =>
                     void handleUpdateStage(
                       row.lead.id,
-                      stage,
+                      stage
                     )
                   }
                   onDelete={() =>
                     void handleDeleteLead(
-                      row.lead.id,
+                      row.lead.id
                     )
                   }
                 />
-              ),
+              )
             )}
           </div>
         ) : (
@@ -1021,20 +1613,29 @@ export default function LeadsPage() {
             selectedLeadIds={
               selectedLeadIds
             }
-            savingLeadId={
-              savingLeadId
+            allVisibleSelected={
+              allVisibleSelected
             }
+            savingIds={savingIds}
             onToggleAll={
               toggleSelectAll
             }
             onToggleLead={
               toggleSelectLead
             }
-            onStageChange={
-              handleUpdateStage
+            onStageChange={(
+              id,
+              stage
+            ) =>
+              void handleUpdateStage(
+                id,
+                stage
+              )
             }
-            onDelete={
-              handleDeleteLead
+            onDelete={(id) =>
+              void handleDeleteLead(
+                id
+              )
             }
           />
         )}
@@ -1043,25 +1644,61 @@ export default function LeadsPage() {
   )
 }
 
-type LeadDisplayRow = {
+/* =========================================================
+   FILTER BUTTON
+========================================================= */
+
+function FilterButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={
+        active
+          ? activeFilterStyle
+          : filterButtonStyle
+      }
+    >
+      {label}
+    </button>
+  )
+}
+
+/* =========================================================
+   MOBILE CARD
+========================================================= */
+
+type LeadViewRow = {
   lead: LeadRow
   address: string
   location: string
   owner: string
-  phone: string
-  email: string
+  phone: string | null
+  email: string | null
+
   stage: StageValue
   stageLabel: string
   stageColor: string
+  stageBackground: string
+  stageBorder: string
+
   askingPrice: number | null
+  marketValue: number | null
   arv: number | null
-  strength: number | null
-  motivation: number | null
-  contactability: number | null
-  marketability: number | null
+  mao: number | null
+
+  analysis: AnalysisResult
 }
 
-function LeadCard({
+function MobileLeadCard({
   row,
   selected,
   saving,
@@ -1069,146 +1706,110 @@ function LeadCard({
   onStageChange,
   onDelete,
 }: {
-  row: LeadDisplayRow
+  row: LeadViewRow
   selected: boolean
   saving: boolean
   onSelect: () => void
   onStageChange: (
-    stage: string,
+    stage: string
   ) => void
   onDelete: () => void
 }) {
+  const strength =
+    row.analysis.strength
+
   return (
     <article
       style={
-        leadCardStyle
+        mobileLeadCardStyle
       }
     >
+      {/* Header */}
       <div
         style={
-          cardHeaderStyle
+          mobileCardHeaderStyle
         }
       >
         <div
           style={
-            cardHeaderMainStyle
+            mobileHeaderLeftStyle
           }
         >
           <input
             type="checkbox"
             checked={selected}
             onChange={onSelect}
-            style={
-              checkboxStyle
-            }
+            style={checkboxStyle}
+            aria-label="Select lead"
           />
 
           <div
             style={
-              cardIdentityStyle
+              propertyIdentityStyle
             }
           >
             <Link
               href={`/leads/${row.lead.id}`}
               style={
-                cardLinkStyle
+                propertyAddressLinkStyle
               }
             >
-              <div
-                style={
-                  cardAddressStyle
-                }
-              >
-                {row.address}
-              </div>
-
-              <div
-                style={
-                  cardLocationStyle
-                }
-              >
-                {row.location}
-              </div>
+              {row.address}
             </Link>
-          </div>
-        </div>
 
-        <span
-          style={{
-            ...stageBadgeStyle,
-            color: row.stageColor,
-            borderColor:
-              `${row.stageColor}55`,
-            background:
-              `${row.stageColor}12`,
-          }}
-        >
-          {row.stageLabel}
-        </span>
-      </div>
-
-      <div
-        style={
-          cardDividerStyle
-        }
-      />
-
-      <div
-        style={
-          cardOwnerSectionStyle
-        }
-      >
-        <div>
-          <div
-            style={
-              cardEyebrowStyle
-            }
-          >
-            Seller
-          </div>
-
-          <div
-            style={
-              cardOwnerStyle
-            }
-          >
-            {row.owner}
-          </div>
-        </div>
-
-        <div
-          style={
-            cardContactStyle
-          }
-        >
-          <div>
-            {row.phone}
-          </div>
-
-          {row.email !==
-            'No email' && (
             <div
               style={
-                cardSecondaryTextStyle
+                propertyLocationStyle
               }
             >
-              {row.email}
+              {row.location}
             </div>
-          )}
+          </div>
         </div>
+
+        {strength !== null ? (
+          <StrengthBadge
+            score={strength}
+          />
+        ) : (
+          <span
+            style={
+              noDataBadgeStyle
+            }
+          >
+            Needs Data
+          </span>
+        )}
       </div>
 
+      {/* Stage */}
       <div
         style={
-          stageEditorStyle
+          stageCardStyle
         }
       >
         <div
           style={
-            cardEyebrowStyle
+            stageLabelRowStyle
           }
         >
-          Pipeline Stage
+          <span
+            style={
+              fieldLabelStyle
+            }
+          >
+            PIPELINE STAGE
+          </span>
+
+          {saving && (
+            <span
+              style={
+                savingTextStyle
+              }
+            >
+              Saving…
+            </span>
+          )}
         </div>
 
         <select
@@ -1216,14 +1817,16 @@ function LeadCard({
           disabled={saving}
           onChange={(event) =>
             onStageChange(
-              event.target.value,
+              event.target.value
             )
           }
           style={{
-            ...stageSelectStyle,
+            ...mobileStageSelectStyle,
             color: row.stageColor,
             borderColor:
-              `${row.stageColor}55`,
+              row.stageBorder,
+            background:
+              row.stageBackground,
           }}
         >
           {STAGE_OPTIONS.map(
@@ -1235,86 +1838,200 @@ function LeadCard({
                 value={
                   option.value
                 }
-                style={
-                  optionStyle
-                }
               >
-                {
-                  option.label
-                }
+                {option.label}
               </option>
-            ),
+            )
           )}
         </select>
       </div>
 
+      {/* Seller */}
+      <div
+        style={
+          sellerBlockStyle
+        }
+      >
+        <div>
+          <div
+            style={
+              fieldLabelStyle
+            }
+          >
+            OWNER
+          </div>
+
+          <div
+            style={
+              ownerNameStyle
+            }
+          >
+            {row.owner}
+          </div>
+        </div>
+
+        <div
+          style={
+            contactActionsStyle
+          }
+        >
+          {row.phone ? (
+            <a
+              href={`tel:${row.phone}`}
+              style={
+                contactActionStyle
+              }
+            >
+              Call
+            </a>
+          ) : null}
+
+          {row.email ? (
+            <a
+              href={`mailto:${row.email}`}
+              style={
+                contactActionStyle
+              }
+            >
+              Email
+            </a>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Numbers */}
       <div
         style={
           financialGridStyle
         }
       >
-        <MetricTile
-          label="List Price"
+        <FinancialCard
+          label="Asking"
           value={formatMoney(
-            row.askingPrice,
+            row.askingPrice
           )}
         />
 
-        <MetricTile
+        <FinancialCard
+          label="Market"
+          value={formatMoney(
+            row.marketValue
+          )}
+        />
+
+        <FinancialCard
           label="ARV"
           value={formatMoney(
-            row.arv,
+            row.arv
           )}
           muted={
-            !isNumber(row.arv)
+            row.arv === null
+          }
+        />
+
+        <FinancialCard
+          label="MAO"
+          value={formatMoney(
+            row.mao
+          )}
+          muted={
+            row.mao === null
           }
         />
       </div>
 
+      {/* Analysis */}
       <div
         style={
-          scoreGridStyle
+          analysisCardStyle
         }
       >
-        <ScoreTile
-          label="Strength"
-          value={
-            row.strength
+        <div
+          style={
+            analysisHeaderStyle
           }
-        />
+        >
+          <span
+            style={
+              fieldLabelStyle
+            }
+          >
+            PROPERTY ANALYSIS
+          </span>
 
-        <ScoreTile
-          label="Motivation"
-          value={
-            row.motivation
-          }
-        />
+          <span
+            style={
+              evidenceLevelStyle(
+                row.analysis
+                  .evidenceLevel
+              )
+            }
+          >
+            {formatEvidenceLevel(
+              row.analysis
+                .evidenceLevel
+            )}
+          </span>
+        </div>
 
-        <ScoreTile
-          label="Contact"
-          value={
-            row.contactability
-          }
-        />
-
-        <ScoreTile
-          label="Market"
-          value={
-            row.marketability
-          }
-        />
+        {row.analysis
+          .reasons.length >
+        0 ? (
+          <div
+            style={
+              analysisReasonListStyle
+            }
+          >
+            {row.analysis.reasons
+              .slice(0, 2)
+              .map(
+                (
+                  reason
+                ) => (
+                  <div
+                    key={
+                      reason
+                    }
+                    style={
+                      analysisReasonStyle
+                    }
+                  >
+                    <span>
+                      •
+                    </span>
+                    <span>
+                      {
+                        reason
+                      }
+                    </span>
+                  </div>
+                )
+              )}
+          </div>
+        ) : (
+          <div
+            style={
+              insufficientDataStyle
+            }
+          >
+            Not enough verified property
+            information to calculate a
+            meaningful lead strength.
+          </div>
+        )}
       </div>
 
+      {/* Footer */}
       <div
         style={
-          cardFooterStyle
+          mobileCardFooterStyle
         }
       >
         <button
           type="button"
           onClick={onDelete}
           style={
-            deleteButtonStyle
+            mobileDeleteStyle
           }
         >
           Delete
@@ -1326,59 +2043,68 @@ function LeadCard({
             workspaceButtonStyle
           }
         >
-          Open Workspace →
+          Open Workspace
+          <span>→</span>
         </Link>
       </div>
     </article>
   )
 }
 
+/* =========================================================
+   DESKTOP TABLE
+========================================================= */
+
 function DesktopLeadTable({
   rows,
   selectedLeadIds,
-  savingLeadId,
+  allVisibleSelected,
+  savingIds,
   onToggleAll,
   onToggleLead,
   onStageChange,
   onDelete,
 }: {
-  rows: LeadDisplayRow[]
+  rows: LeadViewRow[]
   selectedLeadIds: string[]
-  savingLeadId: string | null
+  allVisibleSelected: boolean
+  savingIds: string[]
   onToggleAll: () => void
   onToggleLead: (
-    id: string,
+    id: string
   ) => void
   onStageChange: (
     id: string,
-    stage: string,
+    stage: string
   ) => void
   onDelete: (
-    id: string,
+    id: string
   ) => void
 }) {
-  const allSelected =
-    rows.length > 0 &&
-    rows.every((row) =>
-      selectedLeadIds.includes(
-        row.lead.id,
-      ),
-    )
-
   return (
-    <div className="crm-table-wrap">
-      <table className="crm-table">
+    <div
+      className="crm-table-wrap"
+      style={
+        desktopTableWrapperStyle
+      }
+    >
+      <table
+        className="crm-table"
+        style={
+          desktopTableStyle
+        }
+      >
         <thead>
           <tr>
             <th
-              style={{
-                width: 40,
-              }}
+              style={
+                checkboxColumnStyle
+              }
             >
               <input
                 type="checkbox"
                 checked={
-                  allSelected
+                  allVisibleSelected
                 }
                 onChange={
                   onToggleAll
@@ -1386,206 +2112,254 @@ function DesktopLeadTable({
                 style={
                   checkboxStyle
                 }
+                aria-label="Select all visible leads"
               />
             </th>
 
             <th>Property</th>
-            <th>Seller</th>
-            <th>Stage</th>
-            <th>List Price</th>
+            <th>Owner</th>
+            <th>Contact</th>
+            <th>Pipeline</th>
+            <th>Asking</th>
             <th>ARV</th>
-            <th>Intelligence</th>
-            <th />
+            <th>Analysis</th>
+            <th>Action</th>
           </tr>
         </thead>
 
         <tbody>
           {rows.map(
-            (row) => (
-              <tr
-                key={
+            (row) => {
+              const saving =
+                savingIds.includes(
                   row.lead.id
-                }
-              >
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedLeadIds.includes(
-                      row.lead.id,
-                    )}
-                    onChange={() =>
-                      onToggleLead(
-                        row.lead.id,
-                      )
-                    }
-                    style={
-                      checkboxStyle
-                    }
-                  />
-                </td>
+                )
 
-                <td>
-                  <Link
-                    href={`/leads/${row.lead.id}`}
-                    style={
-                      cardLinkStyle
-                    }
-                  >
-                    <div
+              return (
+                <tr
+                  key={
+                    row.lead.id
+                  }
+                  style={
+                    tableRowStyle
+                  }
+                >
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedLeadIds.includes(
+                        row.lead.id
+                      )}
+                      onChange={() =>
+                        onToggleLead(
+                          row.lead.id
+                        )
+                      }
                       style={
-                        desktopLeadTitleStyle
-                      }
-                    >
-                      {row.address}
-                    </div>
-
-                    <div
-                      style={
-                        desktopSubStyle
-                      }
-                    >
-                      {row.location}
-                    </div>
-                  </Link>
-                </td>
-
-                <td>
-                  <div>
-                    {row.owner}
-                  </div>
-
-                  <div
-                    style={
-                      desktopSubStyle
-                    }
-                  >
-                    {row.phone}
-                  </div>
-                </td>
-
-                <td>
-                  <select
-                    value={
-                      row.stage
-                    }
-                    disabled={
-                      savingLeadId ===
-                      row.lead.id
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      onStageChange(
-                        row.lead.id,
-                        event.target
-                          .value,
-                      )
-                    }
-                    style={{
-                      ...stageSelectStyle,
-                      color:
-                        row.stageColor,
-                      borderColor:
-                        `${row.stageColor}55`,
-                    }}
-                  >
-                    {STAGE_OPTIONS.map(
-                      (
-                        option,
-                      ) => (
-                        <option
-                          key={
-                            option.value
-                          }
-                          value={
-                            option.value
-                          }
-                          style={
-                            optionStyle
-                          }
-                        >
-                          {
-                            option.label
-                          }
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </td>
-
-                <td>
-                  {formatMoney(
-                    row.askingPrice,
-                  )}
-                </td>
-
-                <td>
-                  {formatMoney(
-                    row.arv,
-                  )}
-                </td>
-
-                <td>
-                  <div
-                    style={
-                      desktopScoresStyle
-                    }
-                  >
-                    <ScoreMini
-                      label="STR"
-                      value={
-                        row.strength
+                        checkboxStyle
                       }
                     />
+                  </td>
 
-                    <ScoreMini
-                      label="MOT"
-                      value={
-                        row.motivation
-                      }
-                    />
-
-                    <ScoreMini
-                      label="CON"
-                      value={
-                        row.contactability
-                      }
-                    />
-                  </div>
-                </td>
-
-                <td>
-                  <div
+                  <td
                     style={
-                      desktopActionsStyle
+                      propertyCellStyle
                     }
                   >
                     <Link
                       href={`/leads/${row.lead.id}`}
+                      style={
+                        desktopPropertyLinkStyle
+                      }
                     >
-                      <ActionButton compact>
-                        Workspace
-                      </ActionButton>
+                      {row.address}
                     </Link>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onDelete(
-                          row.lead.id,
+                    <div
+                      style={
+                        desktopLocationStyle
+                      }
+                    >
+                      {row.location}
+                    </div>
+                  </td>
+
+                  <td>
+                    <div
+                      style={
+                        desktopOwnerStyle
+                      }
+                    >
+                      {row.owner}
+                    </div>
+                  </td>
+
+                  <td>
+                    <div
+                      style={
+                        desktopPhoneStyle
+                      }
+                    >
+                      {row.phone ||
+                        'No phone'}
+                    </div>
+
+                    <div
+                      style={
+                        desktopEmailStyle
+                      }
+                    >
+                      {row.email ||
+                        'No email'}
+                    </div>
+                  </td>
+
+                  <td>
+                    <select
+                      value={
+                        row.stage
+                      }
+                      disabled={
+                        saving
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        onStageChange(
+                          row.lead
+                            .id,
+                          event
+                            .target
+                            .value
                         )
                       }
-                      style={
-                        iconDeleteButtonStyle
-                      }
-                      title="Delete Lead"
+                      style={{
+                        ...desktopStageSelectStyle,
+                        color:
+                          row.stageColor,
+                        borderColor:
+                          row.stageBorder,
+                        background:
+                          row.stageBackground,
+                      }}
                     >
-                      ×
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ),
+                      {STAGE_OPTIONS.map(
+                        (
+                          option
+                        ) => (
+                          <option
+                            key={
+                              option.value
+                            }
+                            value={
+                              option.value
+                            }
+                          >
+                            {
+                              option.label
+                            }
+                          </option>
+                        )
+                      )}
+                    </select>
+                  </td>
+
+                  <td>
+                    <MoneyValue
+                      value={
+                        row.askingPrice
+                      }
+                    />
+                  </td>
+
+                  <td>
+                    <MoneyValue
+                      value={
+                        row.arv
+                      }
+                      muted={
+                        row.arv ===
+                        null
+                      }
+                    />
+                  </td>
+
+                  <td>
+                    <div
+                      style={
+                        analysisDesktopStyle
+                      }
+                    >
+                      {row.analysis
+                        .strength !==
+                      null ? (
+                        <StrengthBadge
+                          score={
+                            row.analysis
+                              .strength
+                          }
+                        />
+                      ) : (
+                        <span
+                          style={
+                            noDataBadgeStyle
+                          }
+                        >
+                          Needs Data
+                        </span>
+                      )}
+
+                      <span
+                        style={
+                          evidenceLevelStyle(
+                            row.analysis
+                              .evidenceLevel
+                          )
+                        }
+                      >
+                        {formatEvidenceLevel(
+                          row.analysis
+                            .evidenceLevel
+                        )}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div
+                      style={
+                        desktopActionsStyle
+                      }
+                    >
+                      <Link
+                        href={`/leads/${row.lead.id}`}
+                        style={
+                          desktopWorkspaceButtonStyle
+                        }
+                      >
+                        Workspace
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onDelete(
+                            row.lead
+                              .id
+                          )
+                        }
+                        style={
+                          desktopDeleteButtonStyle
+                        }
+                        title="Delete lead"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            }
           )}
         </tbody>
       </table>
@@ -1593,76 +2367,57 @@ function DesktopLeadTable({
   )
 }
 
-function ScoreTile({
-  label,
-  value,
+/* =========================================================
+   SMALL COMPONENTS
+========================================================= */
+
+function StrengthBadge({
+  score,
 }: {
-  label: string
-  value: number | null
+  score: number
 }) {
   const tone =
-    scoreTone(value)
-
-  return (
-    <div
-      style={
-        scoreTileStyle
-      }
-    >
-      <div
-        style={
-          scoreTileHeaderStyle
+    score >= 80
+      ? {
+          color: '#4ade80',
+          background:
+            'rgba(74,222,128,0.10)',
+          border:
+            'rgba(74,222,128,0.25)',
         }
-      >
-        <span>
-          {label}
-        </span>
-
-        <span
-          style={
-            scoreStatusStyle
+      : score >= 60
+        ? {
+            color: '#e6be67',
+            background:
+              'rgba(214,166,75,0.10)',
+            border:
+              'rgba(214,166,75,0.25)',
           }
-        >
-          {scoreLevel(value)}
-        </span>
-      </div>
+        : {
+            color: '#f59e0b',
+            background:
+              'rgba(245,158,11,0.10)',
+            border:
+              'rgba(245,158,11,0.25)',
+          }
 
-      <div
-        style={{
-          ...scoreTileValueStyle,
-          color:
-            tone === 'green'
-              ? '#7fe3a0'
-              : tone === 'gold'
-                ? '#e6be67'
-                : tone ===
-                    'orange'
-                  ? '#ffb84d'
-                  : '#8fc1ff',
-        }}
-      >
-        {formatScore(value)}
-      </div>
-    </div>
-  )
-}
-
-function ScoreMini({
-  label,
-  value,
-}: {
-  label: string
-  value: number | null
-}) {
   return (
-    <span className="crm-badge soft">
-      {label}{' '}
-      {formatScore(value)}
+    <span
+      style={{
+        ...strengthBadgeStyle,
+        color: tone.color,
+        background:
+          tone.background,
+        borderColor:
+          tone.border,
+      }}
+    >
+      {score}
     </span>
   )
 }
 
-function MetricTile({
+function FinancialCard({
   label,
   value,
   muted = false,
@@ -1674,12 +2429,12 @@ function MetricTile({
   return (
     <div
       style={
-        metricTileStyle
+        financialCardStyle
       }
     >
       <div
         style={
-          metricLabelStyle
+          fieldLabelStyle
         }
       >
         {label}
@@ -1687,9 +2442,9 @@ function MetricTile({
 
       <div
         style={{
-          ...metricValueStyle,
+          ...financialValueStyle,
           color: muted
-            ? 'rgba(255,255,255,0.38)'
+            ? 'rgba(255,255,255,0.32)'
             : '#ffffff',
         }}
       >
@@ -1699,28 +2454,56 @@ function MetricTile({
   )
 }
 
+function MoneyValue({
+  value,
+  muted = false,
+}: {
+  value: number | null
+  muted?: boolean
+}) {
+  return (
+    <span
+      style={{
+        ...tableMoneyStyle,
+        color: muted
+          ? 'rgba(255,255,255,0.32)'
+          : '#ffffff',
+      }}
+    >
+      {formatMoney(value)}
+    </span>
+  )
+}
+
 function LoadingState() {
   return (
     <div
       style={
-        emptyStateStyle
+        loadingStateStyle
       }
     >
       <div
         style={
-          emptyTitleStyle
+          loadingDotStyle
         }
-      >
-        Loading leads
-      </div>
+      />
 
-      <div
-        style={
-          emptyTextStyle
-        }
-      >
-        Loading your acquisition
-        records from Supabase...
+      <div>
+        <div
+          style={
+            loadingTitleStyle
+          }
+        >
+          Loading leads
+        </div>
+
+        <div
+          style={
+            loadingSubtitleStyle
+          }
+        >
+          Pulling the latest property records…
+        </div>
       </div>
     </div>
   )
@@ -1735,6 +2518,10 @@ function EmptyState({
   filter: FilterKey
   onClear: () => void
 }) {
+  const filtered =
+    query.length > 0 ||
+    filter !== 'all'
+
   return (
     <div
       style={
@@ -1746,7 +2533,7 @@ function EmptyState({
           emptyIconStyle
         }
       >
-        ○
+        {filtered ? '⌕' : '＋'}
       </div>
 
       <div
@@ -1754,35 +2541,104 @@ function EmptyState({
           emptyTitleStyle
         }
       >
-        No leads found
+        {filtered
+          ? 'No matching leads'
+          : 'No leads yet'}
       </div>
 
       <div
         style={
-          emptyTextStyle
+          emptySubtitleStyle
         }
       >
-        {query
-          ? `Nothing matches "${query}".`
-          : filter !== 'all'
-            ? 'No leads match this filter.'
-            : 'Your lead list is currently empty.'}
+        {filtered
+          ? 'Try a different search or clear your filters.'
+          : 'Import your first batch of leads to start building your pipeline.'}
       </div>
 
-      {(query ||
-        filter !== 'all') && (
+      {filtered ? (
         <button
           type="button"
           onClick={onClear}
           style={
-            clearButtonStyle
+            emptyActionStyle
           }
         >
           Clear Filters
         </button>
+      ) : (
+        <Link
+          href="/imports"
+          style={
+            emptyActionStyle
+          }
+        >
+          Import Leads
+        </Link>
       )}
     </div>
   )
+}
+
+function formatEvidenceLevel(
+  level: EvidenceLevel
+): string {
+  switch (level) {
+    case 'strong':
+      return 'Strong evidence'
+
+    case 'moderate':
+      return 'Moderate evidence'
+
+    case 'limited':
+      return 'Limited evidence'
+
+    case 'insufficient':
+    default:
+      return 'Insufficient data'
+  }
+}
+
+function evidenceLevelStyle(
+  level: EvidenceLevel
+): CSSProperties {
+  if (level === 'strong') {
+    return {
+      fontSize: 10,
+      color: '#4ade80',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.06em',
+    }
+  }
+
+  if (level === 'moderate') {
+    return {
+      fontSize: 10,
+      color: '#e6be67',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.06em',
+    }
+  }
+
+  if (level === 'limited') {
+    return {
+      fontSize: 10,
+      color: '#f59e0b',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.06em',
+    }
+  }
+
+  return {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.42)',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+  }
 }
 
 /* =========================================================
@@ -1791,108 +2647,175 @@ function EmptyState({
 
 const toolbarStyle: CSSProperties = {
   display: 'grid',
-  gap: 14,
+  gap: 12,
+  marginBottom: 18,
 }
 
-const searchRowStyle: CSSProperties = {
+const searchAndImportStyle: CSSProperties = {
   display: 'flex',
+  alignItems: 'center',
+  gap: 10,
   width: '100%',
 }
 
-const searchStyle: CSSProperties = {
+const searchWrapperStyle: CSSProperties = {
+  position: 'relative',
+  flex: 1,
+  minWidth: 0,
+}
+
+const searchIconStyle: CSSProperties = {
+  position: 'absolute',
+  left: 14,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  color: 'rgba(255,255,255,0.38)',
+  fontSize: 20,
+  pointerEvents: 'none',
+}
+
+const searchInputStyle: CSSProperties = {
   width: '100%',
   minHeight: 46,
+  paddingLeft: 42,
+  paddingRight: 38,
+  boxSizing: 'border-box',
 }
 
-const filterRowStyle: CSSProperties = {
+const clearSearchStyle: CSSProperties = {
+  position: 'absolute',
+  right: 10,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: 26,
+  height: 26,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(255,255,255,0.04)',
+  color: 'rgba(255,255,255,0.55)',
+  cursor: 'pointer',
+  fontSize: 16,
+  lineHeight: 1,
+}
+
+const importLinkStyle: CSSProperties = {
+  textDecoration: 'none',
+  flexShrink: 0,
+}
+
+const filterScrollStyle: CSSProperties = {
   display: 'flex',
+  alignItems: 'center',
   gap: 8,
   overflowX: 'auto',
   paddingBottom: 2,
 }
 
-const chipStyle: CSSProperties = {
+const filterButtonStyle: CSSProperties = {
   minHeight: 36,
-  padding: '0 14px',
+  padding: '0 13px',
   borderRadius: 999,
   border:
     '1px solid rgba(255,255,255,0.08)',
   background:
     'rgba(255,255,255,0.025)',
   color:
-    'rgba(255,255,255,0.68)',
+    'rgba(255,255,255,0.62)',
   whiteSpace: 'nowrap',
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
 }
 
-const activeChipStyle: CSSProperties = {
-  ...chipStyle,
+const activeFilterStyle: CSSProperties = {
+  ...filterButtonStyle,
   border:
-    '1px solid rgba(214,166,75,0.38)',
+    '1px solid rgba(214,166,75,0.30)',
   background:
-    'rgba(214,166,75,0.13)',
+    'rgba(214,166,75,0.12)',
   color: '#ffffff',
 }
 
-const bulkBarContainerStyle: CSSProperties = {
+const bulkBarStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  gap: 16,
-  padding: '13px 15px',
-  borderRadius: 16,
-  border:
-    '1px solid rgba(214,166,75,0.24)',
-  background:
-    'linear-gradient(180deg, rgba(28,22,12,0.92), rgba(10,9,6,0.96))',
+  gap: 12,
   flexWrap: 'wrap',
+  padding: '12px 14px',
+  borderRadius: 14,
+  border:
+    '1px solid rgba(214,166,75,0.22)',
+  background:
+    'linear-gradient(180deg, rgba(30,24,14,0.90), rgba(12,10,7,0.96))',
 }
 
-const bulkCountStyle: CSSProperties = {
-  color: '#e0b84f',
+const bulkSelectionTextStyle: CSSProperties = {
   fontSize: 13,
-  fontWeight: 800,
-}
-
-const bulkHintStyle: CSSProperties = {
   color:
-    'rgba(255,255,255,0.42)',
-  fontSize: 11,
-  marginTop: 2,
+    'rgba(255,255,255,0.72)',
 }
 
-const bulkActionGroupStyle: CSSProperties = {
+const bulkActionsStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
   flexWrap: 'wrap',
 }
 
-const selectStyle: CSSProperties = {
-  minHeight: 36,
-  padding: '0 11px',
-  borderRadius: 9,
-  fontSize: 12,
-  fontWeight: 700,
-  outline: 'none',
-  cursor: 'pointer',
+const bulkSelectStyle: CSSProperties = {
+  minHeight: 34,
+  borderRadius: 8,
   border:
     '1px solid rgba(255,255,255,0.12)',
+  background: '#111111',
+  color: '#ffffff',
+  padding: '0 10px',
+  fontSize: 12,
+  fontWeight: 650,
+  outline: 'none',
+}
+
+const notificationStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '10px 13px',
+  borderRadius: 12,
+  marginBottom: 14,
+  fontSize: 13,
+  fontWeight: 600,
+}
+
+const errorNotificationStyle: CSSProperties = {
   background:
-    'rgba(18,18,18,0.96)',
-  color: '#ffffff',
+    'rgba(239,68,68,0.09)',
+  border:
+    '1px solid rgba(239,68,68,0.22)',
+  color: '#fca5a5',
 }
 
-const stageSelectStyle: CSSProperties = {
-  ...selectStyle,
-  minWidth: 145,
+const successNotificationStyle: CSSProperties = {
+  background:
+    'rgba(74,222,128,0.08)',
+  border:
+    '1px solid rgba(74,222,128,0.20)',
+  color: '#86efac',
 }
 
-const optionStyle: CSSProperties = {
-  background: '#121212',
-  color: '#ffffff',
+const notificationCloseStyle: CSSProperties = {
+  width: 26,
+  height: 26,
+  borderRadius: 7,
+  border:
+    '1px solid rgba(255,255,255,0.08)',
+  background:
+    'rgba(255,255,255,0.04)',
+  color: 'inherit',
+  cursor: 'pointer',
+  fontSize: 16,
+  lineHeight: 1,
 }
 
 const checkboxStyle: CSSProperties = {
@@ -1900,34 +2823,35 @@ const checkboxStyle: CSSProperties = {
   width: 16,
   height: 16,
   cursor: 'pointer',
+  flexShrink: 0,
 }
 
 const mobileListStyle: CSSProperties = {
   display: 'grid',
-  gap: 12,
+  gap: 14,
 }
 
-const leadCardStyle: CSSProperties = {
+const mobileLeadCardStyle: CSSProperties = {
   display: 'grid',
-  gap: 14,
+  gap: 15,
   padding: 16,
   borderRadius: 20,
   border:
     '1px solid rgba(255,255,255,0.075)',
   background:
-    'linear-gradient(180deg, rgba(16,16,16,0.98), rgba(6,6,6,0.99))',
+    'linear-gradient(180deg, rgba(17,17,17,0.98), rgba(7,7,7,0.98))',
   boxShadow:
-    'inset 0 1px 0 rgba(255,255,255,0.025), 0 12px 30px rgba(0,0,0,0.22)',
+    '0 14px 35px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.025)',
 }
 
-const cardHeaderStyle: CSSProperties = {
+const mobileCardHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: 12,
 }
 
-const cardHeaderMainStyle: CSSProperties = {
+const mobileHeaderLeftStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   gap: 11,
@@ -1935,221 +2859,339 @@ const cardHeaderMainStyle: CSSProperties = {
   flex: 1,
 }
 
-const cardIdentityStyle: CSSProperties = {
+const propertyIdentityStyle: CSSProperties = {
+  display: 'grid',
+  gap: 5,
   minWidth: 0,
-  flex: 1,
 }
 
-const cardLinkStyle: CSSProperties = {
-  textDecoration: 'none',
-  color: 'inherit',
-}
-
-const cardAddressStyle: CSSProperties = {
+const propertyAddressLinkStyle: CSSProperties = {
   color: '#ffffff',
+  textDecoration: 'none',
   fontSize: 19,
-  lineHeight: 1.15,
-  fontWeight: 850,
+  lineHeight: 1.12,
+  fontWeight: 800,
   letterSpacing: '-0.025em',
   wordBreak: 'break-word',
 }
 
-const cardLocationStyle: CSSProperties = {
+const propertyLocationStyle: CSSProperties = {
   color:
-    'rgba(255,255,255,0.46)',
+    'rgba(255,255,255,0.42)',
   fontSize: 11,
   lineHeight: 1.4,
-  marginTop: 5,
+  textTransform: 'uppercase',
+  letterSpacing: '0.065em',
 }
 
-const stageBadgeStyle: CSSProperties = {
+const strengthBadgeStyle: CSSProperties = {
+  minWidth: 38,
+  height: 32,
+  padding: '0 8px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 10,
   border: '1px solid',
-  borderRadius: 999,
-  padding: '6px 9px',
-  fontSize: 10,
-  lineHeight: 1,
-  fontWeight: 800,
-  whiteSpace: 'nowrap',
+  fontSize: 13,
+  fontWeight: 850,
+  flexShrink: 0,
 }
 
-const cardDividerStyle: CSSProperties = {
-  height: 1,
+const noDataBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 30,
+  padding: '0 9px',
+  borderRadius: 9,
+  border:
+    '1px solid rgba(255,255,255,0.09)',
   background:
-    'rgba(255,255,255,0.06)',
-}
-
-const cardOwnerSectionStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 14,
-}
-
-const cardEyebrowStyle: CSSProperties = {
+    'rgba(255,255,255,0.035)',
   color:
-    'rgba(255,255,255,0.38)',
+    'rgba(255,255,255,0.45)',
   fontSize: 9,
   fontWeight: 800,
   textTransform: 'uppercase',
-  letterSpacing: '0.12em',
-  marginBottom: 5,
+  letterSpacing: '0.06em',
+  whiteSpace: 'nowrap',
 }
 
-const cardOwnerStyle: CSSProperties = {
+const stageCardStyle: CSSProperties = {
+  display: 'grid',
+  gap: 7,
+}
+
+const stageLabelRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+}
+
+const fieldLabelStyle: CSSProperties = {
+  fontSize: 9,
+  lineHeight: 1.2,
+  textTransform: 'uppercase',
+  letterSpacing: '0.13em',
+  color:
+    'rgba(255,255,255,0.38)',
+  fontWeight: 800,
+}
+
+const savingTextStyle: CSSProperties = {
+  fontSize: 10,
+  color:
+    'rgba(255,255,255,0.40)',
+}
+
+const mobileStageSelectStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 42,
+  borderRadius: 11,
+  border: '1px solid',
+  padding: '0 11px',
+  fontSize: 13,
+  fontWeight: 750,
+  outline: 'none',
+  cursor: 'pointer',
+}
+
+const sellerBlockStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  paddingTop: 2,
+}
+
+const ownerNameStyle: CSSProperties = {
+  marginTop: 5,
   color: '#ffffff',
   fontSize: 14,
+  fontWeight: 700,
+  lineHeight: 1.25,
+}
+
+const contactActionsStyle: CSSProperties = {
+  display: 'flex',
+  gap: 7,
+  flexShrink: 0,
+}
+
+const contactActionStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 30,
+  padding: '0 10px',
+  borderRadius: 8,
+  border:
+    '1px solid rgba(255,255,255,0.09)',
+  background:
+    'rgba(255,255,255,0.035)',
+  color: '#ffffff',
+  textDecoration: 'none',
+  fontSize: 11,
   fontWeight: 750,
-}
-
-const cardContactStyle: CSSProperties = {
-  color:
-    'rgba(255,255,255,0.74)',
-  fontSize: 12,
-  lineHeight: 1.5,
-  textAlign: 'right',
-  maxWidth: '48%',
-  wordBreak: 'break-word',
-}
-
-const cardSecondaryTextStyle: CSSProperties = {
-  color:
-    'rgba(255,255,255,0.4)',
-  fontSize: 10,
-}
-
-const stageEditorStyle: CSSProperties = {
-  display: 'grid',
-  gap: 5,
 }
 
 const financialGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns:
     'repeat(2, minmax(0, 1fr))',
-  gap: 9,
+  gap: 8,
 }
 
-const metricTileStyle: CSSProperties = {
-  borderRadius: 13,
+const financialCardStyle: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  padding: '11px 12px',
+  borderRadius: 12,
   border:
     '1px solid rgba(255,255,255,0.055)',
   background:
-    'rgba(255,255,255,0.022)',
-  padding: '10px 11px',
+    'rgba(255,255,255,0.025)',
 }
 
-const metricLabelStyle: CSSProperties = {
-  color:
-    'rgba(255,255,255,0.38)',
-  fontSize: 9,
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  marginBottom: 4,
-}
-
-const metricValueStyle: CSSProperties = {
+const financialValueStyle: CSSProperties = {
   fontSize: 15,
   fontWeight: 800,
+  lineHeight: 1.1,
 }
 
-const scoreGridStyle: CSSProperties = {
+const analysisCardStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns:
-    'repeat(2, minmax(0, 1fr))',
   gap: 9,
-}
-
-const scoreTileStyle: CSSProperties = {
+  padding: '12px 13px',
   borderRadius: 13,
   border:
     '1px solid rgba(255,255,255,0.055)',
   background:
     'rgba(255,255,255,0.018)',
-  padding: '10px 11px',
 }
 
-const scoreTileHeaderStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 8,
-  color:
-    'rgba(255,255,255,0.42)',
-  fontSize: 9,
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-}
-
-const scoreStatusStyle: CSSProperties = {
-  fontSize: 8,
-  textTransform: 'none',
-  letterSpacing: 0,
-  color:
-    'rgba(255,255,255,0.34)',
-}
-
-const scoreTileValueStyle: CSSProperties = {
-  fontSize: 20,
-  fontWeight: 850,
-  marginTop: 5,
-}
-
-const cardFooterStyle: CSSProperties = {
+const analysisHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  paddingTop: 3,
+  gap: 10,
 }
 
-const deleteButtonStyle: CSSProperties = {
+const analysisReasonListStyle: CSSProperties = {
+  display: 'grid',
+  gap: 5,
+}
+
+const analysisReasonStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '10px 1fr',
+  gap: 5,
+  color:
+    'rgba(255,255,255,0.62)',
+  fontSize: 11,
+  lineHeight: 1.4,
+}
+
+const insufficientDataStyle: CSSProperties = {
+  color:
+    'rgba(255,255,255,0.40)',
+  fontSize: 11,
+  lineHeight: 1.45,
+}
+
+const mobileCardFooterStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  paddingTop: 3,
+  borderTop:
+    '1px solid rgba(255,255,255,0.055)',
+}
+
+const mobileDeleteStyle: CSSProperties = {
   border: 'none',
   background: 'transparent',
   color: '#ef4444',
   fontSize: 11,
   fontWeight: 700,
   cursor: 'pointer',
-  padding: 0,
+  padding: '8px 0',
 }
 
 const workspaceButtonStyle: CSSProperties = {
-  textDecoration: 'none',
-  color: '#e0b84f',
-  fontSize: 12,
-  fontWeight: 800,
-}
-
-const iconDeleteButtonStyle: CSSProperties = {
-  width: 30,
-  height: 30,
-  borderRadius: 8,
   display: 'inline-flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  background:
-    'rgba(239,68,68,0.1)',
+  gap: 7,
+  minHeight: 36,
+  padding: '0 13px',
+  borderRadius: 10,
   border:
-    '1px solid rgba(239,68,68,0.2)',
-  color: '#ef4444',
-  cursor: 'pointer',
-  fontSize: 18,
-  lineHeight: 1,
-}
-
-const desktopLeadTitleStyle: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 13,
+    '1px solid rgba(214,166,75,0.28)',
+  background:
+    'rgba(214,166,75,0.09)',
+  color: '#e6be67',
+  textDecoration: 'none',
+  fontSize: 11,
   fontWeight: 800,
 }
 
-const desktopSubStyle: CSSProperties = {
+/* =========================================================
+   DESKTOP TABLE STYLES
+========================================================= */
+
+const desktopTableWrapperStyle: CSSProperties = {
+  borderRadius: 16,
+  border:
+    '1px solid rgba(255,255,255,0.06)',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  background:
+    'rgba(0,0,0,0.18)',
+}
+
+const desktopTableStyle: CSSProperties = {
+  minWidth: 1050,
+}
+
+const checkboxColumnStyle: CSSProperties = {
+  width: 42,
+}
+
+const tableRowStyle: CSSProperties = {
+  transition:
+    'background 120ms ease',
+}
+
+const propertyCellStyle: CSSProperties = {
+  minWidth: 220,
+}
+
+const desktopPropertyLinkStyle: CSSProperties = {
+  color: '#ffffff',
+  textDecoration: 'none',
+  fontSize: 13,
+  fontWeight: 800,
+  lineHeight: 1.25,
+}
+
+const desktopLocationStyle: CSSProperties = {
+  marginTop: 4,
   color:
     'rgba(255,255,255,0.42)',
   fontSize: 10,
-  marginTop: 3,
+  lineHeight: 1.3,
 }
 
-const desktopScoresStyle: CSSProperties = {
-  display: 'flex',
-  gap: 4,
-  flexWrap: 'wrap',
+const desktopOwnerStyle: CSSProperties = {
+  maxWidth: 150,
+  color: '#ffffff',
+  fontSize: 12,
+  fontWeight: 650,
+  lineHeight: 1.3,
+}
+
+const desktopPhoneStyle: CSSProperties = {
+  color:
+    'rgba(255,255,255,0.78)',
+  fontSize: 11,
+  lineHeight: 1.4,
+}
+
+const desktopEmailStyle: CSSProperties = {
+  marginTop: 2,
+  color:
+    'rgba(255,255,255,0.38)',
+  fontSize: 10,
+  lineHeight: 1.4,
+  maxWidth: 180,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+}
+
+const desktopStageSelectStyle: CSSProperties = {
+  minHeight: 31,
+  minWidth: 130,
+  borderRadius: 8,
+  border: '1px solid',
+  padding: '0 8px',
+  fontSize: 10,
+  fontWeight: 750,
+  outline: 'none',
+  cursor: 'pointer',
+}
+
+const tableMoneyStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 750,
+  whiteSpace: 'nowrap',
+}
+
+const analysisDesktopStyle: CSSProperties = {
+  display: 'grid',
+  gap: 5,
+  justifyItems: 'start',
 }
 
 const desktopActionsStyle: CSSProperties = {
@@ -2158,53 +3200,130 @@ const desktopActionsStyle: CSSProperties = {
   gap: 7,
 }
 
-const emptyStateStyle: CSSProperties = {
-  minHeight: 220,
-  display: 'grid',
-  placeItems: 'center',
-  alignContent: 'center',
-  gap: 7,
-  textAlign: 'center',
-  padding: 30,
-}
-
-const emptyIconStyle: CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: 14,
-  display: 'grid',
-  placeItems: 'center',
+const desktopWorkspaceButtonStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 30,
+  padding: '0 10px',
+  borderRadius: 8,
+  border:
+    '1px solid rgba(214,166,75,0.25)',
   background:
     'rgba(214,166,75,0.08)',
-  border:
-    '1px solid rgba(214,166,75,0.15)',
-  color: '#d6a64b',
-  fontSize: 22,
-}
-
-const emptyTitleStyle: CSSProperties = {
-  color: '#ffffff',
-  fontSize: 15,
+  color: '#e6be67',
+  textDecoration: 'none',
+  fontSize: 10,
   fontWeight: 800,
 }
 
-const emptyTextStyle: CSSProperties = {
-  maxWidth: 420,
+const desktopDeleteButtonStyle: CSSProperties = {
+  width: 29,
+  height: 29,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 8,
+  border:
+    '1px solid rgba(239,68,68,0.18)',
+  background:
+    'rgba(239,68,68,0.06)',
+  color: '#ef4444',
+  cursor: 'pointer',
+  fontSize: 16,
+  lineHeight: 1,
+}
+
+/* =========================================================
+   STATES
+========================================================= */
+
+const loadingStateStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+  minHeight: 220,
+  color:
+    'rgba(255,255,255,0.60)',
+}
+
+const loadingDotStyle: CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: 999,
+  background: '#d6a64b',
+  boxShadow:
+    '0 0 14px rgba(214,166,75,0.45)',
+}
+
+const loadingTitleStyle: CSSProperties = {
+  color: '#ffffff',
+  fontSize: 13,
+  fontWeight: 750,
+}
+
+const loadingSubtitleStyle: CSSProperties = {
+  marginTop: 3,
+  color:
+    'rgba(255,255,255,0.38)',
+  fontSize: 11,
+}
+
+const emptyStateStyle: CSSProperties = {
+  display: 'grid',
+  justifyItems: 'center',
+  textAlign: 'center',
+  minHeight: 300,
+  alignContent: 'center',
+  padding: 24,
+}
+
+const emptyIconStyle: CSSProperties = {
+  width: 48,
+  height: 48,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 14,
+  border:
+    '1px solid rgba(214,166,75,0.18)',
+  background:
+    'rgba(214,166,75,0.07)',
+  color: '#d6a64b',
+  fontSize: 24,
+}
+
+const emptyTitleStyle: CSSProperties = {
+  marginTop: 14,
+  color: '#ffffff',
+  fontSize: 16,
+  fontWeight: 800,
+}
+
+const emptySubtitleStyle: CSSProperties = {
+  maxWidth: 400,
+  marginTop: 6,
   color:
     'rgba(255,255,255,0.42)',
   fontSize: 12,
   lineHeight: 1.5,
 }
 
-const clearButtonStyle: CSSProperties = {
-  marginTop: 6,
+const emptyActionStyle: CSSProperties = {
+  marginTop: 16,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 36,
+  padding: '0 13px',
+  borderRadius: 9,
   border:
     '1px solid rgba(214,166,75,0.25)',
   background:
     'rgba(214,166,75,0.08)',
-  color: '#e0b84f',
-  borderRadius: 9,
-  padding: '8px 12px',
+  color: '#e6be67',
+  textDecoration: 'none',
   fontSize: 11,
   fontWeight: 800,
   cursor: 'pointer',
